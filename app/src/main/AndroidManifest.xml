@@ -4,6 +4,7 @@
 
     <!-- 摄像头权限 -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_LOGS" />
     <!-- 存储权限 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -119,6 +120,11 @@
         <service
             android:name=".service.RecordingFloatingService"
             android:enabled="true"
+            android:exported="false" />
+
+        <!-- 全屏遮罩：压暗导航，窗口类型与超级后视镜相同 -->
+        <service
+            android:name=".overlay.DimOverlayService"
             android:exported="false" />
 
         <!-- 连续时间轴回放（实验性）：把分段拼成一条时间轴，可跨文件拖动 -->

@@ -97,6 +97,8 @@ dependencies {
     // NanoHTTPD 是 BSD-3-Clause，ZXing 是 Apache-2.0。
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.google.zxing:core:3.5.1")
+    // 远程观看：车机拨出到 7xDash 的 /ws/car，有人看的时候才推 JPEG。
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // 设置界面（PreferenceScreen）
     implementation("androidx.preference:preference:1.2.1")

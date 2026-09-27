@@ -3,7 +3,7 @@
   ④ 动作栏：这个界面能做的事，按重要性从上往下。三份主界面布局 <include> 同一份。
 
   按钮：btn_start_record / btn_take_photo / btn_video_playback / btn_photo_playback /
-  btn_fisheye / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
+  btn_remote / btn_fisheye / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
   再点还原（MainActivity.setupCompositeControls），拍照因此独占一行。右下角原来的「×」改成
   「隐藏到后台」；真正的退出在抽屉和设置左栏的最底下。
 
@@ -144,6 +144,15 @@
             android:text="@string/nav_photo_playback"
             app:icon="@drawable/ic_photo" />
     </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_remote"
+        style="@style/Widget.Cam.RailTile"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/rail_tile_height"
+        android:layout_marginTop="@dimen/gutter"
+        android:text="@string/nav_remote"
+        app:icon="@drawable/ic_camera" />
 
     <!--
       环视画面的鱼眼校正，和图片回看、视频回看上那个是同一个开关。只改屏幕上的样子，

@@ -96,6 +96,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private AutoFitTextureView textureFront, textureBack, textureLeft;
+    private com.kooo.evcam.remote.CarLink carLink;
+    private com.kooo.evcam.remote.CarLink.Snapshot lastLink;
+    private final android.os.Handler remoteHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable remotePump = new Runnable() {
+        @Override
+        public void run() {
+            if (carLink == null || !carLink.isWatching()) {
+                return;
+            }
+            pushRemoteFrame();
+            remoteHandler.postDelayed(this, 400);
+        }
+    };
     /** 极氪合成流四宫格容器；非该车型时为 null。 */
     private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
     private TextView tvCompositeInfo;
@@ -347,6 +360,7 @@ public class MainActivity extends AppCompatActivity {
 
         initViews();
         setupNavigationDrawer();
+        startRemoteLink();
 
         // 检查是否需要在主题切换后恢复录制
         if (savedInstanceState != null) {
@@ -667,6 +681,14 @@ public class MainActivity extends AppCompatActivity {
         View btnPhotoPlayback = findViewById(R.id.btn_photo_playback);
         if (btnPhotoPlayback != null) {
             btnPhotoPlayback.setOnClickListener(v -> showPhotoPlaybackInterface());
+        }
+
+        View btnRemote = findViewById(R.id.btn_remote);
+        if (btnRemote != null) {
+            btnRemote.setOnClickListener(v -> {
+                showRemoteInterface();
+                selectNavItem(R.id.nav_remote);
+            });
         }
         
         View btnSettings = findViewById(R.id.btn_settings);
@@ -1123,6 +1145,8 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_photo_playback) {
                 // 显示图片回看界面
                 showPhotoPlaybackInterface();
+            } else if (itemId == R.id.nav_remote) {
+                showRemoteInterface();
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
             } else if (itemId == R.id.nav_about) {
@@ -1436,6 +1460,69 @@ public class MainActivity extends AppCompatActivity {
      */
     private void showSettingsInterface() {
         showFragment(new com.kooo.evcam.settings.SettingsShellFragment());
+    }
+
+    /**
+     * 远程观看。预览布局留着不藏：画面从 texture_front 抓，藏掉 Surface 就断了。
+     * 这一页盖在上面，二维码给手机扫。
+     */
+    private void showRemoteInterface() {
+        getSupportFragmentManager().popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        if (recordingLayout != null) {
+            recordingLayout.setVisibility(View.VISIBLE);
+        }
+        com.kooo.evcam.remote.RemoteViewFragment fragment = new com.kooo.evcam.remote.RemoteViewFragment();
+        if (fragmentContainer != null) {
+            fragmentContainer.setVisibility(View.VISIBLE);
+        }
+        if (com.kooo.evcam.ui.MotionPolicy.decorative(this)) {
+            fragment.setEnterTransition(new com.google.android.material.transition.MaterialSharedAxis(
+                    com.google.android.material.transition.MaterialSharedAxis.Z, true));
+        }
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment, "remote")
+                .setPrimaryNavigationFragment(fragment)
+                .commit();
+        if (lastLink != null) {
+            getSupportFragmentManager().executePendingTransactions();
+            fragment.show(lastLink);
+        }
+    }
+
+    private void startRemoteLink() {
+        carLink = new com.kooo.evcam.remote.CarLink(this);
+        carLink.setUi(snap -> {
+            lastLink = snap;
+            com.kooo.evcam.remote.RemoteViewFragment page =
+                    (com.kooo.evcam.remote.RemoteViewFragment) getSupportFragmentManager()
+                            .findFragmentByTag("remote");
+            if (page != null) {
+                page.show(snap);
+            }
+            remoteHandler.removeCallbacks(remotePump);
+            if (snap.watching) {
+                remoteHandler.post(remotePump);
+            }
+        });
+        carLink.start();
+    }
+
+    private void pushRemoteFrame() {
+        if (textureFront == null || !textureFront.isAvailable()) {
+            return;
+        }
+        int vw = textureFront.getWidth();
+        int vh = textureFront.getHeight();
+        if (vw < 2 || vh < 2) {
+            return;
+        }
+        float scale = 640f / Math.max(vw, vh);
+        int w = Math.max(2, ((int) (vw * scale)) / 2 * 2);
+        int h = Math.max(2, ((int) (vh * scale)) / 2 * 2);
+        android.graphics.Bitmap frame = textureFront.getBitmap(w, h);
+        if (frame != null && carLink != null) {
+            carLink.pushPreview(frame);
+        }
     }
 
 
@@ -3439,6 +3526,7 @@ public class MainActivity extends AppCompatActivity {
         // 以 START_STICKY 的名义再去重启它们
         OverlayCoordinator.onActivityDestroyed(this);
         com.kooo.evcam.zeekr.RearViewMirrorService.stop(this);
+        com.kooo.evcam.overlay.DimOverlayService.hide(this);
         
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();
@@ -3798,6 +3886,12 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        remoteHandler.removeCallbacks(remotePump);
+        if (carLink != null) {
+            carLink.setUi(null);
+            carLink.stop();
+            carLink = null;
+        }
         super.onDestroy();
         com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面 onDestroy finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
