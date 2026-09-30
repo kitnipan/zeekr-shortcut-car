@@ -450,6 +450,27 @@ public class FourLaneContainer extends ViewGroup {
     }
 
     /**
+     * 四路在合成帧里的归一化窗口，按画面序号排：每路 u0,v0,u1,v1。
+     * 远程预览用它把长条拆开。不是合成流时返回 false。
+     */
+    public boolean copyLaneWindows(float[] out) {
+        CompositeStreamGeometry.Plan current = plan;
+        if (current == null || !current.isComposite()
+                || out == null || out.length < CompositeStreamGeometry.LANE_COUNT * 4) {
+            return false;
+        }
+        for (int i = 0; i < CompositeStreamGeometry.LANE_COUNT; i++) {
+            CompositeStreamGeometry.Lane lane = current.lane(i);
+            int at = i * 4;
+            out[at] = lane.u0;
+            out[at + 1] = lane.v0;
+            out[at + 2] = lane.u1;
+            out[at + 3] = lane.v1;
+        }
+        return true;
+    }
+
+    /**
      * 每一格摆在哪、怎么显示。
      *
      * <p>传 null 或空数组就退回 2×2 等分 —— 这也是没有配置时的样子，

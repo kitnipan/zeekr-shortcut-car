@@ -99,6 +99,16 @@ public class MainActivity extends AppCompatActivity {
     private com.kooo.evcam.remote.CarLink carLink;
     private com.kooo.evcam.remote.CarLink.Snapshot lastLink;
     private final android.os.Handler remoteHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final java.util.concurrent.atomic.AtomicBoolean remoteBusy =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.ExecutorService remoteCompose =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "remote-grid");
+                t.setPriority(Thread.NORM_PRIORITY - 1);
+                return t;
+            });
+    private final com.kooo.evcam.zeekr.RemoteFrame remoteFrame = new com.kooo.evcam.zeekr.RemoteFrame();
+    private final float[] remoteLanes = new float[16];
     private final Runnable remotePump = new Runnable() {
         @Override
         public void run() {
@@ -1373,21 +1383,53 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void pushRemoteFrame() {
-        if (textureFront == null || !textureFront.isAvailable()) {
+        if (textureFront == null || !textureFront.isAvailable() || carLink == null) {
+            return;
+        }
+        if (!remoteBusy.compareAndSet(false, true)) {
             return;
         }
         int vw = textureFront.getWidth();
         int vh = textureFront.getHeight();
         if (vw < 2 || vh < 2) {
+            remoteBusy.set(false);
             return;
         }
-        float scale = 640f / Math.max(vw, vh);
+        boolean split = compositeContainer != null && compositeContainer.copyLaneWindows(remoteLanes);
+        float scale = 960f / Math.max(vw, vh);
         int w = Math.max(2, ((int) (vw * scale)) / 2 * 2);
         int h = Math.max(2, ((int) (vh * scale)) / 2 * 2);
-        android.graphics.Bitmap frame = textureFront.getBitmap(w, h);
-        if (frame != null && carLink != null) {
-            carLink.pushPreview(frame);
+        android.graphics.Bitmap source = textureFront.getBitmap(w, h);
+        if (source == null) {
+            remoteBusy.set(false);
+            return;
         }
+        if (!split) {
+            remoteBusy.set(false);
+            carLink.pushPreview(source);
+            return;
+        }
+        float[] lanes = remoteLanes.clone();
+        int[] order = compositeContainer.getLaneOrder();
+        int onlyLane = com.kooo.evcam.zeekr.RemoteFrame.laneForSource(carLink.watchSource());
+        float fov = appConfig.getFisheyeFov();
+        String projection = appConfig.getFisheyeProjection();
+        float strength = appConfig.getFisheyeStrength() / 100f;
+        remoteCompose.execute(() -> {
+            try {
+                android.graphics.Bitmap grid = remoteFrame.compose(
+                        source, lanes, order, onlyLane, fov, projection, strength);
+                java.io.ByteArrayOutputStream jpeg = new java.io.ByteArrayOutputStream(48 * 1024);
+                if (grid.compress(android.graphics.Bitmap.CompressFormat.JPEG, 55, jpeg)) {
+                    carLink.pushJpeg(jpeg.toByteArray());
+                }
+            } catch (RuntimeException e) {
+                AppLog.w(TAG, "remote grid failed: " + e.getMessage());
+            } finally {
+                source.recycle();
+                remoteBusy.set(false);
+            }
+        });
     }
 
 
@@ -2927,6 +2969,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         remoteHandler.removeCallbacks(remotePump);
+        remoteCompose.shutdownNow();
         if (carLink != null) {
             carLink.setUi(null);
             carLink.stop();

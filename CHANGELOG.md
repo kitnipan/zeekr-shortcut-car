@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta6] - 2026-10-01
+
+### New and improved
+
+- Remote watch shows the four surround cameras as a widescreen grid, each one straightened.
+- CH1, CH2, CH3, or CH4 on the phone shows that one camera on its own.
+
 ## [2.0.3-beta5] - 2026-10-01
 
 ### Fixed

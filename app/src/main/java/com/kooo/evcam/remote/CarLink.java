@@ -71,7 +71,7 @@ public final class CarLink {
     private WebSocket socket;
     private long lastPushMs;
     private String email = "";
-    private String source = "drive";
+    private volatile String source = "drive";
     private String lastCode = "";
     private Ui ui;
 
@@ -116,6 +116,11 @@ public final class CarLink {
         return watching.get();
     }
 
+    /** What the phone asked to see: drive, ch1–ch4, driver, backseat. */
+    public String watchSource() {
+        return source;
+    }
+
     public void pushPreview(Bitmap frame) {
         if (!watching.get() || frame == null) {
             if (frame != null) {
@@ -147,6 +152,17 @@ public final class CarLink {
                 frame.recycle();
             }
         });
+    }
+
+    /** Already a JPEG. Caller owns the array. */
+    public void pushJpeg(byte[] jpeg) {
+        if (!watching.get() || jpeg == null || jpeg.length == 0) {
+            return;
+        }
+        WebSocket ws = socket;
+        if (ws != null) {
+            ws.send(ByteString.of(jpeg));
+        }
     }
 
     private void dial() {
