@@ -476,6 +476,7 @@
     <string name="usb_export_failed">Tidak dapat menyimpan: %1$s</string>
     <string name="usb_export_busy">Fail sebelumnya masih disalin</string>
     <string name="usb_export_defish">Menyimpan ke USB. Surround diluruskan dahulu. Kabin dan kamera lain disalin seperti yang dirakam</string>
+    <string name="usb_export_cancelled">Simpan dibatalkan</string>
     <string name="usb_export_saved_count">%1$d fail disimpan ke\n%2$s</string>
     <string name="usb_export_unfinished">%1$d fail belum siap, jadi tidak disalin</string>
     <string name="action_upload_drive">Muat naik ke Drive</string>
@@ -498,7 +499,7 @@
     <string name="drive_sign_in_failed">Log masuk gagal: %1$s</string>
     <string name="drive_uploading">Memuat naik ke Google Drive…</string>
     <string name="drive_progress_title">Muat naik ke Drive</string>
-    <string name="drive_progress_prepare">Meluruskan %1$s</string>
+    <string name="drive_progress_prepare">Meluruskan %1$s · %2$d%%</string>
     <string name="drive_progress_file">%1$d/%2$d %3$s\n%4$d%% · %5$s / %6$s MB</string>
     <string name="drive_uploading_defish">Memuat naik. Surround diluruskan dahulu. Kabin dan kamera lain dihantar seperti yang dirakam</string>
     <string name="drive_uploaded_count">%1$d fail dimuat naik ke Zeekr Shortcut di Google Drive</string>

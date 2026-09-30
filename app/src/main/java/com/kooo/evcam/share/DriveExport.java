@@ -104,7 +104,7 @@ public final class DriveExport {
                 AppLog.w(TAG, "申请设备码失败: " + e);
                 main.post(() -> {
                     SIGNING.set(false);
-                    toast(app, app.getString(R.string.drive_sign_in_failed, String.valueOf(e.getMessage())));
+                    say(activity, app, R.string.drive_sign_in_failed, String.valueOf(e.getMessage()));
                 });
                 return;
             }
@@ -216,12 +216,12 @@ public final class DriveExport {
                     return;
                 }
                 if (ok) {
-                    toast(app, app.getString(R.string.drive_signed_in));
+                    say(activity, app, R.string.drive_signed_in);
                     if (after != null) {
                         after.run();
                     }
                 } else if (error != null) {
-                    toast(app, app.getString(R.string.drive_sign_in_failed, error));
+                    say(activity, app, R.string.drive_sign_in_failed, error);
                 }
             });
         }, "drive-poll").start();
@@ -243,7 +243,8 @@ public final class DriveExport {
         }
         ProgressBar bar = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
         bar.setMax(100);
-        bar.setIndeterminate(true);
+        bar.setIndeterminate(!defish);
+        bar.setProgress(0);
         TextView label = new TextView(activity);
         label.setText(activity.getString(defish
                 ? R.string.drive_uploading_defish : R.string.drive_uploading));
@@ -256,8 +257,7 @@ public final class DriveExport {
         box.setPadding(pad, pad, pad, pad);
         box.addView(label, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        box.addView(bar, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        box.addView(bar, barLayout(activity));
         AtomicBoolean cancelled = new AtomicBoolean(false);
         AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(
                 activity, R.style.Theme_Cam_MaterialAlertDialog)
@@ -318,19 +318,21 @@ public final class DriveExport {
                     final int fileIndex = seen;
                     try {
                         if (SurroundDefish.wanted(app, file)) {
-                            main.post(() -> {
-                                if (activity.isFinishing()) {
-                                    return;
-                                }
-                                bar.setIndeterminate(true);
-                                label.setText(app.getString(R.string.drive_progress_prepare, file.getName()));
-                            });
+                            final String straightening = file.getName();
                             File dir = new File(app.getCacheDir(), "drive");
                             if (!dir.exists() && !dir.mkdirs()) {
                                 throw new java.io.IOException("mkdir " + dir.getAbsolutePath());
                             }
-                            temp = new File(dir, file.getName() + ".part");
-                            SurroundDefish.write(app, file, temp, cancelled);
+                            temp = new File(dir, straightening + ".part");
+                            main.post(() -> showStraighten(activity, bar, label, straightening, 0));
+                            SurroundDefish.write(app, file, temp, cancelled, pct -> {
+                                long now = android.os.SystemClock.uptimeMillis();
+                                if (pct < 100 && now - lastUiMs[0] < 200) {
+                                    return;
+                                }
+                                lastUiMs[0] = now;
+                                main.post(() -> showStraighten(activity, bar, label, straightening, pct));
+                            });
                             if (!UsbExport.playable(temp)) {
                                 throw new java.io.IOException("unfinished " + file.getName());
                             }
@@ -386,20 +388,39 @@ public final class DriveExport {
                     dialog.dismiss();
                 }
                 if (cancelled.get()) {
-                    toast(app, app.getString(R.string.drive_upload_cancelled));
+                    say(activity, app, R.string.drive_upload_cancelled);
                 } else if (sentCount > 0) {
-                    toast(app, app.getString(R.string.drive_uploaded_count, sentCount));
+                    say(activity, app, R.string.drive_uploaded_count, sentCount);
                 } else if (error != null) {
-                    toast(app, app.getString(R.string.drive_upload_failed, error));
+                    say(activity, app, R.string.drive_upload_failed, error);
                 } else if (unfinishedCount == 0) {
-                    toast(app, app.getString(R.string.share_phone_no_file));
+                    say(activity, app, R.string.share_phone_no_file);
                 }
                 if (!cancelled.get() && unfinishedCount > 0) {
-                    toast(app, app.getString(R.string.drive_unfinished, unfinishedCount));
+                    say(activity, app, R.string.drive_unfinished, unfinishedCount);
                 }
                 BUSY.set(false);
             });
         }, "drive-upload").start();
+    }
+
+    private static LinearLayout.LayoutParams barLayout(Activity activity) {
+        int height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20,
+                activity.getResources().getDisplayMetrics());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, height);
+        lp.topMargin = height / 2;
+        return lp;
+    }
+
+    private static void showStraighten(Activity activity, ProgressBar bar, TextView label,
+                                       String name, int percent) {
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+        bar.setIndeterminate(false);
+        bar.setProgress(percent);
+        label.setText(activity.getString(R.string.drive_progress_prepare, name, percent));
     }
 
     private static void showProgress(Activity activity, ProgressBar bar, TextView label,
@@ -439,6 +460,12 @@ public final class DriveExport {
         String id = DriveClient.ensureFolder(access);
         config.setDriveFolderId(id);
         return id;
+    }
+
+    /** 字从界面上取。Application 上下文不认应用内语言，取出来的是默认中文。 */
+    private static void say(Activity activity, Context fallback, int res, Object... args) {
+        Context ui = activity != null && !activity.isDestroyed() ? activity : fallback;
+        Toast.makeText(fallback, ui.getString(res, args), Toast.LENGTH_LONG).show();
     }
 
     private static void toast(Context context, String text) {

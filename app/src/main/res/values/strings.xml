@@ -3,8 +3,8 @@
       应用名：装在车机上的这一份，本身就是车机版，桌面图标、抽屉标题、通知里不用再重复一遍。
       app_name_full 才带「（车机版）」—— 关于页、诊断报告这种要跟以后的 iOS 版区分开的地方用它。
     -->
-    <string name="app_name">极氪即刻</string>
-    <string name="app_name_full">极氪即刻（车机版）</string>
+    <string name="app_name">Zeekr Shortcut</string>
+    <string name="app_name_full">Zeekr Shortcut</string>
     <string name="accessibility_service_description">保活服务：只用来提高应用在后台的存活率。\n\n本服务不会读取或操作任何界面内容，不收集任何信息。</string>
 
     <!-- 极氪合成流模式 -->
@@ -485,6 +485,7 @@
     <string name="usb_export_failed">保存失败：%1$s</string>
     <string name="usb_export_busy">上一次还在复制，请稍等</string>
     <string name="usb_export_defish">正在写入 U 盘。环视会先拉直，座舱和其他相机按原文件拷过去</string>
+    <string name="usb_export_cancelled">已取消保存</string>
     <string name="usb_export_saved_count">已保存 %1$d 个文件到\n%2$s</string>
     <string name="usb_export_unfinished">%1$d 个文件还没写完，没有拷走</string>
     <string name="action_upload_drive">传到网盘</string>
@@ -507,7 +508,7 @@
     <string name="drive_sign_in_failed">登录失败：%1$s</string>
     <string name="drive_uploading">正在上传到 Google Drive…</string>
     <string name="drive_progress_title">传到网盘</string>
-    <string name="drive_progress_prepare">正在拉直 %1$s</string>
+    <string name="drive_progress_prepare">正在拉直 %1$s · %2$d%%</string>
     <string name="drive_progress_file">%1$d/%2$d %3$s\n%4$d%% · %5$s / %6$s MB</string>
     <string name="drive_uploading_defish">正在上传。环视会先拉直，座舱和其他相机按原文件传</string>
     <string name="drive_uploaded_count">已上传 %1$d 个文件到 Google Drive 的 Zeekr Shortcut</string>
@@ -547,7 +548,7 @@
     <string name="msg_restart_required">重启应用后生效</string>
 
     <!-- 主界面（统一骨架） -->
-    <string name="main_title">极氪即刻</string>
+    <string name="main_title">Zeekr Shortcut</string>
     <string name="record_start">开始录制</string>
     <string name="record_stop">停止录制</string>
     <string name="record_preparing">正在准备…</string>

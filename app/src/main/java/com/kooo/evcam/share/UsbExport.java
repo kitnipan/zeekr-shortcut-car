@@ -4,7 +4,13 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.TypedValue;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.AppLog;
@@ -187,17 +193,59 @@ public final class UsbExport {
                 break;
             }
         }
-        toast(activity, activity.getString(defish
-                ? R.string.usb_export_defish : R.string.usb_export_copying));
+        ProgressBar bar = null;
+        TextView label = null;
+        AlertDialog dialog = null;
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        if (defish) {
+            bar = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
+            bar.setMax(100);
+            bar.setIndeterminate(false);
+            bar.setProgress(0);
+            label = new TextView(activity);
+            label.setText(activity.getString(R.string.usb_export_defish));
+            LinearLayout box = new LinearLayout(activity);
+            box.setOrientation(LinearLayout.VERTICAL);
+            int pad = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24,
+                    activity.getResources().getDisplayMetrics());
+            box.setPadding(pad, pad, pad, pad);
+            box.addView(label, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            int barHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20,
+                    activity.getResources().getDisplayMetrics());
+            LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, barHeight);
+            barLp.topMargin = barHeight / 2;
+            box.addView(bar, barLp);
+            ProgressBar progressBar = bar;
+            dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(
+                    activity, R.style.Theme_Cam_MaterialAlertDialog)
+                    .setTitle(R.string.action_save_to_usb)
+                    .setView(box)
+                    .setCancelable(false)
+                    .setNegativeButton(R.string.action_cancel, (d, w) -> cancelled.set(true))
+                    .create());
+            dialog.show();
+            bar = progressBar;
+        } else {
+            toast(activity, activity.getString(R.string.usb_export_copying));
+        }
         Context app = activity.getApplicationContext();
         Handler main = new Handler(Looper.getMainLooper());
         File dir = folder(root);
+        ProgressBar straightenBar = bar;
+        TextView straightenLabel = label;
+        AlertDialog progress = dialog;
+        final long[] lastUiMs = {0};
         new Thread(() -> {
             int saved = 0;
             int unfinished = 0;
             String folder = dir.getAbsolutePath();
             String failure = null;
             for (File file : files) {
+                if (cancelled.get()) {
+                    break;
+                }
                 if (file == null || !file.isFile() || file.length() <= 0) {
                     continue;
                 }
@@ -213,7 +261,40 @@ public final class UsbExport {
                             throw new IOException("mkdir " + dir.getAbsolutePath());
                         }
                         File part = new File(dir, file.getName() + ".part");
-                        SurroundDefish.write(app, file, part);
+                        String name = file.getName();
+                        main.post(() -> {
+                            if (activity.isFinishing() || activity.isDestroyed()
+                                    || straightenBar == null || straightenLabel == null) {
+                                return;
+                            }
+                            straightenBar.setIndeterminate(false);
+                            straightenBar.setProgress(0);
+                            straightenLabel.setText(activity.getString(
+                                    R.string.drive_progress_prepare, name, 0));
+                        });
+                        SurroundDefish.write(app, file, part, cancelled, pct -> {
+                            long now = android.os.SystemClock.uptimeMillis();
+                            if (pct < 100 && now - lastUiMs[0] < 200) {
+                                return;
+                            }
+                            lastUiMs[0] = now;
+                            main.post(() -> {
+                                if (activity.isFinishing() || activity.isDestroyed()
+                                        || straightenBar == null || straightenLabel == null) {
+                                    return;
+                                }
+                                straightenBar.setIndeterminate(false);
+                                straightenBar.setProgress(pct);
+                                straightenLabel.setText(activity.getString(
+                                        R.string.drive_progress_prepare, name, pct));
+                            });
+                        });
+                        if (cancelled.get()) {
+                            if (part.exists() && !part.delete()) {
+                                AppLog.w(TAG, "删不掉取消的半成品: " + part.getAbsolutePath());
+                            }
+                            break;
+                        }
                         if (!playable(part)) {
                             if (part.exists() && !part.delete()) {
                                 AppLog.w(TAG, "删不掉没封口的半成品: " + part.getAbsolutePath());
@@ -228,6 +309,9 @@ public final class UsbExport {
                     folder = out.getParent() == null ? out.getAbsolutePath() : out.getParent();
                     AppLog.i(TAG, "已写入 " + out.getAbsolutePath() + "（" + out.length() + " 字节）");
                 } catch (Exception e) {
+                    if (cancelled.get()) {
+                        break;
+                    }
                     AppLog.e(TAG, "写入 U 盘失败: " + file.getAbsolutePath(), e);
                     failure = String.valueOf(e.getMessage());
                 }
@@ -237,19 +321,30 @@ public final class UsbExport {
             final String savedFolder = folder;
             final String error = failure;
             main.post(() -> {
-                if (savedCount > 0) {
-                    toast(app, app.getString(R.string.usb_export_saved_count, savedCount, savedFolder));
-                } else if (error != null) {
-                    toast(app, app.getString(R.string.usb_export_failed, error));
-                } else if (unfinishedCount == 0) {
-                    toast(app, app.getString(R.string.share_phone_no_file));
+                if (progress != null && progress.isShowing() && !activity.isFinishing()) {
+                    progress.dismiss();
                 }
-                if (unfinishedCount > 0) {
-                    toast(app, app.getString(R.string.usb_export_unfinished, unfinishedCount));
+                if (cancelled.get()) {
+                    say(activity, app, R.string.usb_export_cancelled);
+                } else if (savedCount > 0) {
+                    say(activity, app, R.string.usb_export_saved_count, savedCount, savedFolder);
+                } else if (error != null) {
+                    say(activity, app, R.string.usb_export_failed, error);
+                } else if (unfinishedCount == 0) {
+                    say(activity, app, R.string.share_phone_no_file);
+                }
+                if (!cancelled.get() && unfinishedCount > 0) {
+                    say(activity, app, R.string.usb_export_unfinished, unfinishedCount);
                 }
                 BUSY.set(false);
             });
         }, "usb-export").start();
+    }
+
+    /** 字从界面上取。Application 上下文不认应用内语言，取出来的是默认中文。 */
+    private static void say(Activity activity, Context fallback, int res, Object... args) {
+        Context ui = activity != null && !activity.isDestroyed() ? activity : fallback;
+        Toast.makeText(fallback, ui.getString(res, args), Toast.LENGTH_LONG).show();
     }
 
     private static void toast(Context context, String text) {

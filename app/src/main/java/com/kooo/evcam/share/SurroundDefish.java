@@ -57,6 +57,11 @@ public final class SurroundDefish {
         return CameraSlots.SURROUND.equals(CameraSlots.canonical(suffix));
     }
 
+    /** 拉直进度，0 到 100。在拉直线程上回调。 */
+    public interface Percent {
+        void onPercent(int percent);
+    }
+
     /** 环视视频，而且屏幕上的拉直开关开着。关着就按原文件导出。 */
     public static boolean wanted(Context context, File file) {
         return file != null
@@ -76,6 +81,12 @@ public final class SurroundDefish {
      */
     public static void write(Context context, File source, File dest, AtomicBoolean cancel)
             throws IOException {
+        write(context, source, dest, cancel, null);
+    }
+
+    /** 同上一档。{@code percent} 按画面时间报 0–100，调用方自己切回主线程。 */
+    public static void write(Context context, File source, File dest, AtomicBoolean cancel,
+                             Percent percent) throws IOException {
         if (dest.exists() && !dest.delete()) {
             throw new IOException("replace " + dest.getAbsolutePath());
         }
@@ -85,7 +96,8 @@ public final class SurroundDefish {
                     config.getFisheyeFov(),
                     config.getFisheyeProjection(),
                     config.getFisheyeStrength() / 100f,
-                    cancel);
+                    cancel,
+                    percent);
         } catch (IOException e) {
             if (dest.exists() && !dest.delete()) {
                 AppLog.w(TAG, "删不掉半成品: " + dest.getAbsolutePath());
@@ -96,7 +108,7 @@ public final class SurroundDefish {
 
     private static void transcode(File source, File dest,
                                   float fov, String projection, float strength,
-                                  AtomicBoolean cancel) throws IOException {
+                                  AtomicBoolean cancel, Percent percent) throws IOException {
         MediaExtractor videoEx = new MediaExtractor();
         MediaExtractor audioEx = new MediaExtractor();
         MediaCodec decoder = null;
@@ -166,7 +178,7 @@ public final class SurroundDefish {
             decoder.start();
 
             muxer = new MediaMuxer(dest.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            run(videoEx, audioEx, decoder, encoder, muxer, pipe, audioFormat, durationUs, cancel);
+            run(videoEx, audioEx, decoder, encoder, muxer, pipe, audioFormat, durationUs, cancel, percent);
             AppLog.i(TAG, "环视已拉直: " + dest.getName() + " " + width + "x" + height);
         } catch (IOException e) {
             throw e;
@@ -199,7 +211,7 @@ public final class SurroundDefish {
     private static void run(MediaExtractor videoEx, MediaExtractor audioEx,
                             MediaCodec decoder, MediaCodec encoder, MediaMuxer muxer,
                             FisheyeGlPipe pipe, MediaFormat audioFormat, long durationUs,
-                            AtomicBoolean cancel)
+                            AtomicBoolean cancel, Percent percent)
             throws IOException {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean inEos = false;
@@ -208,6 +220,7 @@ public final class SurroundDefish {
         boolean encEos = false;
         boolean muxerStarted = false;
         int rendered = 0;
+        int lastPercent = -1;
         int videoTrack = -1;
         int audioTrack = -1;
         long budgetMs = Math.max(120_000L, durationUs / 1000L * 4L + 30_000L);
@@ -229,7 +242,9 @@ public final class SurroundDefish {
                         decoder.queueInputBuffer(in, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                         inEos = true;
                     } else {
-                        decoder.queueInputBuffer(in, 0, n, Math.max(0L, videoEx.getSampleTime()), 0);
+                        long sampleUs = Math.max(0L, videoEx.getSampleTime());
+                        decoder.queueInputBuffer(in, 0, n, sampleUs, 0);
+                        lastPercent = report(percent, durationUs, sampleUs, lastPercent);
                         videoEx.advance();
                     }
                 }
@@ -275,6 +290,9 @@ public final class SurroundDefish {
                     muxer.writeSampleData(videoTrack, buf, info);
                 }
                 boolean eos = (info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+                if (info.size > 0 && (info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                    lastPercent = report(percent, durationUs, info.presentationTimeUs, lastPercent);
+                }
                 encoder.releaseOutputBuffer(enc, false);
                 if (eos) {
                     encEos = true;
@@ -288,6 +306,21 @@ public final class SurroundDefish {
             copyAudio(audioEx, muxer, audioTrack);
         }
         muxer.stop();
+        if (percent != null) {
+            percent.onPercent(100);
+        }
+    }
+
+    private static int report(Percent percent, long durationUs, long timeUs, int last) {
+        if (percent == null || durationUs <= 0 || timeUs < 0) {
+            return last;
+        }
+        int pct = (int) Math.min(99L, timeUs * 100L / durationUs);
+        if (pct > last) {
+            percent.onPercent(pct);
+            return pct;
+        }
+        return last;
     }
 
     private static void copyAudio(MediaExtractor audioEx, MediaMuxer muxer, int audioTrack) {

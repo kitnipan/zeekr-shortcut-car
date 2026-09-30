@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta2] - 2026-09-30
+
+### New and improved
+
+- Straightening a surround clip for USB or Drive shows a progress bar that counts to 100%.
+- Cancel, and the message when a save or upload finishes, follow the language you picked.
+- The app name is Zeekr Shortcut.
+
 ## [2.0.3-beta1] - 2026-09-30
 
 ### New and improved
