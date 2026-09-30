@@ -35,12 +35,22 @@ public class SurroundDefishTest {
     }
 
     @Test
-    public void eachChannelIsWidescreenWithInfoBar() {
-        int[] frame = SurroundDefish.exportFrame(2560, 2560);
+    public void eachChannelIsWidescreen() {
+        int[] plain = SurroundDefish.exportFrame(2560, 2560);
+        assertEquals(2560, plain[0]);
+        assertEquals(1440, plain[2]);
+        assertEquals(1440, plain[1]);
+        assertEquals(0, plain[3]);
+        assertEquals(16f / 9f, (plain[0] / 2f) / (plain[2] / 2f), 0.001f);
+    }
+
+    @Test
+    public void keepsDrivingBarFromTheRecording() {
+        int[] frame = SurroundDefish.exportFrame(2560, 2660);
         assertEquals(2560, frame[0]);
         assertEquals(1440, frame[2]);
-        assertEquals(1440 + com.kooo.evcam.telemetry.InfoBar.HEIGHT, frame[1]);
-        assertEquals(16f / 9f, (frame[0] / 2f) / (frame[2] / 2f), 0.001f);
+        assertEquals(1540, frame[1]);
+        assertEquals(100, frame[3]);
     }
 
     @Test

@@ -14,7 +14,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.EncodeSize;
 import com.kooo.evcam.camera.WatermarkText;
-import com.kooo.evcam.telemetry.InfoBar;
+import com.kooo.evcam.playback.PlaybackViewport;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.zeekr.FisheyeGlPipe;
 
@@ -151,6 +151,7 @@ public final class SurroundDefish {
             int outW = frame[0];
             int outH = frame[1];
             int contentH = frame[2];
+            int inset = frame[3];
             int fps = inFormat.containsKey(MediaFormat.KEY_FRAME_RATE)
                     ? inFormat.getInteger(MediaFormat.KEY_FRAME_RATE) : 30;
             if (fps <= 0) {
@@ -180,7 +181,8 @@ public final class SurroundDefish {
             encoder.start();
 
             float[] lanes = lanesFor(width, height);
-            if (contentH < outH) {
+            boolean strip = CompositeStreamGeometry.looksLikeCompositeByRatio(width, height);
+            if (!strip && contentH < outH) {
                 lanes = FisheyeGlPipe.gridLanes(contentH / (float) outH);
             }
             pipe = FisheyeGlPipe.start("usb", encoderSurface, width, height, lanes);
@@ -188,9 +190,12 @@ public final class SurroundDefish {
                 throw new IOException("defish pipe");
             }
             pipe.setCorrection(true, fov, projection, strength);
-            if (contentH < outH) {
-                pipe.setExport(outW / (float) contentH, lanes, FisheyeGlPipe.GRID_2X2,
-                        outH - contentH, stampLeft, clipStartMs);
+            if (!strip) {
+                float srcFrac = inset <= 0 ? 1f : (height - inset) / (float) height;
+                pipe.setExport(outW / (float) Math.max(1, contentH), lanes,
+                        FisheyeGlPipe.gridLanes(srcFrac),
+                        outH - contentH, srcFrac, contentH / (float) outH,
+                        stampLeft, clipStartMs);
             }
             decoderSurface = pipe.newInputSurface();
             if (decoderSurface == null) {
@@ -399,38 +404,38 @@ public final class SurroundDefish {
     }
 
     /**
-     * 2×2 的导出尺寸。每一格是 16:9，整幅也是 16:9，下面再加一条信息条。
+     * 2×2 的导出尺寸。每一格是 16:9。原片底下若有行驶信息条，原样留在导出画面底下。
      * 合成流长条保持原尺寸。
      *
-     * @return {@code {宽, 总高, 画面高}}。画面高小于总高时，差出来的是信息条。
+     * @return {@code {宽, 总高, 画面高, 原片信息条高}}
      */
     static int[] exportFrame(int srcW, int srcH) {
         int w = srcW & ~1;
         int h = srcH & ~1;
         if (w < 2 || h < 2) {
-            return new int[]{Math.max(2, w), Math.max(2, h), Math.max(2, h)};
+            return new int[]{Math.max(2, w), Math.max(2, h), Math.max(2, h), 0};
         }
         if (CompositeStreamGeometry.looksLikeCompositeByRatio(w, h)) {
-            return new int[]{w, h, h};
+            return new int[]{w, h, h, 0};
         }
+        int inset = PlaybackViewport.infoBarInset(w, h, true);
         int content = (w * 9 / 16) & ~1;
         if (content < 2) {
             content = 2;
         }
-        int bar = InfoBar.HEIGHT & ~1;
-        int total = content + bar;
+        int total = content + inset;
         if (w > EncodeSize.MAX_SIDE || total > EncodeSize.MAX_SIDE) {
             float scale = Math.min((float) EncodeSize.MAX_SIDE / w,
-                    (float) EncodeSize.MAX_SIDE / total);
+                    (float) EncodeSize.MAX_SIDE / Math.max(1, total));
             w = Math.max(2, ((int) (w * scale)) & ~1);
             content = Math.max(2, ((int) (content * scale)) & ~1);
-            total = content + bar;
+            total = content + inset;
             if (total > EncodeSize.MAX_SIDE) {
-                content = Math.max(2, (EncodeSize.MAX_SIDE - bar) & ~1);
-                total = content + bar;
+                content = Math.max(2, (EncodeSize.MAX_SIDE - inset) & ~1);
+                total = content + inset;
             }
         }
-        return new int[]{w, total, content};
+        return new int[]{w, total, content, inset};
     }
 
     /** 文件名里的 {@code yyyyMMdd_HHmmss}。没有就返回 -1，信息条不写时间。 */

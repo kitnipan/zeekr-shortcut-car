@@ -108,6 +108,8 @@ public final class FisheyeGlPipe {
             "uniform float uAspect;\n" +
             "uniform vec4 uSources[4];\n" +
             "uniform float uPad;\n" +
+            "uniform float uOutContent;\n" +
+            "uniform float uSrcContent;\n" +
             "const float HALF_PI = 1.5707963268;\n" +
             "vec2 corrected(vec2 p) {\n" +
             "    float ay = max(uAspect, 0.01);\n" +
@@ -157,8 +159,8 @@ public final class FisheyeGlPipe {
             "        hit = true;\n" +
             "    }\n" +
             "    if (!hit && uPad > 0.5) {\n" +
-            "        gl_FragColor = vec4(0.164706, 0.172549, 0.188235, 1.0);\n" +
-            "        return;\n" +
+            "        float t = clamp((vPos.y - uOutContent) / max(1.0 - uOutContent, 0.00001), 0.0, 1.0);\n" +
+            "        src = vec2(vPos.x, mix(uSrcContent, 1.0, t));\n" +
             "    }\n" +
             // SurfaceTexture 的矩阵按左下为原点的纹理坐标算
             "    vec4 t = uTexMatrix * vec4(src.x, 1.0 - src.y, 0.0, 1.0);\n" +
@@ -167,8 +169,7 @@ public final class FisheyeGlPipe {
 
     private static final float[] QUAD = {-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f};
 
-    /** 信息条底色和字。和录像信息条同一套深底白字。 */
-    private static final int BAR_BG = 0xFF2A2C30;
+    /** 角标字。底是透明的，不盖住下面的行驶信息条。 */
     private static final int BAR_TEXT = 0xFFF0F1F2;
     private static final String STAMP_VERTEX =
             "attribute vec2 aPosition;\n" +
@@ -234,10 +235,14 @@ public final class FisheyeGlPipe {
     private int aspectHandle;
     private int sourcesHandle;
     private int padHandle;
+    private int outContentHandle;
+    private int srcContentHandle;
     private float[] sources;
     private float cellAspect = 1f;
     private boolean padBar;
     private int barPx;
+    private float outContent = 1f;
+    private float srcContent = 1f;
     private String stampLeft = "";
     private long stampStartMs = Long.MIN_VALUE;
     private long stampSecond = Long.MIN_VALUE;
@@ -429,11 +434,13 @@ public final class FisheyeGlPipe {
      * 导出才用。四格改成宽银幕，下面留一条信息条。
      *
      * <p>{@code outputLanes} 是画在输出上的位置，{@code sourceLanes} 是从原片取哪一块。
-     * {@code cellAspect} 是一格的宽/高（1 = 正方形）。{@code stampLeft} 写在条的左边
-     * （应用名、版本、车牌），{@code startMs} 加上这一帧的时间写在右边。</p>
+     * {@code cellAspect} 是一格的宽/高（1 = 正方形）。{@code barPx} 是原片底部行驶信息条的高，
+     * 导出时原样贴到画面下面。{@code stampLeft} 和 {@code startMs} 写在画面上沿，
+     * 跟录像的角标一样，不盖那条行驶信息。</p>
      */
     public void setExport(float cellAspect, float[] outputLanes, float[] sourceLanes,
-                          int barPx, String stampLeft, long startMs) {
+                          int barPx, float srcContent, float outContent,
+                          String stampLeft, long startMs) {
         float[] out = Arrays.copyOf(outputLanes == null ? GRID_2X2 : outputLanes, MAX_LANES * 4);
         float[] src = Arrays.copyOf(sourceLanes == null ? out : sourceLanes, MAX_LANES * 4);
         int count = Math.min(MAX_LANES, (outputLanes == null ? GRID_2X2.length : outputLanes.length) / 4);
@@ -445,6 +452,8 @@ public final class FisheyeGlPipe {
             this.cellAspect = cellAspect <= 0f ? 1f : cellAspect;
             this.barPx = Math.max(0, barPx);
             this.padBar = this.barPx > 0;
+            this.srcContent = srcContent <= 0f ? 1f : srcContent;
+            this.outContent = outContent <= 0f ? 1f : outContent;
             this.stampLeft = stampLeft == null ? "" : stampLeft;
             this.stampStartMs = startMs;
             stampSecond = Long.MIN_VALUE;
@@ -573,6 +582,8 @@ public final class FisheyeGlPipe {
         aspectHandle = GLES20.glGetUniformLocation(program, "uAspect");
         sourcesHandle = GLES20.glGetUniformLocation(program, "uSources");
         padHandle = GLES20.glGetUniformLocation(program, "uPad");
+        outContentHandle = GLES20.glGetUniformLocation(program, "uOutContent");
+        srcContentHandle = GLES20.glGetUniformLocation(program, "uSrcContent");
         quad = ByteBuffer.allocateDirect(QUAD.length * 4).order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
         quad.put(QUAD).position(0);
@@ -657,6 +668,8 @@ public final class FisheyeGlPipe {
         GLES20.glUniform1f(aspectHandle, cellAspect <= 0f ? 1f : cellAspect);
         GLES20.glUniform4fv(sourcesHandle, MAX_LANES, sources != null ? sources : lanes, 0);
         GLES20.glUniform1f(padHandle, padBar ? 1f : 0f);
+        GLES20.glUniform1f(outContentHandle, outContent);
+        GLES20.glUniform1f(srcContentHandle, srcContent);
         GLES20.glEnableVertexAttribArray(positionHandle);
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quad);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
@@ -693,9 +706,12 @@ public final class FisheyeGlPipe {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
     }
 
-    /** 信息条：左边应用名、版本、车牌，右边这一帧的日期时间。 */
+    /** 左上应用名、版本、车牌，右上这一帧的日期时间。透明底，不盖行驶信息条。 */
     private void drawStamp() {
-        if (!padBar || barPx <= 0 || stampProgram == 0 || size[0] <= 0 || size[1] <= 0) {
+        if (stampProgram == 0 || size[0] <= 0 || size[1] <= 0) {
+            return;
+        }
+        if ((stampLeft == null || stampLeft.isEmpty()) && stampStartMs < 0) {
             return;
         }
         long shownMs = stampStartMs;
@@ -706,18 +722,21 @@ public final class FisheyeGlPipe {
             }
         }
         long second = shownMs >= 0 ? shownMs / 1000L : Long.MIN_VALUE;
+        int strip = Math.max(48, Math.min(72, size[0] / 36));
         if (stampBitmap == null || stampBitmap.getWidth() != size[0]
-                || stampBitmap.getHeight() != barPx || second != stampSecond) {
-            rebuildStamp(size[0], barPx, shownMs);
+                || stampBitmap.getHeight() != strip || second != stampSecond) {
+            rebuildStamp(size[0], strip, shownMs);
             stampSecond = second;
         }
         if (stampBitmap == null) {
             return;
         }
-        float top = -1f + 2f * barPx / size[1];
+        float bottom = 1f - 2f * strip / size[1];
         stampXy.position(0);
-        stampXy.put(new float[]{-1f, -1f, 1f, -1f, -1f, top, 1f, top}).position(0);
+        stampXy.put(new float[]{-1f, bottom, 1f, bottom, -1f, 1f, 1f, 1f}).position(0);
 
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         GLES20.glUseProgram(stampProgram);
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);
@@ -729,6 +748,7 @@ public final class FisheyeGlPipe {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         GLES20.glDisableVertexAttribArray(stampPosHandle);
         GLES20.glDisableVertexAttribArray(stampTexHandle);
+        GLES20.glDisable(GLES20.GL_BLEND);
     }
 
     private void rebuildStamp(int width, int height, long shownMs) {
@@ -737,19 +757,25 @@ public final class FisheyeGlPipe {
         }
         stampBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(stampBitmap);
-        canvas.drawColor(BAR_BG);
-        float textSize = Math.max(28f, Math.min(42f, height * 0.36f));
+        float textSize = Math.max(22f, Math.min(48f, width * 0.028f));
+        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        shadow.setColor(Color.BLACK);
+        shadow.setTextSize(textSize);
+        shadow.setTypeface(Typeface.MONOSPACE);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(BAR_TEXT);
         paint.setTextSize(textSize);
         paint.setTypeface(Typeface.MONOSPACE);
         Paint.FontMetrics fm = paint.getFontMetrics();
         float baseline = (height - fm.ascent - fm.descent) / 2f;
-        float pad = textSize * 0.6f;
+        float pad = textSize * 0.5f;
         String right = shownMs >= 0 ? stampClock.format(new Date(shownMs)) : "";
         float rightW = right.isEmpty() ? 0f : paint.measureText(right);
-        canvas.drawText(stampLeft == null ? "" : stampLeft, pad, baseline, paint);
+        String left = stampLeft == null ? "" : stampLeft;
+        canvas.drawText(left, pad + 2f, baseline + 2f, shadow);
+        canvas.drawText(left, pad, baseline, paint);
         if (!right.isEmpty()) {
+            canvas.drawText(right, width - pad - rightW + 2f, baseline + 2f, shadow);
             canvas.drawText(right, width - pad - rightW, baseline, paint);
         }
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);

@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta5] - 2026-10-01
+
+### Fixed
+
+- Straightening a surround clip keeps the driving bar at the bottom. Version, plate, and time sit along the top.
+
 ## [2.0.3-beta4] - 2026-10-01
 
 ### New and improved
