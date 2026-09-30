@@ -11,7 +11,7 @@ commit message, not here.
 
 Nothing yet.
 
-## [2.0.2-beta1] - 2026-09-30
+## [2.0.3-beta1] - 2026-09-30
 
 ### New and improved
 
