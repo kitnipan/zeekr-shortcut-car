@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.2] - 2026-09-30
+
+Changes since 2.0.0.
+
+### New and improved
+
+- Save clips to a USB drive from video playback, photo playback, and diagnostics. Files go into the stick's exports folder and keep their recorded names. Surround video is straightened for that copy; the recording on the car stays as it was. Cabin and the other cameras are copied unchanged. Clips that are still being written are skipped.
+- Upload the same files to Google Drive. Sign in once from Settings → Google Drive with the code shown on screen. A progress bar shows the upload. Surround video is straightened for the upload too. Files land in a Drive folder named Zeekr Shortcut.
+- Check for updates uses this app's own releases.
+
 ## [2.0.0] - 2026-09-30
 
 Changes since 1.0.0.
