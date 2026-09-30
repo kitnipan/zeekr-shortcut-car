@@ -37,9 +37,7 @@ public class CameraForegroundService extends Service {
     // 服务重启延迟时间
     private static final long RESTART_DELAY_MS = 1000;
 
-    private static final long CAMERA_REPAIR_INTERVAL_MS = 10000;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private Runnable cameraRepairRunnable;
 
     private static volatile boolean isForegroundReady = false;
     private static final java.util.List<Runnable> pendingReadyCallbacks = new java.util.ArrayList<>();
@@ -82,11 +80,18 @@ public class CameraForegroundService extends Service {
         // 相机服务眼里每一路空不空。环视卡死、只能重启车机的那种状态，
         // 要靠它说出「是谁占着」—— 注册时系统会把当前状态报一遍
         com.kooo.evcam.camera.CameraAvailabilityWatch.start(this);
+        // 恢复（Recovery.restore）在 onStartCommand 里做：started 服务的 onCreate 后面必然跟一次 onStartCommand，
+        // 以前两处各调一次，冷启动的恢复跑两遍
+    }
 
-        // 前台服务起来了 = 我们的代码有机会运行了：按开机自启动的规矩恢复核心程序（规格 §1）
-        com.kooo.evcam.recovery.Recovery.restore(this, "service-create");
+    /** 前台服务此刻在不在（startForeground 做完了）。保活的各条路只在它不在时才去启动它。 */
+    public static boolean isRunning() {
+        return isForegroundReady;
+    }
 
-        startCameraRepairLoop();
+    /** 被系统杀了要不要重启：保活开着才要（规格 §3：关 = 被杀了不回来）。几个服务共用这一条。 */
+    public static int stickiness(Context context) {
+        return new AppConfig(context).isKeepAliveEnabled() ? START_STICKY : START_NOT_STICKY;
     }
     
     /**
@@ -129,7 +134,6 @@ public class CameraForegroundService extends Service {
                 
         // 每次被启动都按开机自启动的规矩看一眼该恢复什么（例行的那种五分钟做一次）
         com.kooo.evcam.recovery.Recovery.restore(this, com.kooo.evcam.recovery.Recovery.WHY_ROUTINE);
-        startCameraRepairLoop();
 
         // 从Intent获取通知内容，如果没有则使用默认内容
         String title = intent != null ? intent.getStringExtra("title") : null;
@@ -157,8 +161,7 @@ public class CameraForegroundService extends Service {
             pendingReadyCallbacks.clear();
         }
 
-        // 保活关着就不让系统重启我们（规格 §3：关 = 被杀了不回来）
-        return new AppConfig(this).isKeepAliveEnabled() ? START_STICKY : START_NOT_STICKY;
+        return stickiness(this);
     }
 
     /** 黑匣子心跳间隔：一分钟看一次。 */
@@ -193,8 +196,6 @@ public class CameraForegroundService extends Service {
                 lastBeatScreenOn = screenOn;
                 lastBeatAtMs = now;
             }
-            // 熄屏录制拿着的锁，屏幕其实亮了就该放（亮屏广播漏了也不至于一直拿着）
-            com.kooo.evcam.recording.ScreenOffRecording.checkScreenOn(CameraForegroundService.this);
             com.kooo.evcam.blackbox.BlackBox.flushCountsIfDue();
             blackBoxHandler.postDelayed(this, BLACK_BOX_TICK_MS);
         }
@@ -231,56 +232,26 @@ public class CameraForegroundService extends Service {
         blackBoxHandler.removeCallbacks(blackBoxTick);
         AppLog.d(TAG, "Service destroyed - 尝试重启...");
         isForegroundReady = false;
-        stopCameraRepairLoop();
 
-        // 服务被杀时，发送延迟重启广播 —— 用户主动退出时不发：这正是以前「退不掉」的一条路
-        if (!UserExit.isExited(this)) {
+        // 服务被杀时自己拉自己：这是保活的手段之一，保活开着才做（规格 §3）；
+        // 用户主动退出时不做 —— 这正是以前「退不掉」的一条路
+        if (!UserExit.isExited(this) && new AppConfig(this).isKeepAliveEnabled()) {
             scheduleServiceRestart();
         }
 
         super.onDestroy();
     }
 
-    private void startCameraRepairLoop() {
-        stopCameraRepairLoop();
-        cameraRepairRunnable = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    com.kooo.evcam.camera.MultiCameraManager cameraManager = com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
-                    if (cameraManager != null) {
-                        int repaired = cameraManager.checkAndRepairCameras();
-                        if (repaired > 0) {
-                            AppLog.w(TAG, "Camera repair triggered for " + repaired + " cameras");
-                        }
-                    }
-                } catch (Exception e) {
-                    AppLog.e(TAG, "Camera repair loop error: " + e.getMessage(), e);
-                }
-                mainHandler.postDelayed(this, CAMERA_REPAIR_INTERVAL_MS);
-            }
-        };
-        mainHandler.postDelayed(cameraRepairRunnable, CAMERA_REPAIR_INTERVAL_MS);
-    }
 
-    private void stopCameraRepairLoop() {
-        if (cameraRepairRunnable != null) {
-            mainHandler.removeCallbacks(cameraRepairRunnable);
-            cameraRepairRunnable = null;
-        }
-    }
-    
     /**
-     * 当用户从最近任务中滑动清除应用时调用
-     * 这是保活的关键：在被清除时重新启动服务
+     * 当用户从最近任务中滑动清除应用时调用：保活开着就重新启动服务。
      */
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        AppLog.d(TAG, "onTaskRemoved - 应用被从最近任务清除，尝试重启服务...");
-        
-        // 立即重启服务
-        scheduleServiceRestart();
-        
+        AppLog.d(TAG, "onTaskRemoved - 应用被从最近任务清除");
+        if (!UserExit.isExited(this) && new AppConfig(this).isKeepAliveEnabled()) {
+            scheduleServiceRestart();
+        }
         super.onTaskRemoved(rootIntent);
     }
     
@@ -408,10 +379,21 @@ public class CameraForegroundService extends Service {
     }
 
     /**
-     * 静态方法：停止前台服务
-     * @param context 上下文
+     * 录像停了（RecordingCoordinator 调）、或主界面收尾 / 退出要停服务。
+     *
+     * <p>前台服务的寿命 = 「保活」开着 或 在录（规格 §3）。保活开着时它本来就该一直在：
+     * 这里只把通知换回「在后台运行」，不停。保活关着、或用户退出了，才真的停。
+     * 以前一律 stopService，保活开着时它 onDestroy 里一秒后又把自己拉起来 ——
+     * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
      */
     public static void stop(Context context) {
+        if (!UserExit.isExited(context) && new AppConfig(context).isKeepAliveEnabled()) {
+            if (isForegroundReady) {
+                start(context, context.getString(R.string.notif_running),
+                        context.getString(R.string.notif_running_desc));
+            }
+            return;
+        }
         isForegroundReady = false;
         Intent intent = new Intent(context, CameraForegroundService.class);
         context.stopService(intent);

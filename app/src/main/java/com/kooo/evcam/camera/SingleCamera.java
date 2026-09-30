@@ -110,6 +110,23 @@ public class SingleCamera {
         void onFailed(String reason);
     }
 
+    /** 这一路这一张拍完了：存下了（true）或没拍成（false）。每次拍照只回一次。 */
+    public interface PhotoDone {
+        void onDone(boolean saved);
+    }
+
+    /**
+     * 不显示的出帧口。
+     *
+     * <p>拍照登记着（{@link CameraNeeds.Holder#PHOTO}）、而这一路此刻没有预览、后视镜、录像
+     * 任何一个输出时（主界面在后台，它的预览画面已被系统收回），会话挂上它，相机才有地方出帧、
+     * 拍照才有画面可拍；拍完注销了就从会话里摘掉。和预览同尺寸、同格式，帧到了就丢。</p>
+     */
+    private ImageReader frameSink;
+
+    /** 眼下的会话里挂着出帧口没有（相机线程写，主线程读）。 */
+    private volatile boolean frameSinkInSession;
+
     // 鱼眼矫正
     
     // 亮度/降噪调节相关
@@ -149,22 +166,8 @@ public class SingleCamera {
     private volatile long lastProgressUptimeMs = 0;
     /** 最近一次真的收到画面（capture 完成）—— 开相机、建会话不算。 */
     private volatile long lastCaptureUptimeMs = 0;
-    /**
-     * 这一趟有没有<b>成功打开过</b>。
-     *
-     * <p>兜底看门狗只管「开起来之后又不出帧」，不管「压根打不开」——
-     * 后者是开相机那条路自己的事（它有退避重连），看门狗再去强制重开只会
-     * 一起捶已经卡住的相机服务。</p>
-     */
-    private volatile boolean everOpened;
     /** 最后一次相机报错的短名，给界面说明「为什么点了没反应」。 */
     private volatile String lastErrorName;
-    private long lastStallRecoveryMs = 0;
-    private int stallRecoveryLevel = 0;
-    private Runnable healthCheckRunnable;
-    private static final long HEALTH_CHECK_INTERVAL_MS = 1000;
-    private static final long STALL_TIMEOUT_MS = 2500;
-    private static final long MIN_RECOVERY_INTERVAL_MS = 2000;
 
     private boolean shouldReconnect = false;  // 是否应该重连
     private int reconnectAttempts = 0;  // 重连尝试次数
@@ -172,6 +175,8 @@ public class SingleCamera {
     private long reconnectDelayFloorMs = 0;
     /** 被别的程序拿走了（{@link CameraTaken}）：只慢慢试；它放开或我们回到前台时 MultiCameraManager 会来接。 */
     private volatile boolean takenByOthers;
+    /** 一次强制重开还在路上（关旧的、等 300 ms、开新的、等回调）：这期间再来的重开请求合并掉，不双开。 */
+    private volatile boolean reopenInFlight;
     private Runnable reconnectRunnable;  // 重连任务
     private boolean isReconnecting = false;  // 是否正在重连中（防止多个重连任务同时运行）
     private volatile boolean isOpening = false;  // 是否正在打开中（防止并行触发时重复调用 openCamera）
@@ -194,10 +199,18 @@ public class SingleCamera {
     private static final long OPEN_WAIT_FOR_CLOSE_MS = 10_000L;
     /** 关的时候还有一次打开在途：它的回调可能晚到，这一轮的相机线程多留这么久，好把晚到的设备关掉。 */
     private static final long LATE_OPEN_GRACE_MS = 3_000L;
-    private boolean isPrimaryInstance = true;  // 是否是主实例（用于多实例共享同一个cameraId时，只有主实例负责重连）
-    private boolean isConfiguring = false; // 新增：标记是否正在配置中
-    private boolean isPendingReconfiguration = false; // 新增：标记是否有待处理的配置请求
-    private boolean isSessionClosing = false; // 新增：标记 Session 是否正在关闭中
+    private boolean isConfiguring = false;    // 一次 createCaptureSession 发出去了、回调还没来
+    private boolean isSessionClosing = false; // 旧会话在关，等 onClosed
+    /**
+     * 会话重建的代数：每次真正去建就 +1；建到一半又有人要重建，就再 +1 把在途的那一次作废。
+     * 回调带着自己那一代回来，不是最新一代的一律作废（关掉、然后按最新的输出再建一次）。
+     * 以前靠「正在配置就记个 pending、配好了再来一次」加五处各自的延时来避免撞车（1.66.0 起只有这一套）。
+     */
+    private int sessionGeneration;
+    /** 重建请求的去抖；关掉旧会话之后再建要隔一下（0 ms 会碰上 "Surface already has a stream"）；onClosed 不来时的兜底。 */
+    private static final long REBUILD_DEBOUNCE_MS = 100L;
+    private static final long REBUILD_AFTER_CLOSE_MS = 50L;
+    private static final long CLOSE_FALLBACK_MS = 300L;
     private int configFailRetryCount = 0; // session 配置失败重试计数
     private static final int MAX_CONFIG_FAIL_RETRIES = 3; // 最大重试次数
     private final Object sessionLock = new Object(); // 新增：用于同步 Session 操作
@@ -264,28 +277,6 @@ public class SingleCamera {
         }
     }
 
-
-    /**
-     * 设置是否为主实例（用于多实例共享同一个cameraId时）
-     * 只有主实例负责打开摄像头和重连，从属实例只负责显示
-     */
-    public void setPrimaryInstance(boolean isPrimary) {
-        this.isPrimaryInstance = isPrimary;
-        if (!isPrimary) {
-            // 从属实例不需要重连
-            synchronized (reconnectLock) {
-                shouldReconnect = false;
-            }
-        }
-        AppLog.d(TAG, "Camera " + cameraId + " (" + cameraPosition + ") set as " + (isPrimary ? "PRIMARY" : "SECONDARY") + " instance");
-    }
-
-    /**
-     * 检查是否是主实例
-     */
-    public boolean isPrimaryInstance() {
-        return isPrimaryInstance;
-    }
 
     /**
      * 这一路的摆法：旋转、镜像、裁剪、缩放平移，全部来自配置里那一格。
@@ -744,64 +735,6 @@ public class SingleCamera {
         StallWatch.watchLooper("Camera-" + cameraId, backgroundHandler);
     }
 
-    private void startHealthMonitor() {
-        stopHealthMonitor();
-        if (backgroundHandler == null) {
-            return;
-        }
-        healthCheckRunnable = () -> {
-            Handler handler = backgroundHandler;
-            if (handler == null) {
-                return;
-            }
-            if (cameraDevice == null || captureSession == null) {
-                stopHealthMonitor();
-                return;
-            }
-            synchronized (sessionLock) {
-                if (isConfiguring || isSessionClosing) {
-                    Runnable next = healthCheckRunnable;
-                    if (next != null) {
-                        handler.postDelayed(next, HEALTH_CHECK_INTERVAL_MS);
-                    }
-                    return;
-                }
-            }
-            long now = System.currentTimeMillis();
-            long last = lastFrameTimestampMs;
-            boolean isStalled = last > 0 && (now - last) > STALL_TIMEOUT_MS;
-            if (isStalled) {
-                if (now - lastStallRecoveryMs >= MIN_RECOVERY_INTERVAL_MS) {
-                    lastStallRecoveryMs = now;
-                    if (stallRecoveryLevel == 0) {
-                        stallRecoveryLevel = 1;
-                        AppLog.w(TAG, "Camera " + cameraId + " stalled (" + (now - last) + "ms), recreating session");
-                        recreateSession();
-                    } else {
-                        stallRecoveryLevel++;
-                        AppLog.w(TAG, "Camera " + cameraId + " stalled (" + (now - last) + "ms), force reopening (level " + stallRecoveryLevel + ")");
-                        forceReopen();
-                    }
-                }
-            } else {
-                stallRecoveryLevel = 0;
-            }
-            Runnable next = healthCheckRunnable;
-            if (next != null) {
-                handler.postDelayed(next, HEALTH_CHECK_INTERVAL_MS);
-            }
-        };
-        backgroundHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_INTERVAL_MS);
-    }
-
-    private void stopHealthMonitor() {
-        if (backgroundHandler != null && healthCheckRunnable != null) {
-            backgroundHandler.removeCallbacks(healthCheckRunnable);
-        }
-        healthCheckRunnable = null;
-        stallRecoveryLevel = 0;
-    }
-
     /**
      * 卡顿报告里这一路相机的状态，一行。
      *
@@ -810,23 +743,20 @@ public class SingleCamera {
      */
     public String describeForStall() {
         long last = lastFrameTimestampMs;
-        return "camera " + cameraId + " (" + cameraPosition + ", "
-                + (isPrimaryInstance ? "primary" : "secondary") + " @"
+        return "camera " + cameraId + " (" + cameraPosition + " @"
                 + Integer.toHexString(System.identityHashCode(this)) + ")"
                 + " device=" + (cameraDevice != null)
                 + " session=" + (captureSession != null)
                 + " opening=" + isOpening
                 + " configuring=" + isConfiguring
                 + " closing=" + isSessionClosing
-                + " pendingRebuild=" + isPendingReconfiguration
                 + " reconnecting=" + isReconnecting
                 + " outputs[main-preview=" + surfaceState(previewSurface)
                 + " mirror=" + surfaceState(mainFloatingSurface)
                 + " record=" + surfaceState(recordSurface)
                 + " jpeg=" + (jpegReader != null) + "]"
                 + " fps=" + String.format(java.util.Locale.US, "%.1f", currentFps)
-                + " lastResult=" + (last > 0 ? (System.currentTimeMillis() - last) + "ms ago" : "never")
-                + " stallRecoveryLevel=" + stallRecoveryLevel;
+                + " lastResult=" + (last > 0 ? (System.currentTimeMillis() - last) + "ms ago" : "never");
     }
 
     private static String surfaceState(Surface surface) {
@@ -888,14 +818,36 @@ public class SingleCamera {
      * 那些状态标志卡住的情形，拿卡住的标志当前提就等于不救。</p>
      */
     public boolean wantsFrames() {
-        return isPrimaryInstance
-                && (previewSurface != null || mainFloatingSurface != null
-                || recordSurface != null);
+        return previewSurface != null || mainFloatingSurface != null || recordSurface != null
+                || photoWantsFrames();
     }
 
-    /** 这一趟成功打开过没有。见 {@link #everOpened}。 */
-    public boolean hasEverOpened() {
-        return everOpened;
+    /** 有人在等拍照（登记表上的 PHOTO）。 */
+    private static boolean photoWantsFrames() {
+        return CameraNeeds.current().isHeld(CameraNeeds.Holder.PHOTO);
+    }
+
+    /** 能按快门了：设备开着、会话在、最近 {@code freshMs} 毫秒里真出过画面。 */
+    public boolean readyForPhoto(long freshMs) {
+        return cameraDevice != null && captureSession != null && hasFramesWithin(freshMs);
+    }
+
+    /**
+     * 登记表变了（{@link MultiCameraManager#reconcileCameras}）：这一路的输出要不要跟着变。
+     *
+     * <p>跟着登记表走的输出只有出帧口：有人等拍照、而没有别的输出时挂上，拍完摘掉。
+     * 会话里有没有它和该不该有它对不上，就请求重建一次 —— 重建按最新情况定输出。
+     * 相机还没开好的不用管：开好建会话时自然按登记表来。</p>
+     */
+    public void followNeeds() {
+        if (cameraDevice == null) {
+            return;
+        }
+        boolean want = photoWantsFrames() && previewSurface == null
+                && mainFloatingSurface == null && recordSurface == null;
+        if (want != frameSinkInSession) {
+            requestSessionRebuild(want ? "photo-needs-frames" : "photo-done", 0);
+        }
     }
 
     /** 最后一次报错的短名，没有就返回 null。 */
@@ -914,12 +866,6 @@ public class SingleCamera {
      * 打开摄像头
      */
     public void openCamera() {
-        // 如果不是主实例，不执行打开操作
-        if (!isPrimaryInstance) {
-            AppLog.d(TAG, "Camera " + cameraId + " (" + cameraPosition + ") is SECONDARY instance, skipping openCamera");
-            return;
-        }
-
         // 已经打开，不重复打开
         if (cameraDevice != null) {
             AppLog.d(TAG, "Camera " + cameraId + " already opened, skipping openCamera");
@@ -949,7 +895,7 @@ public class SingleCamera {
                 return;
             }
             
-            AppLog.d(TAG, "openCamera: Starting for camera " + cameraId + " (PRIMARY instance)");
+            AppLog.d(TAG, "openCamera: Starting for camera " + cameraId + "");
             shouldReconnect = true;  // 启用自动重连
             reconnectAttempts = 0;  // 重置重连计数
         }
@@ -1016,6 +962,10 @@ public class SingleCamera {
                 // 相机声明的帧率上限记下来 —— 设置界面拿不到相机对象，
                 // 而「原始帧率」那一项以前显示的是一个和相机无关的写死的数
                 CameraCapabilities.record(cameraId, characteristics);
+                // 镜像判断要的 LENS_FACING 也顺手记下：sourceMirrored() 在视图线程上被调，不该再进相机服务
+                cameraCharacteristics = characteristics;
+                Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                sourceMirrored = facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT;
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " failed to get characteristics - camera may be virtual/invalid", e);
                 if (callback != null) {
@@ -1066,6 +1016,7 @@ public class SingleCamera {
                 // 配不上才丢的，换了配置未必还配不上
                 jpegDropped = false;
                 prepareJpegReader(map);
+                closeFrameSink();   // 尺寸可能换了；要用时按新的预览尺寸再建
 
                 // 通知回调预览尺寸已确定
                 if (callback != null && previewSize != null) {
@@ -1138,12 +1089,6 @@ public class SingleCamera {
      * 调度重连任务
      */
     private void scheduleReconnect() {
-        // 如果不是主实例，不执行重连
-        if (!isPrimaryInstance) {
-            AppLog.d(TAG, "Camera " + cameraId + " (" + cameraPosition + ") is SECONDARY instance, skipping reconnect");
-            return;
-        }
-        
         synchronized (reconnectLock) {
             // 检查是否允许重连
             if (!shouldReconnect) {
@@ -1192,6 +1137,7 @@ public class SingleCamera {
                     oldDevice = cameraDevice;
                     cameraDevice = null;
                 }
+                voidSessionWork();
                 closeSessionQuietly(oldSession);
                 closeDeviceTimed(oldDevice, "reconnect");
                 Handler handler = backgroundHandler;
@@ -1235,9 +1181,9 @@ public class SingleCamera {
                 return;
             }
             isOpening = false;
+            reopenInFlight = false;
             synchronized (reconnectLock) {
                 cameraDevice = camera;
-                everOpened = true;
                 lastErrorName = null;
                 CameraContention.ourCameraOpened(cameraId, reconnectAttempts);
                 reconnectAttempts = 0;  // 重置重连计数
@@ -1259,6 +1205,7 @@ public class SingleCamera {
                 return;
             }
             isOpening = false;
+            reopenInFlight = false;
             // 这是相机服务把我们踢掉：被别的程序（多半是原厂功能）拿走，或者设备自己没了。
             // 基座把它记成自定义的 -4，标签写的「资源耗尽」是错的
             com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 被相机服务断开（onDisconnected）");
@@ -1295,6 +1242,7 @@ public class SingleCamera {
                 return;
             }
             isOpening = false;
+            reopenInFlight = false;
             com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 出错 error=" + error);
             // 锁外关：它进相机服务，可能卡住（见 closeDeviceTimed）
             closeDeviceTimed(camera, "onError");
@@ -1377,53 +1325,30 @@ public class SingleCamera {
             return;
         }
 
+        final int generation;
         synchronized (sessionLock) {
-            if (isConfiguring) {
-                AppLog.d(TAG, "Camera " + cameraId + " is already configuring, marking as pending");
-                isPendingReconfiguration = true;
-                return;
-            }
             if (isSessionClosing) {
-                AppLog.d(TAG, "Camera " + cameraId + " is closing old session, marking as pending and delaying");
-                isPendingReconfiguration = true;
-                if (backgroundHandler != null) {
-                    backgroundHandler.postDelayed(this::createCameraPreviewSession, 200);
-                }
+                // 旧会话还在关：关完（onClosed，或到点的兜底）会再来建
                 return;
             }
+            if (isConfiguring) {
+                // 一次配置在途：把它作废（回调来了会关掉那份会话、再按最新的输出建一次）
+                sessionGeneration++;
+                AppLog.d(TAG, "Camera " + cameraId + " configure in flight superseded, gen=" + sessionGeneration);
+                return;
+            }
+            generation = ++sessionGeneration;
             isConfiguring = true;
-            isPendingReconfiguration = false;
         }
 
         try {
-            AppLog.d(TAG, "createCameraPreviewSession: Starting for camera " + cameraId);
+            AppLog.d(TAG, "createCameraPreviewSession: Starting for camera " + cameraId + " gen=" + generation);
 
-            // 【关键】如果旧会话仍在运行，必须先关闭它再创建新 session。
-            // HAL 不允许 Surface 同时绑定到多个 stream（"Surface already has a stream created for it"）
+            // 【关键】旧会话还在就先关它，关完再建：HAL 不允许一个 Surface 同时绑到两条流
             if (captureSession != null) {
                 final CameraCaptureSession oldSession = captureSession;
                 captureSession = null;
-                try {
-                    synchronized (sessionLock) {
-                        isSessionClosing = true;
-                    }
-                    oldSession.stopRepeating();
-                    oldSession.close();
-                    AppLog.d(TAG, "Camera " + cameraId + " initiated session close (early, before surface prep)");
-                } catch (Exception e) {
-                    AppLog.e(TAG, "Camera " + cameraId + " error closing old session: " + e.getMessage());
-                    synchronized (sessionLock) {
-                        isSessionClosing = false;
-                    }
-                }
-
-                // 通过 onClosed 回调触发重建；设置 300ms 安全兜底
-                if (backgroundHandler != null) {
-                    backgroundHandler.postDelayed(sessionCloseFallbackRunnable, 300);
-                }
-                synchronized (sessionLock) {
-                    isConfiguring = false;
-                }
+                closeSessionForRebuild(oldSession, "rebuild");
                 return;
             }
 
@@ -1471,10 +1396,15 @@ public class SingleCamera {
                 }
             }
             
+            // 有人等拍照、而这一路没有任何显示或录像输出（主界面在后台）：挂上不显示的出帧口
+            boolean nothingElse = (surface == null || !surface.isValid())
+                    && (mainFloatingSurface == null || !mainFloatingSurface.isValid())
+                    && (recordSurface == null || !recordSurface.isValid());
+            Surface sinkSurface = (nothingElse && photoWantsFrames()) ? frameSinkSurface() : null;
+            frameSinkInSession = sinkSurface != null;
+
             // 检查是否有可用的输出 Surface（后台初始化时可能全部为 null）
-            boolean hasAnySurface = (surface != null && surface.isValid())
-                    || (mainFloatingSurface != null && mainFloatingSurface.isValid())
-                    || (recordSurface != null && recordSurface.isValid());
+            boolean hasAnySurface = !nothingElse || sinkSurface != null;
             if (!hasAnySurface) {
                 AppLog.d(TAG, "Camera " + cameraId + " no available surfaces, skipping session creation (waiting for surface)");
                 // 关闭旧 session，防止继续推帧到已销毁的 Surface（queueBuffer abandoned）
@@ -1550,6 +1480,13 @@ public class SingleCamera {
                 }
             }
 
+            if (sinkSurface != null) {
+                outputConfigs.add(new OutputConfiguration(sinkSurface));
+                surfaces.add(sinkSurface);
+                previewRequestBuilder.addTarget(sinkSurface);
+                AppLog.d(TAG, "Camera " + cameraId + " 没有显示输出，拍照用不显示的出帧口: " + previewSize);
+            }
+
             // 录制 Surface 作为一个独立的硬件流
             if (recordSurface != null && recordSurface.isValid()) {
                 outputConfigs.add(new OutputConfiguration(recordSurface));
@@ -1603,21 +1540,19 @@ public class SingleCamera {
                         closeSessionQuietly(session);
                         return;
                     }
-                    AppLog.d(TAG, "Camera " + cameraId + " Session configured!");
-                    configFailRetryCount = 0; // 成功，重置重试计数
-                    
-                    boolean pending;
+                    boolean superseded;
                     synchronized (sessionLock) {
+                        superseded = generation != sessionGeneration;
                         isConfiguring = false;
                         isSessionClosing = false;
-                        pending = isPendingReconfiguration;
                     }
-
-                    if (pending) {
-                        AppLog.d(TAG, "Camera " + cameraId + " found pending configuration request, restarting...");
-                        createCameraPreviewSession();
+                    if (superseded) {
+                        // 配置发出去之后又有人要重建：这份会话作废，关掉，关完按最新的输出再建
+                        closeSessionForRebuild(session, "superseded gen=" + generation);
                         return;
                     }
+                    AppLog.d(TAG, "Camera " + cameraId + " Session configured! gen=" + generation);
+                    configFailRetryCount = 0; // 成功，重置重试计数
 
                     if (cameraDevice == null) {
                         AppLog.e(TAG, "Camera " + cameraId + " cameraDevice is null in onConfigured");
@@ -1640,9 +1575,6 @@ public class SingleCamera {
                         AppLog.d(TAG, "Camera " + cameraId + " preview started!");
                         lastFrameTimestampMs = System.currentTimeMillis();
                         lastProgressUptimeMs = SystemClock.uptimeMillis();
-                        stallRecoveryLevel = 0;
-                        lastStallRecoveryMs = 0;
-                        startHealthMonitor();
                         if (callback != null) callback.onCameraConfigured(cameraId);
                     } catch (CameraAccessException e) {
                         AppLog.e(TAG, "Failed to start preview", e);
@@ -1662,16 +1594,14 @@ public class SingleCamera {
                     try {
                         session.close();
                     } catch (Exception ignored) {}
-                    boolean pending;
+                    boolean superseded;
                     synchronized (sessionLock) {
+                        superseded = generation != sessionGeneration;
                         isConfiguring = false;
                         isSessionClosing = false;
-                        pending = isPendingReconfiguration;
                     }
-
-                    if (pending) {
-                        AppLog.d(TAG, "Camera " + cameraId + " found pending configuration request after failure, retrying...");
-                        createCameraPreviewSession();
+                    if (superseded) {
+                        requestSessionRebuild("superseded-after-failure", REBUILD_DEBOUNCE_MS);
                         return;
                     }
                     
@@ -1683,11 +1613,7 @@ public class SingleCamera {
                         closeJpegReader();
                         AppLog.w(TAG, "Camera " + cameraId
                                 + " 会话配不上，先丢掉拍照通道再试（拍照将回退到抓预览）");
-                        if (backgroundHandler != null) {
-                            backgroundHandler.postDelayed(() -> {
-                                if (cameraDevice != null) createCameraPreviewSession();
-                            }, 200);
-                        }
+                        requestSessionRebuild("config-failed-drop-jpeg", 200);
                         return;
                     }
 
@@ -1708,25 +1634,14 @@ public class SingleCamera {
                                     + " 录像中会话配置失败：丢掉了录像输出，这一路从此不再录");
                             recordSurface = null;
                         }
-                        if (backgroundHandler != null) {
-                            backgroundHandler.postDelayed(() -> {
-                                if (cameraDevice != null) createCameraPreviewSession();
-                            }, 500);
-                        }
+                        requestSessionRebuild("config-failed-recording", 500);
                     } else {
                         configFailRetryCount++;
                         if (configFailRetryCount <= MAX_CONFIG_FAIL_RETRIES) {
                             // 可能是 Surface 正在从其他摄像头转移（connect: already connected），
                             // 短暂延迟后重试，等待旧 session 释放 Surface
                             AppLog.w(TAG, "Camera " + cameraId + " session config failed, retry " + configFailRetryCount + "/" + MAX_CONFIG_FAIL_RETRIES + " in 200ms...");
-                            if (backgroundHandler != null) {
-                                backgroundHandler.postDelayed(() -> {
-                                    if (cameraDevice != null) {
-                                        AppLog.d(TAG, "Camera " + cameraId + " retrying session after config failure");
-                                        createCameraPreviewSession();
-                                    }
-                                }, 200);
-                            }
+                            requestSessionRebuild("config-failed-retry", 200);
                         } else {
                             // 重试耗尽：不再重试，下面报错误
                             AppLog.e(TAG, "Camera " + cameraId + " config retries exhausted (" + configFailRetryCount + ")");
@@ -1739,19 +1654,19 @@ public class SingleCamera {
                 }
                 @Override
                 public void onClosed(@NonNull CameraCaptureSession session) {
-                    AppLog.d(TAG, "Camera " + cameraId + " Session CLOSED callback received");
-                    boolean wasClosing;
+                    AppLog.d(TAG, "Camera " + cameraId + " Session CLOSED callback received gen=" + generation);
+                    if (isStale()) {
+                        return; // 上一轮相机线程的会话，这一轮不管
+                    }
+                    boolean rebuild;
                     synchronized (sessionLock) {
-                        wasClosing = isSessionClosing;
+                        // 正在等的就是这份关完（closeCamera / forceReopen 会先把 closing 清掉）
+                        rebuild = isSessionClosing;
                         isSessionClosing = false;
                     }
-                    // CLOSED 回调后 HAL 仍需少量时间释放 Surface 绑定
-                    // 延迟 50ms 重建（0ms 会触发 "Surface already has a stream" 错误）
-                    if (wasClosing && backgroundHandler != null) {
-                        // 移除所有待执行的重建任务，避免重复重建
-                        backgroundHandler.removeCallbacks(sessionCloseFallbackRunnable);
-                        backgroundHandler.removeCallbacks(recreateSessionRunnable);
-                        backgroundHandler.postDelayed(recreateSessionRunnable, 50);
+                    if (rebuild) {
+                        // CLOSED 之后 HAL 还要一点时间放开 Surface 的绑定
+                        requestSessionRebuild("closed", REBUILD_AFTER_CLOSE_MS);
                     }
                 }
             };
@@ -1786,13 +1701,8 @@ public class SingleCamera {
                     cleared = true;
                     AppLog.w(TAG, "Camera " + cameraId + " cleared abandoned recordSurface and retrying");
                 }
-                if (cleared && backgroundHandler != null) {
-                    backgroundHandler.postDelayed(() -> {
-                        if (cameraDevice != null) {
-                            AppLog.d(TAG, "Camera " + cameraId + " retrying session creation after abandoning surface cleanup");
-                            createCameraPreviewSession();
-                        }
-                    }, 100);
+                if (cleared) {
+                    requestSessionRebuild("abandoned-surface", 100);
                     return;
                 }
             }
@@ -1806,29 +1716,88 @@ public class SingleCamera {
         }
     }
 
+    /** 会话重建这一件事只有一个任务：去抖后在相机线程上跑 {@link #createCameraPreviewSession}。 */
+    private final Runnable recreateSessionRunnable = this::createCameraPreviewSession;
+
     /**
-     * 安全兜底：如果 CLOSED 回调未触发，300ms 后检查并重建
+     * 设备要没了（关相机 / 强制重开 / 掉线重连）：排着的重建取消，在途的配置作废，等着的关闭不再接着建。
+     * 三条路都调这一个，别各自清一遍标志。
      */
-    private void createCameraPreviewSessionIfClosePending() {
-        synchronized (sessionLock) {
-            if (isSessionClosing) {
-                // 回调还没来，继续等
-                return;
-            }
+    private void voidSessionWork() {
+        Handler handler = backgroundHandler;
+        if (handler != null) {
+            handler.removeCallbacks(recreateSessionRunnable);
         }
-        // CLOSED 回调已经来过但没触发重建（理论上不该到这），或回调丢失，兜底重建
-        if (cameraDevice != null && captureSession == null) {
-            AppLog.d(TAG, "Camera " + cameraId + " session close fallback triggered");
-            createCameraPreviewSession();
+        synchronized (sessionLock) {
+            isConfiguring = false;
+            isSessionClosing = false;
+            sessionGeneration++;
         }
     }
 
     /**
-     * 重新创建会话（用于开始/停止录制时，或者悬浮窗切换时）
-     * 增加防抖处理，避免频繁重建导致黑屏
+     * 为了重建而关掉一份会话（旧的在用的、或建到一半被作废的）：关完（onClosed）接着建；
+     * 回调迟迟不来就到点自己建。HAL 不允许一个 Surface 同时绑到两条流，所以关完才能建。
      */
-    private final Runnable recreateSessionRunnable = this::createCameraPreviewSession;
-    private final Runnable sessionCloseFallbackRunnable = this::createCameraPreviewSessionIfClosePending;
+    private void closeSessionForRebuild(CameraCaptureSession old, String why) {
+        final int generation;
+        synchronized (sessionLock) {
+            isConfiguring = false;
+            isSessionClosing = true;
+            generation = sessionGeneration;
+        }
+        try {
+            old.stopRepeating();
+        } catch (Exception ignored) {
+            // 没在跑就没得停
+        }
+        try {
+            old.close();
+            AppLog.d(TAG, "Camera " + cameraId + " closing session before rebuild (" + why + ")");
+        } catch (Exception e) {
+            AppLog.e(TAG, "Camera " + cameraId + " error closing old session: " + e.getMessage());
+            synchronized (sessionLock) {
+                isSessionClosing = false;
+            }
+            requestSessionRebuild("close-failed", REBUILD_AFTER_CLOSE_MS);
+            return;
+        }
+        Handler handler = backgroundHandler;
+        if (handler == null) {
+            return;
+        }
+        handler.postDelayed(() -> {
+            boolean stillClosing;
+            synchronized (sessionLock) {
+                stillClosing = isSessionClosing && generation == sessionGeneration;
+                if (stillClosing) {
+                    isSessionClosing = false;
+                }
+            }
+            if (stillClosing) {
+                AppLog.w(TAG, "Camera " + cameraId + " session close callback missing, rebuilding anyway");
+                requestSessionRebuild("close-fallback", 0);
+            }
+        }, CLOSE_FALLBACK_MS);
+    }
+
+    /**
+     * 所有重建请求的唯一入口（外面的 {@link #recreateSession}、关完旧会话、配置失败重试、
+     * Surface 被弃、在途配置被作废 —— 都到这里）。同一时刻只排一个；正在关旧会话时任务会自己等。
+     */
+    private void requestSessionRebuild(String why, long delayMs) {
+        Handler handler = backgroundHandler;
+        if (handler == null || cameraDevice == null) {
+            return;
+        }
+        handler.removeCallbacks(recreateSessionRunnable);
+        if (delayMs <= 0) {
+            handler.post(recreateSessionRunnable);
+        } else {
+            handler.postDelayed(recreateSessionRunnable, delayMs);
+        }
+        AppLog.d(TAG, "Camera " + cameraId + " session rebuild requested (" + why + ", " + delayMs + "ms)");
+    }
 
     /** 帧捕获回调（复用实例，供动态 Surface 更新时 setRepeatingRequest 使用） */
     private final CameraCaptureSession.CaptureCallback activeCaptureCallback = new CameraCaptureSession.CaptureCallback() {
@@ -1889,30 +1858,14 @@ public class SingleCamera {
      * @param urgent 紧急模式，跳过防抖延迟以最快速度重建
      */
     public void recreateSession(boolean urgent) {
-        if (cameraDevice != null) {
-            if (backgroundHandler != null) {
-                // 移除待执行的任务，实现防抖
-                backgroundHandler.removeCallbacks(recreateSessionRunnable);
-                
-                int delay;
-                if (urgent) {
-                    // 紧急模式：最小延迟，用于需要快速响应的场景
-                    delay = isConfiguring ? 50 : 0;
-                } else {
-                    // 普通模式：保持防抖延迟
-                    delay = isConfiguring ? 500 : 100;
-                }
-
-                if (delay == 0) {
-                    backgroundHandler.post(recreateSessionRunnable);
-                } else {
-                    backgroundHandler.postDelayed(recreateSessionRunnable, delay);
-                }
-                AppLog.d(TAG, "Camera " + cameraId + " recreateSession scheduled (delay=" + delay + "ms, isConfiguring=" + isConfiguring + ", urgent=" + urgent + ")");
-            } else {
-                createCameraPreviewSession();
-            }
+        if (cameraDevice == null) {
+            return;
         }
+        if (backgroundHandler == null) {
+            createCameraPreviewSession();
+            return;
+        }
+        requestSessionRebuild(urgent ? "urgent" : "debounced", urgent ? 0 : REBUILD_DEBOUNCE_MS);
     }
 
     /**
@@ -1997,22 +1950,27 @@ public class SingleCamera {
     private boolean requestJpeg(JpegCallback callback) {
         ImageReader reader = jpegReader;
         CameraCaptureSession currentSession = captureSession;
-        if (reader == null || currentSession == null || cameraDevice == null) {
+        CameraDevice device = cameraDevice;
+        Handler handler = backgroundHandler;
+        if (reader == null || currentSession == null || device == null || handler == null) {
             return false;
         }
-        try {
-            CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(
-                    CameraDevice.TEMPLATE_STILL_CAPTURE);
-            builder.addTarget(reader.getSurface());
-            builder.set(CaptureRequest.JPEG_QUALITY, (byte) 95);
-            pendingJpeg = callback;
-            currentSession.capture(builder.build(), null, backgroundHandler);
-            return true;
-        } catch (Exception e) {
-            pendingJpeg = null;
-            AppLog.w(TAG, "Camera " + cameraId + " 拍照请求失败: " + e);
-            return false;
-        }
+        pendingJpeg = callback;
+        // 建请求、下发都是进相机服务的调用：放到这一路的相机线程上（以前在主线程，相机服务一卡主线程跟着卡）
+        handler.post(() -> {
+            try {
+                CaptureRequest.Builder builder = device.createCaptureRequest(
+                        CameraDevice.TEMPLATE_STILL_CAPTURE);
+                builder.addTarget(reader.getSurface());
+                builder.set(CaptureRequest.JPEG_QUALITY, (byte) 95);
+                currentSession.capture(builder.build(), null, handler);
+            } catch (Exception e) {
+                pendingJpeg = null;
+                AppLog.w(TAG, "Camera " + cameraId + " 拍照请求失败: " + e);
+                callback.onFailed("capture: " + e.getMessage());
+            }
+        });
+        return true;
     }
 
     private void closeJpegReader() {
@@ -2024,6 +1982,46 @@ public class SingleCamera {
         pendingJpeg = null;
     }
 
+    /** 出帧口的 Surface；还没建就按预览尺寸建一个（相机线程上调）。建不出来返回 null。 */
+    private Surface frameSinkSurface() {
+        if (frameSink == null) {
+            Size size = previewSize;
+            Handler handler = backgroundHandler;
+            if (size == null || handler == null) {
+                return null;
+            }
+            try {
+                frameSink = ImageReader.newInstance(size.getWidth(), size.getHeight(),
+                        ImageFormat.PRIVATE, 2);
+                frameSink.setOnImageAvailableListener(reader -> {
+                    // 帧只是为了让相机转起来：拿到就还回去
+                    try {
+                        Image image = reader.acquireLatestImage();
+                        if (image != null) {
+                            image.close();
+                        }
+                    } catch (Exception e) {
+                        AppLog.d(TAG, "Camera " + cameraId + " frame sink: " + e.getMessage());
+                    }
+                }, handler);
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " 建不出不显示的出帧口: " + e);
+                frameSink = null;
+                return null;
+            }
+        }
+        Surface surface = frameSink.getSurface();
+        return surface != null && surface.isValid() ? surface : null;
+    }
+
+    private void closeFrameSink() {
+        frameSinkInSession = false;
+        if (frameSink != null) {
+            frameSink.close();
+            frameSink = null;
+        }
+    }
+
     /**
      * 拍照。
      *
@@ -2032,36 +2030,37 @@ public class SingleCamera {
      * <p>多路拍的是同一个瞬间，回看是按文件名里的时间戳分组的 —— 各自取各自的
      * 时间，跨过一秒就会被拆成两组。</p>
      *
+     * <h3>结果</h3>
+     *
+     * <p>存下了还是没拍成，都经 {@code done} 回报一次 —— 界面按它说话，而不是按了就说「已保存」。</p>
+     *
      * @param timestamp 文件命名用的时间戳，由调用方统一生成
+     * @param done      这一路这一张的结果
      */
-    public void takePicture(String timestamp) {
-        if (textureView == null || !textureView.isAvailable()) {
-            AppLog.e(TAG, "Camera " + cameraId + " TextureView not available");
-            return;
-        }
-
+    public void takePicture(String timestamp, PhotoDone done) {
         if (previewSize == null) {
             AppLog.e(TAG, "Camera " + cameraId + " preview size not available");
+            done.onDone(false);
             return;
         }
 
         // 图片通道优先：那是相机自己的 JPEG 输出，分辨率是这一路的最大值，
-        // 和预览缓冲区无关。发不出去（通道没开、会话不在）就回退抓预览。
+        // 和预览缓冲区无关，主界面在不在前台都能拍。发不出去（通道没开、会话不在）就回退抓预览。
         if (requestJpeg(new JpegCallback() {
             @Override
             public void onJpeg(byte[] data) {
-                saveJpeg(data, timestamp);
+                saveJpeg(data, timestamp, done);
             }
 
             @Override
             public void onFailed(String reason) {
                 AppLog.w(TAG, "Camera " + cameraId + " 图片通道没出图（" + reason + "），改抓预览");
-                grabPreview(timestamp);
+                grabPreview(timestamp, done);
             }
         })) {
             return;
         }
-        grabPreview(timestamp);
+        grabPreview(timestamp, done);
     }
 
     /**
@@ -2071,24 +2070,27 @@ public class SingleCamera {
      * 里没有我们的应用名、车牌和时间。EXIF 由 {@code saveBitmapAsJPEG} 之后
      * 单独补写，重新编码会把相机写的标签丢掉。</p>
      */
-    private void saveJpeg(byte[] data, String timestamp) {
-        if (backgroundHandler == null) {
+    private void saveJpeg(byte[] data, String timestamp, PhotoDone done) {
+        Handler handler = backgroundHandler;
+        if (handler == null) {
+            done.onDone(false);
             return;
         }
-        backgroundHandler.post(() -> {
+        handler.post(() -> {
             android.graphics.Bitmap bitmap = null;
             try {
                 bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
                 if (bitmap == null) {
                     AppLog.e(TAG, "Camera " + cameraId + " JPEG 解不开，改抓预览");
-                    grabPreview(timestamp);
+                    grabPreview(timestamp, done);
                     return;
                 }
                 AppLog.d(TAG, "Camera " + cameraId + " 图片通道拍到 "
                         + bitmap.getWidth() + "x" + bitmap.getHeight());
-                saveBitmapAsJPEG(bitmap, timestamp);
+                done.onDone(saveBitmapAsJPEG(bitmap, timestamp));
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " 保存 JPEG 失败", e);
+                done.onDone(false);
             } finally {
                 if (bitmap != null) {
                     bitmap.recycle();
@@ -2097,38 +2099,47 @@ public class SingleCamera {
         });
     }
 
-    /** 老路子：从 TextureView 抓一张预览画面。分辨率受预览缓冲区限制。 */
-    private void grabPreview(String timestamp) {
-        if (backgroundHandler == null) {
+    /**
+     * 老路子：从主界面的预览上抓一张。分辨率受预览缓冲区限制。
+     * 主界面不在前台就没有预览可抓（画面已被系统收回），这一路算没拍成。
+     */
+    private void grabPreview(String timestamp, PhotoDone done) {
+        Handler handler = backgroundHandler;
+        TextureView view = textureView;
+        Size size = previewSize;
+        if (handler == null || view == null || !view.isAvailable() || size == null) {
+            AppLog.w(TAG, "Camera " + cameraId + " 没有预览画面可抓，这一路没拍成");
+            done.onDone(false);
             return;
         }
-        backgroundHandler.post(() -> {
+        handler.post(() -> {
             try {
-                // 立即从 TextureView 抓一张（快速抓拍）
-                android.graphics.Bitmap bitmap = textureView.getBitmap(
-                        previewSize.getWidth(),
-                        previewSize.getHeight()
-                );
+                android.graphics.Bitmap bitmap = view.getBitmap(size.getWidth(), size.getHeight());
                 if (bitmap == null) {
                     AppLog.e(TAG, "Camera " + cameraId + " failed to get bitmap from TextureView");
+                    done.onDone(false);
                     return;
                 }
                 bitmap = toNormalView(bitmap);
                 AppLog.d(TAG, "Camera " + cameraId + " picture captured ("
                         + bitmap.getWidth() + "x" + bitmap.getHeight() + ")");
-                saveBitmapAsJPEG(bitmap, timestamp);
+                boolean saved = saveBitmapAsJPEG(bitmap, timestamp);
                 bitmap.recycle();
-                AppLog.d(TAG, "Camera " + cameraId + " picture saved");
+                done.onDone(saved);
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " error capturing picture", e);
+                done.onDone(false);
             }
         });
     }
 
     /**
      * 将Bitmap保存为JPEG文件（使用指定的时间戳）
+     *
+     * @return 文件写完了（EXIF 写不进不算失败，见 {@link #writeExif}）
      */
-    private void saveBitmapAsJPEG(android.graphics.Bitmap bitmap, String timestamp) {
+    private boolean saveBitmapAsJPEG(android.graphics.Bitmap bitmap, String timestamp) {
+        boolean saved = false;
         File photoDir = StorageHelper.getPhotoDir(context);
         if (!photoDir.exists()) {
             photoDir.mkdirs();
@@ -2182,6 +2193,7 @@ public class SingleCamera {
             output.flush();
             output.close();
             output = null;
+            saved = true;
             writeExif(photoFile, timestamp, finalBitmap.getWidth(), finalBitmap.getHeight());
             AppLog.i(TAG, "Photo saved: " + photoFile.getAbsolutePath());
         } catch (IOException e) {
@@ -2213,6 +2225,7 @@ public class SingleCamera {
                 gridBitmap.recycle();
             }
         }
+        return saved;
     }
 
     /**
@@ -2395,12 +2408,6 @@ public class SingleCamera {
      * @param why 为什么关（英文短语）。给了就在关完时往黑匣子记一行，带用时；null 表示例行的关，不记
      */
     public void closeCamera(String why) {
-        // 如果不是主实例，不执行关闭操作
-        if (!isPrimaryInstance) {
-            AppLog.d(TAG, "Camera " + cameraId + " (" + cameraPosition + ") is SECONDARY instance, skipping closeCamera");
-            return;
-        }
-
         final CameraCaptureSession session;
         final CameraDevice device;
         final Surface preview;
@@ -2413,24 +2420,17 @@ public class SingleCamera {
             isReconnecting = false;
             openInFlight = isOpening && cameraDevice == null;
             isOpening = false;
-            stopHealthMonitor();
+            // 这一趟的标记都归零：被拿走、报错抬高的重连底线、路上的强制重开
+            takenByOthers = false;
+            reconnectDelayFloorMs = 0;
+            reopenInFlight = false;
 
-            // 取消待处理的重连、会话重建（防止关了之后还去 createCaptureSession）
-            if (backgroundHandler != null) {
-                if (reconnectRunnable != null) {
-                    backgroundHandler.removeCallbacks(reconnectRunnable);
-                }
-                backgroundHandler.removeCallbacks(recreateSessionRunnable);
-                backgroundHandler.removeCallbacks(sessionCloseFallbackRunnable);
+            // 取消待处理的重连（防止关了之后还去 createCaptureSession）
+            if (backgroundHandler != null && reconnectRunnable != null) {
+                backgroundHandler.removeCallbacks(reconnectRunnable);
             }
             reconnectRunnable = null;
-
-            // 重置 Session 状态标志（防止重新打开时残留状态导致死循环）
-            synchronized (sessionLock) {
-                isSessionClosing = false;
-                isConfiguring = false;
-                isPendingReconfiguration = false;
-            }
+            voidSessionWork();
 
             // 要关的从字段上摘下来，交给相机线程去关
             session = captureSession;
@@ -2455,6 +2455,7 @@ public class SingleCamera {
         if (handler == null) {
             // 没有相机线程：这一路眼下没开着，也就没有设备、会话要关，就地收拾完
             closeJpegReader();
+            closeFrameSink();
             AppLog.d(TAG, "Camera " + cameraId + " closed (was not open)");
             if (callback != null) {
                 callback.onCameraClosed(cameraId);
@@ -2478,8 +2479,9 @@ public class SingleCamera {
                     AppLog.d(TAG, "Camera " + cameraId + " ignored exception while releasing preview surface: " + e.getMessage());
                 }
             }
-            // 拍照通道也要放，否则下次建会话会多一条悬着的流
+            // 拍照通道、出帧口也要放，否则下次建会话会多一条悬着的流
             closeJpegReader();
+            closeFrameSink();
             // 同一台相机上一次的关闭要是还没完，等它：「这一次关完」要蕴含「之前的都关完」
             awaitQuietly(previous, OPEN_WAIT_FOR_CLOSE_MS);
             long ms = SystemClock.elapsedRealtime() - requestedAt;
@@ -2585,16 +2587,16 @@ public class SingleCamera {
      * 以前旧的是在调用方线程上、拿着 {@link #reconnectLock} 关的。</p>
      */
     public void forceReopen() {
-        // 如果不是主实例，不执行重开操作
-        if (!isPrimaryInstance) {
-            AppLog.d(TAG, "Camera " + cameraId + " (" + cameraPosition + ") is SECONDARY instance, skipping forceReopen");
+        if (reopenInFlight) {
+            AppLog.d(TAG, "Camera " + cameraId + " force reopen already in flight, coalesced");
             return;
         }
+        reopenInFlight = true;
         final CameraCaptureSession oldSession;
         final CameraDevice oldDevice;
         final Handler handler;
         synchronized (reconnectLock) {
-            AppLog.d(TAG, "Camera " + cameraId + " force reopen requested (PRIMARY instance)");
+            AppLog.d(TAG, "Camera " + cameraId + " force reopen requested");
 
             // 取消所有待执行的重连任务
             if (reconnectRunnable != null && backgroundHandler != null) {
@@ -2611,11 +2613,7 @@ public class SingleCamera {
             shouldReconnect = true;
             isReconnecting = false;
             isOpening = false;
-            synchronized (sessionLock) {
-                isConfiguring = false;
-                isSessionClosing = false;
-                isPendingReconfiguration = false;
-            }
+            voidSessionWork();
 
             oldSession = captureSession;
             captureSession = null;
@@ -2625,7 +2623,8 @@ public class SingleCamera {
         }
 
         if (handler == null) {
-            // 这一路眼下没有相机线程（没开着）：走正常的打开
+            // 这一路眼下没有相机线程（没开着）：走正常的打开（它自己有 isOpening 挡重复）
+            reopenInFlight = false;
             openCamera();
             return;
         }
@@ -2641,6 +2640,7 @@ public class SingleCamera {
     private void forceReopenOnCameraThread(Handler handler) {
         synchronized (reconnectLock) {
             if (handler != backgroundHandler || !shouldReconnect) {
+                reopenInFlight = false;
                 return;   // 等的时候被关了，或者已经换了一轮
             }
         }
@@ -2660,6 +2660,7 @@ public class SingleCamera {
                 synchronized (reconnectLock) {
                     shouldReconnect = false;
                 }
+                reopenInFlight = false;
                 return;
             }
             // 验证摄像头是否真正可用
@@ -2670,11 +2671,13 @@ public class SingleCamera {
                 synchronized (reconnectLock) {
                     shouldReconnect = false;
                 }
+                reopenInFlight = false;
                 return;
             }
             openCameraMarked(handler);
             AppLog.d(TAG, "Camera " + cameraId + " force reopen initiated");
         } catch (CameraAccessException e) {
+            reopenInFlight = false;
             AppLog.e(TAG, "Failed to force reopen camera " + cameraId, e);
             synchronized (reconnectLock) {
                 if (shouldReconnect) {
@@ -3042,12 +3045,22 @@ public class SingleCamera {
             AppLog.d(TAG, "Camera " + cameraId + " image adjust not enabled, skip update");
             return false;
         }
-        
-        if (cameraDevice == null || captureSession == null || currentRequestBuilder == null) {
+        Handler handler = backgroundHandler;
+        if (cameraDevice == null || captureSession == null || currentRequestBuilder == null || handler == null) {
             AppLog.w(TAG, "Camera " + cameraId + " not ready for image adjust update");
             return false;
         }
-        
+        // 改请求、重新提交都是进相机服务的调用：放到这一路的相机线程上（以前在主线程，画面调节窗口每拖一下都可能卡一下）
+        handler.post(() -> applyImageAdjustParamsNow(exposureCompensation, awbMode, tonemapMode,
+                edgeMode, noiseReductionMode, effectMode));
+        return true;
+    }
+
+    private boolean applyImageAdjustParamsNow(int exposureCompensation, int awbMode, int tonemapMode,
+                                              int edgeMode, int noiseReductionMode, int effectMode) {
+        if (cameraDevice == null || captureSession == null || currentRequestBuilder == null) {
+            return false;
+        }
         try {
             // 应用曝光补偿
             if (exposureCompensation != Integer.MIN_VALUE) {

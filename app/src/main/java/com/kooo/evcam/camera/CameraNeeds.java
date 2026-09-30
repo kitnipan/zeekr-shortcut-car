@@ -24,7 +24,8 @@ import java.util.Set;
  * 以后再加一个用相机的地方，是加一个登记者，而不是加第五条判断。</p>
  *
  * <p>以前还有一类是「问」不是「登记」：补盲 / 常驻预览 / 副屏那几个窗口，开关由它们自己的服务管着，
- * 这里去问它。那一套 1.44.0 删了，剩下三类的生命周期都清楚，都走登记。</p>
+ * 这里去问它。那一套 1.44.0 删了，剩下的生命周期都清楚，都走登记。
+ * 拍照（1.67.0）就是按这句话加进来的：加了一个登记者，没有加判断。</p>
  *
  * <p>纯逻辑，见 {@code CameraNeedsTest}。</p>
  */
@@ -37,7 +38,12 @@ public final class CameraNeeds {
         /** 录制中，或者正要开始录。 */
         RECORDING,
         /** 超级后视镜那个悬浮窗。 */
-        MIRROR
+        MIRROR,
+        /**
+         * 拍照：从按下快门到这一张存完（或放弃）。相机没开就为它开，主界面不在前台时由出帧口出画面；
+         * 拍完注销，没人要了照常关（1.67.0）。
+         */
+        PHOTO
     }
 
     private static final CameraNeeds CURRENT = new CameraNeeds();
@@ -49,18 +55,48 @@ public final class CameraNeeds {
 
     private final Set<Holder> holders = EnumSet.noneOf(Holder.class);
 
+    /** 登记表变了谁来看：相机层（MultiCameraManager.reconcileCameras）—— 有人要就开，没人要就关。 */
+    public interface Listener {
+        void onNeedsChanged();
+    }
+
+    private volatile Listener listener;
+
+    public void setListener(Listener listener) {
+        this.listener = listener;
+    }
+
     /**
      * 登记：我要用相机。
      *
      * <p>重复登记无害 —— 同一个登记者只算一次，所以不需要配对计数。</p>
      */
-    public synchronized void claim(Holder holder) {
-        holders.add(holder);
+    public void claim(Holder holder) {
+        boolean changed;
+        synchronized (this) {
+            changed = holders.add(holder);
+        }
+        if (changed) {
+            notifyChanged();
+        }
     }
 
     /** 注销：我不用了。没登记过就注销也无害。 */
-    public synchronized void release(Holder holder) {
-        holders.remove(holder);
+    public void release(Holder holder) {
+        boolean changed;
+        synchronized (this) {
+            changed = holders.remove(holder);
+        }
+        if (changed) {
+            notifyChanged();
+        }
+    }
+
+    private void notifyChanged() {
+        Listener l = listener;
+        if (l != null) {
+            l.onNeedsChanged();
+        }
     }
 
     /** 这一项此刻有没有登记着。 */

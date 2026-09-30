@@ -78,6 +78,18 @@
             android:dependency="pref_watermark"
             android:title="@string/set_watermark_spec_title"
             android:summary="@string/set_watermark_spec_summary" />
+
+        <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。子项只在总开关开着时可拨 -->
+        <SwitchPreferenceCompat
+            android:key="pref_info_bar"
+            android:title="@string/set_info_bar_title"
+            android:summary="@string/set_info_bar_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_info_bar_all"
+            android:dependency="pref_info_bar"
+            android:title="@string/set_info_bar_all_title"
+            android:summary="@string/set_info_bar_all_summary" />
     </PreferenceScreen>
 
     <!-- ==================== 存储 ==================== -->
@@ -89,6 +101,12 @@
             android:key="pref_storage_location"
             android:title="@string/set_storage_location_title"
             android:summary="%s" />
+
+        <!-- 选哪个盘之前要知道的事：下车开哨兵模式后只有 USB-A 口还通电 -->
+        <Preference
+            android:key="pref_storage_sentry_note"
+            android:selectable="false"
+            android:summary="@string/set_storage_sentry_note" />
 
         <SwitchPreferenceCompat
             android:key="pref_relay_write"
@@ -348,6 +366,11 @@
             android:key="pref_diagnostics"
             android:title="@string/set_diagnostics_title"
             android:summary="@string/set_diagnostics_summary" />
+
+        <Preference
+            android:key="pref_vehicle_info"
+            android:title="@string/set_vehicle_info_title"
+            android:summary="@string/set_vehicle_info_summary" />
 
     </PreferenceScreen>
 

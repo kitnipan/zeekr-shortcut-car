@@ -171,6 +171,53 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindSwitch("pref_watermark_spec", appConfig.isWatermarkSpecEnabled(),
                 value -> appConfig.setWatermarkSpecEnabled(value));
+
+        // 行驶信息条（试验项目）：打开时顺手要定位权限 —— 经纬度和 GPS 车速靠它
+        bindSwitch("pref_info_bar", appConfig.isInfoBarEnabled(), enabled -> {
+            appConfig.setInfoBarEnabled(enabled);
+            if (enabled) {
+                askLocationPermission();
+            }
+        });
+        // 「激活所有栏目信息」锁在开发者模式后面：没解锁时灰掉、关着、写明为什么（值那边 AppConfig 同样锁着）
+        bindSwitch("pref_info_bar_all", appConfig.isInfoBarAllActive(),
+                value -> appConfig.setInfoBarAllActive(value));
+        SwitchPreferenceCompat infoBarAll = findPreference("pref_info_bar_all");
+        if (infoBarAll != null && !DeveloperMode.isUnlocked()) {
+            infoBarAll.setEnabled(false);
+            infoBarAll.setSummary(getString(R.string.set_info_bar_all_dev_only));
+        }
+    }
+
+    private static final int REQUEST_LOCATION = 41;
+
+    /** 信息条要经纬度和车速：向系统要定位权限。容器给不给、弹不弹框，看黑匣子。 */
+    private void askLocationPermission() {
+        android.content.Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        boolean granted = androidx.core.content.ContextCompat.checkSelfPermission(context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        com.kooo.evcam.blackbox.BlackBox.note("行驶信息条打开，定位权限" + (granted ? "已有" : "没有，向系统申请"));
+        if (!granted) {
+            requestPermissions(new String[]{
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @androidx.annotation.NonNull String[] permissions,
+                                           @androidx.annotation.NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            com.kooo.evcam.blackbox.BlackBox.note("定位权限申请结果：" + (granted ? "已授予" : "被拒绝或没有弹框"));
+        }
     }
 
     /**
@@ -373,6 +420,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         // 盘的探测结果有 5 秒缓存：不清的话，回到主界面时状态条还写着换之前那个盘的余量
         StorageHelper.clearCache();
+        com.kooo.evcam.storage.StorageState.refresh(pref.getContext(), "storage-setting");
         pref.setValue(value);
         pref.setSummary(pref.getEntry());
         toast(getString(R.string.msg_storage_changed, pref.getEntry()));
@@ -898,6 +946,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
+        // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时收，离开就把资源放掉
+        onClick("pref_vehicle_info", pref ->
+                openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
 
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));

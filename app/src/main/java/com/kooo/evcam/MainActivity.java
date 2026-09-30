@@ -44,6 +44,8 @@ import com.kooo.evcam.settings.Languages;
 import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.SettingsRegistry;
 import com.kooo.evcam.recording.RecordingCoordinator;
+import com.kooo.evcam.recording.RecordingIntent;
+import com.kooo.evcam.recording.RecordingStops;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
@@ -59,10 +61,8 @@ public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_OPEN_DRAWER = "open_drawer";
 
     /** 悬浮按钮在应用没运行时按了「拍照」：拉起来，等相机就绪再拍。 */
-    public static final String EXTRA_AUTO_TAKE_PHOTO = "auto_take_photo";
 
     /** 悬浮按钮在应用还活着时按了「拍照」。 */
-    public static final String ACTION_TAKE_PHOTO = "com.kooo.evcam.action.TAKE_PHOTO";
 
     /** 环视流探测结果的那几行文字；相机开起来后可能被实际尺寸替掉。 */
     private String compositeProbeInfo;
@@ -146,8 +146,13 @@ public class MainActivity extends AppCompatActivity {
     private MultiCameraManager cameraManager;
     /** 上一条已提示过的拒绝理由，用来挡住定时重试造成的重复提示。 */
     private String lastRefusalShown;
-    /** 录不录、能不能录由它决定；这里只负责画面反馈。 */
+    /**
+     * 录不录、能不能录、什么时候录、停了接不接，都由它决定（进程里只有一份）；
+     * 这里只负责把它的结果画到屏幕上。
+     */
     private RecordingCoordinator recordingCoordinator;
+    /** 悬浮按钮拉起主界面来开录：录起来之后让用户看一眼，再把主界面收到后台。 */
+    private boolean hideMainAfterStart;
 
     public MultiCameraManager getCameraManager() {
         if (cameraManager == null) {
@@ -170,84 +175,41 @@ public class MainActivity extends AppCompatActivity {
     private long lastRecordingErrorToastTime = 0;  // 上次显示录制异常提示的时间
     private static final long RECORDING_ERROR_TOAST_INTERVAL = 20000;  // 最小显示间隔（20秒）
     private boolean shouldMoveToBackgroundOnReady = false;  // 开机自启动后，窗口准备好时移到后台
-    private boolean isAutoRecordingPending = false;  // 标记自动录制已计划但尚未开始（防止 onPause 关闭摄像头）
-    
-    // 自动录制定时检查相关
-    private android.os.Handler autoRecordingCheckHandler;  // 定时检查 Handler
-    private Runnable autoRecordingCheckRunnable;  // 定时检查 Runnable
-    private static final long AUTO_RECORDING_CHECK_INTERVAL_MS = 30000;  // 检查间隔（30秒）
-    
-    // 主题切换后恢复录制相关
-    private boolean shouldResumeRecordingAfterRecreate = false;  // 主题切换后是否需要恢复录制
-    private long savedRecordingStartTime = 0;  // 保存的录制开始时间（用于计时器恢复）
-    private int savedSegmentCount = 1;  // 保存的分段数
-    
+
     // 摄像头重连防抖相关
-    private android.os.Handler reopenCameraHandler;  // 重新打开摄像头的 Handler
-    private Runnable reopenCameraRunnable;  // 重新打开摄像头的 Runnable
     
-    // 息屏录制相关
-    private android.content.BroadcastReceiver screenStateReceiver;  // 屏幕状态广播接收器
+    // 悬浮按钮发来的广播
     private android.content.BroadcastReceiver toggleRecordingReceiver;  // 录制切换广播接收器（来自悬浮窗）
-    private android.content.BroadcastReceiver storageReceiver;  // U 盘插拔：录制键可不可录、状态条余量
-    private android.os.Handler screenStateHandler;  // 息屏/亮屏延迟处理
-    private Runnable screenOffStopRunnable;  // 息屏停止录制的延迟任务
-    private Runnable screenOnStartRunnable;  // 亮屏恢复录制的延迟任务
+
+    // 熄屏：屏幕状态只有 ScreenState 一份（熄屏广播 + 黑着时每 2 秒问系统一次代替亮屏广播）。
+    // 唤醒锁、录像的 10 秒停 / 亮屏接回、1.5 秒没人要就关相机、亮屏把退下去的界面接回来，
+    // 都在它那里按固定顺序做完；主界面只剩自己的事 —— 熄屏 15 秒退后台
+    private final android.os.Handler screenStateHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());  // 熄屏退后台的延迟处理
     private Runnable screenOffBackgroundRunnable;  // 息屏退后台的延迟任务
-    private Runnable screenOffCameraRunnable;  // 息屏尽快关相机的延迟任务
-    private boolean isScreenOff = false;  // 收到过熄屏、还没收到亮屏。亮屏广播深睡醒来后不来，见 reconcileScreenState
+    private static final long SCREEN_OFF_BACKGROUND_DELAY_MS = 15000;  // 息屏后等待15秒（退后台）
 
     /**
-     * 把「记下来的熄屏」和「屏幕实际亮着」对一下。
-     *
-     * <p>实测（2026-09-24）：熄屏广播四次四次都到，深睡醒来后的亮屏广播一次都没到。
-     * 于是 {@link #isScreenOff} 一旦置上就再也没人清 —— {@link #onScreenOn()} 不跑，
-     * 相机不重开、界面不接回来；十五秒那个退后台的任务按 uptime 算，醒来十几秒后照样执行，
-     * 读到的还是「熄屏中」。</p>
-     *
-     * <p>所以凡是要看「现在是不是熄屏」的地方，先调这一步：屏幕其实亮着，
-     * 就补跑一次 {@link #onScreenOn()}，回到用户设定的状态（规格 §0）。
-     * 车机停车后自己醒来亮屏的那两分钟也一样（规格 §1.3 选 a）。</p>
-     *
-     * @return 屏幕此刻是不是真的黑着
+     * 熄屏 / 亮屏（{@link com.kooo.evcam.screen.ScreenState} 在主线程调；onStart 登记、onStop 摘掉，
+     * 和存储监听放在一起）。只管界面自己的事：熄屏 15 秒退后台，亮屏取消它。
+     * 接回录像、接回界面不在这里 —— ScreenState 在叫到这里之前已经做完了。
      */
-    private boolean reconcileScreenState(String where) {
-        android.os.PowerManager power = (android.os.PowerManager) getSystemService(POWER_SERVICE);
-        boolean dark = power != null ? !power.isInteractive() : isScreenOff;
-        if (isScreenOff && !dark) {
-            // 总原则（规格 §0）：停车熄屏是特殊情况；屏幕亮了，特殊情况就结束了，
-            // 回到用户设定的状态 —— 把漏掉的亮屏逻辑补跑一次（接回界面、接回录像）
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播，补跑亮屏逻辑（" + where + "）");
-            onScreenOn();
-        }
-        return dark;
-    }
-    private boolean wasRecordingBeforeScreenOff = false;  // 息屏前是否正在录制
-    /**
-     * 熄屏持续录制这一段是什么时候熄的屏（elapsedRealtime，含深睡）；0 表示不在这种状态。
-     * 亮屏时和 {@link #keepRecordingOffAtUptime}（不含深睡）一减，就知道车机睡了多久。
-     */
-    private long keepRecordingOffAtElapsed;
-    private long keepRecordingOffAtUptime;
-    /** 熄屏持续录制这一段里录像停过几次（停了又接回的也算）。 */
-    private int keepRecordingStops;
-    private static final long SCREEN_OFF_DELAY_MS = 10000;  // 息屏后等待10秒（停止录制）
-    private static final long SCREEN_ON_DELAY_MS = 10000;   // 亮屏后等待10秒（恢复录制）
-    private static final long SCREEN_OFF_BACKGROUND_DELAY_MS = 15000;  // 息屏后等待15秒（退后台）
-    /**
-     * 息屏后多久放开相机。
-     *
-     * <p>退后台那一步可以慢慢来，<b>放开相机不能</b>：实测车机熄屏六秒后就深睡了，
-     * 而 15 秒的延迟任务用的是 uptime 时钟，深睡期间根本不走 —— 那一次它是在
-     * 十九分钟后、车机醒来时才执行的，相机就这么开着睡了过去。醒来时会话已经作废，
-     * 关它卡在 binder 里，接着被相机服务断开（日志里的 error -4，基座自定义码），靠看门狗重开花了 9.4 秒。</p>
-     *
-     * <p>1.5 秒既躲得开深睡，也还留着一点余地：屏幕闪一下就亮回来的话，
-     * 相机还没来得及关。</p>
-     */
-    private static final long SCREEN_OFF_CAMERA_DELAY_MS = 1500;
-    
-    
+    private final com.kooo.evcam.screen.ScreenState.Listener screenListener =
+            new com.kooo.evcam.screen.ScreenState.Listener() {
+                @Override
+                public void onScreenOff() {
+                    AppLog.d(TAG, "检测到息屏，15 秒后退后台（录像中、熄屏录制生效则留在前台）");
+                    scheduleBackgroundTask();
+                }
+
+                @Override
+                public void onScreenOn() {
+                    AppLog.d(TAG, "检测到亮屏，取消退后台任务");
+                    cancelBackgroundTask();
+                }
+            };
+
+
     // 车型配置相关
     private AppConfig appConfig;
     private int configuredCameraCount = 4;  // 配置的摄像头数量
@@ -279,44 +241,23 @@ public class MainActivity extends AppCompatActivity {
      * 「准备中」最多等多久。
      *
      * <p>开始录制之后，要等录制器写出第一笔数据才算真的录上。以前这一步<b>没有超时</b>：
-     * 第一笔数据一直不来，按钮就永远停在「正在准备」，而录制器其实早就没在录了 ——
-     * 典型场景是录制中退到后台、Activity 被重建（比如车机切夜间模式），
-     * 新实例「恢复录制」没接上。用户得先点一下（弹出「录制异常」，那是在清理空的分段文件），
-     * 再点一下才恢复。这里让应用自己做这两下。</p>
+     * 第一笔数据一直不来，按钮就永远停在「正在准备」，而录制器其实早就没在录了。
+     * 到点就按「没收到画面」停掉（{@code RecordingStops.Reason.NO_DATA}）；
+     * 停了之后接不接、还剩几次额度，由 {@link RecordingCoordinator} 判。</p>
      */
-    private static final long PREPARING_TIMEOUT_MS = 10_000L;
     private final android.os.Handler preparingHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
-    private final Runnable preparingWatchdog = this::onPreparingTimedOut;
-    /** 连续几次准备超时。超时后自动重试一次；重试也超时就停下来交给用户。 */
-    private int preparingTimeouts = 0;
-    /** 看门狗自己停掉录制器时，不弹「录制已停止」「录制异常」—— 那是它在收拾，不是出了新问题。 */
-    private boolean quietStop = false;
-    private long suppressRecordErrorToastUntil = 0;
 
-    /** 下一次 onRecordingStopped 是因为什么停的。没人填，就是录制器自己停的（UNKNOWN）。 */
-    private com.kooo.evcam.recording.RecordingStops.Reason nextStopReason;
-    /** 这一段录像从什么时候开始（开机起算）。恢复额度看它录了多久，见 RecordingStops.ResumeBudget。 */
-    private long recordingStartedAtMs;
-    /** 什么时候被打断的，恢复时算一下断了多久。 */
-    private long interruptedAtMs;
-    private final com.kooo.evcam.recording.RecordingStops.ResumeBudget resumeBudget =
-            new com.kooo.evcam.recording.RecordingStops.ResumeBudget();
-    /** 等环视恢复的那个检查；null 表示没在等。 */
-    private Runnable surroundResumeCheck;
-    /** 这次接回要不要计入自动恢复额度：相机被别的程序拿走的那种不计（见 onRecordingInterrupted）。 */
-    private boolean resumeCounts = true;
     /** 状态条最右那一格的正文（合成流识别结果）；环视被拿走时那一格临时改写成提示。 */
     private String compositeInfoText = "";
     private boolean cameraTakenHint;
-    private final android.os.Handler surroundResumeHandler =
-            new android.os.Handler(android.os.Looper.getMainLooper());
-    /** 多久看一次环视回来了没有。 */
-    private static final long SURROUND_RESUME_POLL_MS = 2000;
-    /** 最近这么久里出过画面，才算环视正常。 */
-    private static final long SURROUND_FRESH_MS = 2000;
+    /** 存储快照变了（U 盘插拔、换盘、定时探测）：录制键可不可录、状态条余量跟着变。 */
+    private final com.kooo.evcam.storage.StorageState.Listener storageListener = snapshot -> {
+        refreshRecordAvailability();
+        updateStatusLine();
+    };
 
-    
+
     // 存储清理管理器
     private StorageCleanupManager storageCleanupManager;
 
@@ -348,7 +289,12 @@ public class MainActivity extends AppCompatActivity {
 
         // 初始化应用配置
         appConfig = new AppConfig(this);
-        
+
+        // 录像的唯一入口是进程级的协调器：相机管理器还没建出来时就可以先「要录」，
+        // 它会等相机交过来、环视出画面再开（见 attachRecordingCoordinator）
+        recordingCoordinator = RecordingCoordinator.get(this);
+        recordingCoordinator.addListener(recordingListener);
+
         // 重置U盘回退提示标志（每次冷启动重置）
         AppConfig.resetSdFallbackFlag();
         
@@ -362,16 +308,8 @@ public class MainActivity extends AppCompatActivity {
         setupNavigationDrawer();
         startRemoteLink();
 
-        // 检查是否需要在主题切换后恢复录制
-        if (savedInstanceState != null) {
-            boolean wasRecording = savedInstanceState.getBoolean("wasRecording", false);
-            if (wasRecording) {
-                shouldResumeRecordingAfterRecreate = true;
-                savedRecordingStartTime = savedInstanceState.getLong("recordingStartTime", 0);
-                savedSegmentCount = savedInstanceState.getInt("segmentCount", 1);
-                AppLog.d(TAG, "onCreate: 检测到主题切换，需要恢复录制 - savedStartTime=" + savedRecordingStartTime + ", savedSegment=" + savedSegmentCount);
-            }
-        }
+        // 界面重建（切日夜模式、换语言）时录制管线一直在跑（见 onDestroy 的 keepPipeline），
+        // 新界面只是把它现在的样子画出来（syncRecordingStateFromManager），没有「恢复录制」这回事
 
         // 检查是否首次启动
         checkFirstLaunch();
@@ -403,60 +341,24 @@ public class MainActivity extends AppCompatActivity {
             getIntent().removeExtra("auto_start_from_boot");
 
             // 静默拉起来的主界面闪一下就退后台（规格 1.6）：录像不靠主界面显示，
-            // 退到后台照常录；开始录像那一步在等相机的两秒里自己会跑到
+            // 退到后台照常录；开始录像由协调器在环视出画面时开（checkAutoStartRecording 只是提出要录）
             AppLog.d(TAG, "开机自启动模式：等待窗口准备好后移到后台");
             shouldMoveToBackgroundOnReady = true;
         }
 
-        // 检查是否是从录制悬浮按钮启动（需要自动开始录制）
-        // 悬浮按钮在应用没运行时按了「拍照」：相机得先起来，晚一点再拍
-        if (getIntent().getBooleanExtra(EXTRA_AUTO_TAKE_PHOTO, false)) {
-            getIntent().removeExtra(EXTRA_AUTO_TAKE_PHOTO);
-            scheduleAutoPhoto();
-        }
-
-        boolean autoStartRecording = getIntent().getBooleanExtra("auto_start_recording", false);
-        if (autoStartRecording) {
-            getIntent().removeExtra("auto_start_recording");
-            AppLog.d(TAG, "从录制悬浮按钮启动，准备自动开始录制");
-            // 标记自动录制等待中，防止 onPause 关闭摄像头
-            isAutoRecordingPending = true;
-            // 延迟等待摄像头初始化完成（需要更长时间确保摄像头完全准备好）
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                if (cameraManager != null && !cameraManager.isRecording()) {
-                    // 确保摄像头已连接
-                    if (!cameraManager.hasConnectedCameras()) {
-                        AppLog.d(TAG, "摄像头未连接，先打开摄像头");
-                        cameraManager.openAllCameras();
-                    }
-                    // 再等待一段时间确保摄像头完全准备好
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                        if (cameraManager != null && cameraManager.hasConnectedCameras() && !cameraManager.isRecording()) {
-                            AppLog.d(TAG, "摄像头已准备好，自动开始录制");
-                            startRecording();
-                            // 录制开始后，延迟将 Activity 移到后台（让用户看到录制已开始）
-                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                                if (isRecording) {
-                                    AppLog.d(TAG, "录制已开始，将 Activity 移到后台");
-                                    moveTaskToBack(true);
-                                }
-                            }, 1500);
-                        } else {
-                            AppLog.w(TAG, "摄像头未准备好，无法开始录制");
-                            isAutoRecordingPending = false;
-                            Toast.makeText(this, R.string.msg_camera_not_ready, Toast.LENGTH_SHORT).show();
-                        }
-                    }, 2000);
-                }
-            }, 1000);
+        // 从录制悬浮按钮拉起来的：要录。相机还没建，协调器先记着，环视出画面就开
+        if (getIntent().getBooleanExtra("auto_start_recording", false)) {
+            requestRecordingFromFloatingButton(getIntent());
         }
 
         // 按设置把该开的悬浮窗恢复出来（画面悬浮窗 / 超级后视镜 /
         // 录制悬浮按钮 / 补盲）。该不该开、能不能开都在协调器里判断。
         OverlayCoordinator.restoreOnLaunch(this, this::broadcastCurrentRecordingState);
         
-        // 初始化息屏录制检测
-        initScreenStateReceiver();
+        // 悬浮按钮发来的录制切换 / 拍照广播
+        // 屏幕状态只听 ScreenState；整个界面生命周期都听着（熄屏时界面可能先被暂停、广播后到）
+        com.kooo.evcam.screen.ScreenState.addListener(screenListener);
+        initToggleRecordingReceiver();
     }
 
     @Override
@@ -467,46 +369,25 @@ public class MainActivity extends AppCompatActivity {
         openDrawerIfAsked(intent);
 
 // 处理从录制悬浮按钮启动（需要自动开始录制）
-        if (intent.getBooleanExtra(EXTRA_AUTO_TAKE_PHOTO, false)) {
-            intent.removeExtra(EXTRA_AUTO_TAKE_PHOTO);
-            scheduleAutoPhoto();
+        if (intent.getBooleanExtra("auto_start_recording", false)) {
+            requestRecordingFromFloatingButton(intent);
         }
+    }
 
-        boolean autoStartRecording = intent.getBooleanExtra("auto_start_recording", false);
-        if (autoStartRecording) {
-            intent.removeExtra("auto_start_recording");
-            AppLog.d(TAG, "从录制悬浮按钮启动（onNewIntent），准备自动开始录制");
-            // 标记自动录制等待中，防止 onPause 关闭摄像头
-            isAutoRecordingPending = true;
-            // 延迟等待摄像头准备好
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                if (cameraManager != null && !cameraManager.isRecording()) {
-                    // 确保摄像头已连接
-                    if (!cameraManager.hasConnectedCameras()) {
-                        AppLog.d(TAG, "摄像头未连接，先打开摄像头");
-                        cameraManager.openAllCameras();
-                    }
-                    // 再等待一段时间确保摄像头完全准备好
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                        if (cameraManager != null && cameraManager.hasConnectedCameras() && !cameraManager.isRecording()) {
-                            AppLog.d(TAG, "摄像头已准备好，自动开始录制");
-                            startRecording();
-                            // 录制开始后，延迟将 Activity 移到后台
-                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                                if (isRecording) {
-                                    AppLog.d(TAG, "录制已开始，将 Activity 移到后台");
-                                    moveTaskToBack(true);
-                                }
-                            }, 1500);
-                        } else {
-                            AppLog.w(TAG, "摄像头未准备好，无法开始录制");
-                            isAutoRecordingPending = false;
-                            Toast.makeText(this, R.string.msg_camera_not_ready, Toast.LENGTH_SHORT).show();
-                        }
-                    }, 2000);
-                }
-            }, 500);
-        }
+    /**
+     * 悬浮按钮在主界面不在前台时按了「开始录制」，把主界面拉了起来。
+     *
+     * <p>人按的：前面的失败都不算了。什么时候开由协调器定（环视出画面就开）；
+     * 录起来之后让用户看一眼，再把主界面收回后台（见 {@link #recordingListener}）。
+     * 以前这里是「等一秒再等两秒再开」的梯子，onCreate 和 onNewIntent 各抄一份 —— 都归到协调器那一个等待里。</p>
+     */
+    private void requestRecordingFromFloatingButton(Intent intent) {
+        intent.removeExtra("auto_start_recording");
+        AppLog.d(TAG, "从录制悬浮按钮启动，交给协调器开录");
+        hideMainAfterStart = true;
+        RecordingIntent.current().noteUserStarted();
+        recordingCoordinator.resetBudget();
+        recordingCoordinator.request(RecordingCoordinator.Why.FLOATING);
     }
 
     @Override
@@ -837,24 +718,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * 等相机就绪再拍一张。
-     *
-     * <p>悬浮按钮在应用没运行时按了拍照，只能先把界面拉起来 —— 而这会儿相机
-     * 还没连上。和自动开始录制走同一个思路：等一会儿，等到了就拍，等不到就算了，
-     * 不弹错误 —— 用户按的是一个快捷键，不是在等一个回执。</p>
-     */
-    private void scheduleAutoPhoto() {
-        AppLog.d(TAG, "从悬浮按钮拍照，等相机就绪");
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            if (cameraManager != null && cameraManager.hasConnectedCameras()) {
-                takePicture();
-            } else {
-                AppLog.w(TAG, "相机还没就绪，这次拍照放弃");
-            }
-        }, 3000);
-    }
-
         
     /**
      * 初始化录制状态显示
@@ -1043,14 +906,16 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 待机时录制键该是「开始录制」还是「插入 U 盘后可录制」。
      *
-     * <p>判断和拒录是同一个（{@code StorageHelper.isRecordingStorageAvailable}）——
+     * <p>判断和拒录是同一个（快照里的 {@code available}，源头都是 {@code StorageHelper.isRecordingStorageAvailable}）——
      * 按钮不会显示能录、按下去却被拒。录制中不动它：盘拔了由录制链路自己处理。</p>
      */
     private void refreshRecordAvailability() {
         if (recordButtonUi == null || isRecording) {
             return;
         }
-        recordButtonUi.setState(StorageHelper.isRecordingStorageAvailable(this)
+        // 只读快照，不碰盘；还没探测过时先按能录画，探测完监听器会再画一次
+        com.kooo.evcam.storage.StorageState.Snapshot storage = com.kooo.evcam.storage.StorageState.current();
+        recordButtonUi.setState(!storage.known || storage.available
                 ? com.kooo.evcam.ui.RecordButtonUi.State.IDLE
                 : com.kooo.evcam.ui.RecordButtonUi.State.UNAVAILABLE);
     }
@@ -1526,23 +1391,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    /**
-     * 录制这一项的登记跟着状态走。
-     *
-     * <p>「正要开始录」也算 —— 开机自启动那条路上，相机得先开着等录制起来，
-     * 这中间要是被判成「没人要」关掉了，录制就永远起不来。</p>
-     */
-    private void syncRecordingClaim() {
-        com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
-        // 在等环视恢复、准备接回录像的，也算「正要开始录」：不算的话，后视镜熄屏那一步会把相机放掉，
-        // 哨兵模式（车机醒着、黑屏）下录像一断就再也接不回来
-        if (isRecording || isAutoRecordingPending || surroundResumeCheck != null) {
-            needs.claim(com.kooo.evcam.camera.CameraNeeds.Holder.RECORDING);
-        } else {
-            needs.release(com.kooo.evcam.camera.CameraNeeds.Holder.RECORDING);
-        }
-    }
-
     private boolean checkPermissions() {
         for (String permission : getRequiredPermissions()) {
             if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
@@ -1635,12 +1483,9 @@ public class MainActivity extends AppCompatActivity {
             imageAdjustManager = new ImageAdjustManager(this);
             registerCamerasToImageAdjustManager();
             AppLog.d(TAG, "Camera initialized with " + configuredCameraCount + " cameras (reused from background)");
-            // 必须在下面几个检查之前：管线还在录的话，界面的标记要先对上，
-            // 否则「重建后恢复录制」会以为没在录，又去开一次
+            // 管线还在录的话，界面先画成它现在的样子；然后才问要不要自动开一次
             syncRecordingStateFromManager();
-            checkResumeRecordingAfterRecreate();
             checkAutoStartRecording();
-            startAutoRecordingCheck();
             return;
         }
 
@@ -1683,16 +1528,9 @@ public class MainActivity extends AppCompatActivity {
                 registerCamerasToImageAdjustManager();
 
                 AppLog.d(TAG, "Camera initialized with " + configuredCameraCount + " cameras");
-                //Toast.makeText(this, "已打开 " + configuredCameraCount + " 个摄像头", Toast.LENGTH_SHORT).show();
-                
-                // 检查是否需要恢复录制（主题切换后），优先级高于自动录制
-                checkResumeRecordingAfterRecreate();
-                
-                // 检查并触发自动录制（延迟执行，确保摄像头准备就绪）
+
+                // 「启动自动录制」开着就要录一次；什么时候开由协调器定（环视出画面就开）
                 checkAutoStartRecording();
-                
-                // 启动自动录制定时检查（如果启用了自动录制）
-                startAutoRecordingCheck();
 
             } catch (CameraAccessException e) {
                 AppLog.e(TAG, "Failed to access camera", e);
@@ -1922,7 +1760,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 把主界面要的那 8 个回调挂到 {@link #cameraManager} 上。
+     * 把主界面要的几个<b>画面</b>回调挂到 {@link #cameraManager} 上。
      *
      * <p>复用后台实例和新建实例两条路都要挂，而且挂的必须<b>一模一样</b> ——
      * 原来是各抄了一份，两份已经开始漂了（一份多个注释、一份带着尾随空格）。
@@ -1931,6 +1769,9 @@ public class MainActivity extends AppCompatActivity {
      *
      * <p>后台建的那份没有主界面的回调，
      * 不补上的话左右摄像头的旋转变换、录制计时都不正常。</p>
+     *
+     * <p>盘满、写不进、相机被拿走、一路都没起来 —— 这几个决定「停不停、接不接」的回调
+     * 不在这里：它们由 {@link RecordingCoordinator#setCameraManager} 接，主界面在不在都一样。</p>
      */
     private void wireCameraCallbacks() {
         // 设置摄像头状态回调
@@ -1951,41 +1792,6 @@ public class MainActivity extends AppCompatActivity {
             onSegmentSwitch(newSegmentIndex);
         });
 
-        // U 盘满了录不下去：由界面来停，按钮、计时器、前台服务一起回到待机
-        cameraManager.setStorageFullCallback(capless -> runOnUiThread(() -> {
-            nextStopReason = capless ? com.kooo.evcam.recording.RecordingStops.Reason.STORAGE_FULL
-                    : com.kooo.evcam.recording.RecordingStops.Reason.STORAGE_CANNOT_FREE;
-            quietStop = true;
-            try {
-                stopRecording();
-            } finally {
-                quietStop = false;
-            }
-            Toast.makeText(this, capless ? R.string.msg_storage_full_stopped
-                    : R.string.msg_storage_cannot_free, Toast.LENGTH_LONG).show();
-        }));
-
-        // 录像写不进文件（编码器坏了没修好、U 盘写不进）：按「录像被打断」处理 ——
-        // 按钮和悬浮按钮如实回到未录，提示原因，等环视正常再自动接回。
-        // 以前这种情况界面一直显示「录制中」，实际一个字节都没写（2026-09-26 哨兵模式）
-        cameraManager.setWriteStallCallback(stalledMs -> runOnUiThread(() -> {
-            if (!isRecording) {
-                return;
-            }
-            nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.WRITE_STALLED;
-            stopRecording();
-        }));
-
-        // 录着的那一路相机被别的程序拿走了（车机原生功能）：立刻停这一段，不等看门狗；
-        // 状态条说明原因，它放开、相机接回之后自动继续（CameraTaken）
-        cameraManager.setCameraLostCallback(cameraId -> runOnUiThread(() -> {
-            if (!isRecording) {
-                return;
-            }
-            nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.CAMERA_LOST;
-            stopRecording();
-        }));
-
         // 设置损坏文件删除回调
         cameraManager.setCorruptedFilesCallback(deletedFiles -> {
             showCorruptedFilesDeletedDialog(deletedFiles);
@@ -2000,31 +1806,12 @@ public class MainActivity extends AppCompatActivity {
             });
         });
 
-        // 设置录制状态回调（监听录制成功或失败）
-        cameraManager.setRecordingStatusCallback((activeCameras, failedCameras) -> {
-            AppLog.d(TAG, "录制状态回调: 成功=" + activeCameras.size() + ", 失败=" + failedCameras.size());
-            if (activeCameras.isEmpty()) {
-                // 所有摄像头都启动失败
-                runOnUiThread(() -> {
-                    AppLog.e(TAG, "所有摄像头启动录制失败");
-                    preparingHandler.removeCallbacks(preparingWatchdog);
-                    isRecording = false;
-                    isAutoRecordingPending = false;
-                    isPreparingRecording = false;
-                    hidePreparingIndicator();
-                    Toast.makeText(this, R.string.msg_record_start_failed, Toast.LENGTH_SHORT).show();
-                });
-            }
-        });
-
         // 设置首次数据写入回调
         // 用于在摄像头真正开始输出数据后启动计时器（分段计时等）
         cameraManager.setFirstDataWrittenCallback(() -> {
             AppLog.d(TAG, "收到首次数据写入回调，录制已真正开始");
             runOnUiThread(() -> {
                 // 结束"准备中"状态
-                preparingHandler.removeCallbacks(preparingWatchdog);
-                preparingTimeouts = 0;
                 if (isPreparingRecording) {
                     isPreparingRecording = false;
                     hidePreparingIndicator();
@@ -2034,19 +1821,8 @@ public class MainActivity extends AppCompatActivity {
                 // 启动录制计时器（从首次写入开始计时，而不是从录制请求开始）
                 // 这样右上角显示的时间是"有效录制时长"
                 if (isRecording) {
-                    // 检查是否是主题切换后恢复的录制
-                    if (shouldResumeRecordingAfterRecreate && savedRecordingStartTime > 0) {
-                        // 使用保存的时间恢复计时器（计时不重置）
-                        startRecordingTimer(savedRecordingStartTime, savedSegmentCount);
-                        AppLog.d(TAG, "主题切换后恢复录制计时器（首次写入后）");
-                        // 重置恢复标志
-                        shouldResumeRecordingAfterRecreate = false;
-                        savedRecordingStartTime = 0;
-                        savedSegmentCount = 1;
-                    } else {
-                        startRecordingTimer();
-                        AppLog.d(TAG, "手动录制计时器已启动（首次写入后）");
-                    }
+                    startRecordingTimer();
+                    AppLog.d(TAG, "录制计时器已启动（首次写入后）");
                 }
             });
         });
@@ -2566,323 +2342,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 检查是否需要在主题切换后恢复录制
-     * 在摄像头初始化完成后调用，如果之前正在录制，则自动恢复录制
-     */
-    private void checkResumeRecordingAfterRecreate() {
-        if (!shouldResumeRecordingAfterRecreate) {
-            return;
-        }
-        
-        AppLog.d(TAG, "检测到需要恢复录制（主题切换后），将在2秒后自动恢复...");
-        
-        // 延迟2秒后恢复录制，确保所有摄像头都已准备就绪
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            // 再次检查是否已经在录制（可能用户手动开始了）
-            if (isRecording) {
-                AppLog.d(TAG, "已在录制中，跳过恢复录制");
-                shouldResumeRecordingAfterRecreate = false;
-                return;
-            }
-            
-            // 检查摄像头是否就绪
-            if (cameraManager == null || !cameraManager.hasConnectedCameras()) {
-                AppLog.w(TAG, "摄像头未就绪，无法恢复录制");
-                Toast.makeText(this, R.string.msg_resume_failed, Toast.LENGTH_SHORT).show();
-                shouldResumeRecordingAfterRecreate = false;
-                savedRecordingStartTime = 0;
-                savedSegmentCount = 1;
-                return;
-            }
-            
-            AppLog.d(TAG, "主题切换后自动恢复录制...");
-            startRecording();
-            Toast.makeText(this, R.string.msg_recording_resumed, Toast.LENGTH_SHORT).show();
-            // 注意：shouldResumeRecordingAfterRecreate 在首次数据写入回调中重置，
-            // 以便计时器使用保存的时间
-        }, 2000);  // 延迟2秒
-    }
-    
-    /**
-     * 检查并触发自动录制
-     * 在摄像头初始化完成后调用，如果用户启用了"启动自动录制"则自动开始录制
+     * 「启动自动录制」：这一趟还没自动开过、用户也没停过，就向协调器要一次。
+     *
+     * <p>开过没有、停过没有记在进程级的 {@link RecordingIntent} 上 ——
+     * 以前记在界面的字段里，界面一重建（切日夜模式、换语言、关掉再打开）就忘了，
+     * 于是用户明明按过停止，重建之后又自己录上了。什么时候真的开（环视出画面）、
+     * 录不起来怎么办，都是协调器的事；以前这里的「等两秒再开」和 30 秒定时检查都归到它那一个等待里。</p>
      */
     private void checkAutoStartRecording() {
-        // 如果正在恢复录制（主题切换后），跳过自动录制
-        if (shouldResumeRecordingAfterRecreate) {
-            AppLog.d(TAG, "正在恢复录制，跳过自动录制检查");
-            return;
-        }
-        
-        // 这一趟开过没有、用户停过没有，都记在进程级的 RecordingIntent 上 ——
-        // 以前记在界面的字段里，界面一重建（切日夜模式、换语言、关掉再打开）就忘了，
-        // 于是用户明明按过停止，重建之后又自己录上了
-        com.kooo.evcam.recording.RecordingIntent intent =
-                com.kooo.evcam.recording.RecordingIntent.current();
+        RecordingIntent intent = RecordingIntent.current();
         if (!intent.shouldAutoStart(appConfig.isAutoStartRecording())) {
             AppLog.d(TAG, "不自动开始录制（" + intent.describe() + "，开关="
                     + appConfig.isAutoStartRecording() + "）");
             return;
         }
         intent.noteAutoStarted();
-        isAutoRecordingPending = true;  // 标记自动录制正在等待中（防止 onPause 关闭摄像头）
-        AppLog.d(TAG, "检测到启用了启动自动录制，将在2秒后自动开始录制...");
-        
-        // 延迟2秒后开始录制，确保所有摄像头都已准备就绪
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            // 自动录制等待结束
-            isAutoRecordingPending = false;
-            
-            // 再次检查是否已经在录制（可能用户手动开始了）
-            if (isRecording) {
-                AppLog.d(TAG, "已在录制中，跳过自动录制");
-                return;
-            }
-            
-            // 检查摄像头是否就绪
-            if (cameraManager == null || !cameraManager.hasConnectedCameras()) {
-                AppLog.w(TAG, "摄像头未就绪，无法自动开始录制");
-                Toast.makeText(this, R.string.msg_auto_record_failed, Toast.LENGTH_SHORT).show();
-                return;
-            }
-            
-            AppLog.d(TAG, "自动开始录制...");
-            startRecording();
-            Toast.makeText(this, R.string.msg_recording_auto_started, Toast.LENGTH_SHORT).show();
-        }, 2000);  // 延迟2秒
-    }
-    
-    /**
-     * 启动自动录制定时检查
-     * 定期检查录制状态，如果启用了自动录制且不是手动停止的，则自动恢复录制
-     */
-    private void startAutoRecordingCheck() {
-        // 检查是否启用了自动录制
-        if (!appConfig.isAutoStartRecording()) {
-            AppLog.d(TAG, "未启用自动录制，跳过定时检查");
-            return;
-        }
-        
-        // 初始化 Handler
-        if (autoRecordingCheckHandler == null) {
-            autoRecordingCheckHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        }
-        
-        // 取消之前的检查任务
-        if (autoRecordingCheckRunnable != null) {
-            autoRecordingCheckHandler.removeCallbacks(autoRecordingCheckRunnable);
-        }
-        
-        // 创建定时检查任务
-        autoRecordingCheckRunnable = new Runnable() {
-            @Override
-            public void run() {
-                checkAndRestoreAutoRecording();
-                // 继续下一次检查
-                if (autoRecordingCheckHandler != null && autoRecordingCheckRunnable != null) {
-                    autoRecordingCheckHandler.postDelayed(this, AUTO_RECORDING_CHECK_INTERVAL_MS);
-                }
-            }
-        };
-        
-        // 延迟首次检查（给自动录制启动一些时间）
-        autoRecordingCheckHandler.postDelayed(autoRecordingCheckRunnable, AUTO_RECORDING_CHECK_INTERVAL_MS);
-        AppLog.d(TAG, "自动录制定时检查已启动（每 " + (AUTO_RECORDING_CHECK_INTERVAL_MS / 1000) + " 秒检查一次）");
-    }
-    
-    /**
-     * 停止自动录制定时检查
-     */
-    private void stopAutoRecordingCheck() {
-        if (autoRecordingCheckHandler != null && autoRecordingCheckRunnable != null) {
-            autoRecordingCheckHandler.removeCallbacks(autoRecordingCheckRunnable);
-            AppLog.d(TAG, "自动录制定时检查已停止");
-        }
-        autoRecordingCheckRunnable = null;
-    }
-    
-    /**
-     * 录像被非人为原因打断了（规格 §2.3）。
-     *
-     * <p>记进黑匣子、告诉用户被什么打断的；开着自动录制、额度还在的话，
-     * 开始等环视恢复 —— 不等主界面显示，环视一出画面就接回去。</p>
-     */
-    private void onRecordingInterrupted(com.kooo.evcam.recording.RecordingStops.Reason reason) {
-        boolean lost = reason == com.kooo.evcam.recording.RecordingStops.Reason.CAMERA_LOST;
-        String why = getString(reason == com.kooo.evcam.recording.RecordingStops.Reason.NO_DATA
-                ? R.string.rec_reason_no_data
-                : reason == com.kooo.evcam.recording.RecordingStops.Reason.WRITE_STALLED
-                ? R.string.rec_reason_write_stalled
-                : lost ? R.string.rec_reason_camera_lost : R.string.rec_reason_unknown);
-        interruptedAtMs = android.os.SystemClock.elapsedRealtime();
-        com.kooo.evcam.recording.RecordingIntent intent =
-                com.kooo.evcam.recording.RecordingIntent.current();
-        // 总原则（规格 §0）：用户开着录像，App 就该一直录着 —— 不管是手动开的还是自动录制开的。
-        // shouldRestore(true) 只剩三条：这一趟录起来过、不是人停的、没连着失败太多次
-        boolean wanted = intent.shouldRestore(true);
-        // 相机被拿走不算我们的失败：额度防的是「接回去又立刻停」的循环，这一种要等它放开才接，
-        // 不会循环。不豁免的话，一分钟内开三次车机的座舱画面，录像就再也不自动接了
-        resumeCounts = !lost;
-        if (wanted && (lost || resumeBudget.allows())) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason
-                    + "），等环视恢复后自动接回（已试 " + resumeBudget.attempts() + " 次）");
-            Toast.makeText(this, getString(R.string.msg_recording_interrupted_resuming, why),
-                    Toast.LENGTH_LONG).show();
-            armSurroundResume();
-            showCameraTakenHint(lost);
-        } else if (wanted) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason
-                    + "），自动恢复已连续失败 " + resumeBudget.attempts() + " 次，不再尝试");
-            Toast.makeText(this, getString(R.string.msg_recording_resume_gave_up,
-                    resumeBudget.attempts()), Toast.LENGTH_LONG).show();
-        } else {
-            // 人停过，或者这一趟从没录起来过：只告诉用户，不自己接
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason + "），不自动接回");
-            Toast.makeText(this, getString(R.string.msg_recording_interrupted, why),
-                    Toast.LENGTH_LONG).show();
-        }
+        AppLog.d(TAG, "启动自动录制开着，交给协调器：环视出画面就录");
+        recordingCoordinator.request(RecordingCoordinator.Why.AUTO_START);
     }
 
-    /** 环视此刻是不是在正常出画面 —— 「能获得视频流」以环视为准（规格 §2.2）。 */
-    private boolean surroundHealthy() {
-        if (cameraManager == null) {
-            return false;
-        }
-        com.kooo.evcam.camera.SingleCamera surround =
-                cameraManager.getCamera(com.kooo.evcam.camera.CameraSlots.KEY_SURROUND);
-        return surround != null && surround.isCameraOpened()
-                && surround.hasFramesWithin(SURROUND_FRESH_MS);
-    }
-
-    private void armSurroundResume() {
-        disarmSurroundResume();
-        surroundResumeCheck = new Runnable() {
-            @Override
-            public void run() {
-                if (surroundResumeCheck != this) {
-                    return;
-                }
-                com.kooo.evcam.recording.RecordingIntent intent =
-                        com.kooo.evcam.recording.RecordingIntent.current();
-                if (isRecording || isPreparingRecording || isAutoRecordingPending
-                        || !intent.shouldRestore(true)) {
-                    // 已经有人把它开起来了，或者人停了：不用等了
-                    surroundResumeCheck = null;
-                    syncRecordingClaim();
-                    return;
-                }
-                if (surroundHealthy()) {
-                    surroundResumeCheck = null;
-                    showCameraTakenHint(false);
-                    long gone = (android.os.SystemClock.elapsedRealtime() - interruptedAtMs) / 1000;
-                    if (resumeCounts) {
-                        resumeBudget.noteAttempt();
-                    }
-                    intent.noteRestoreAttempt();
-                    com.kooo.evcam.blackbox.BlackBox.noteImportant("环视正常了，自动接回录像（断了 "
-                            + gone + " 秒，第 " + resumeBudget.attempts() + " 次）");
-                    startRecording();
-                    Toast.makeText(MainActivity.this, R.string.msg_recording_resumed,
-                            Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                surroundResumeHandler.postDelayed(this, SURROUND_RESUME_POLL_MS);
-            }
-        };
-        surroundResumeHandler.postDelayed(surroundResumeCheck, SURROUND_RESUME_POLL_MS);
-        syncRecordingClaim();
-    }
-
-    private void disarmSurroundResume() {
-        showCameraTakenHint(false);
-        if (surroundResumeCheck != null) {
-            surroundResumeHandler.removeCallbacks(surroundResumeCheck);
-            surroundResumeCheck = null;
-            syncRecordingClaim();
-        }
-    }
-
-    /**
-     * 检查并恢复自动录制
-     * 条件：启用了自动录制 + 不是手动停止 + 当前没在录制 + 摄像头已连接
-     */
-    private void checkAndRestoreAutoRecording() {
-        // 开着功能、这一趟真的录起来过、而且不是用户自己停的 —— 三条缺一不可。
-        // 中间那条是新加的：以前「从来没录起来过」也会被这里开起来，
-        // 于是看完回放切回主界面、开机没插 U 盘，都会莫名其妙开始录制
-        com.kooo.evcam.recording.RecordingIntent intent =
-                com.kooo.evcam.recording.RecordingIntent.current();
-        if (!intent.shouldRestore(appConfig.isAutoStartRecording())) {
-            return;
-        }
-        
-        // 如果已经在录制，不需要恢复
-        if (isRecording) {
-            return;
-        }
-        
-        // 如果正在准备录制，不需要恢复
-        if (isAutoRecordingPending || isPreparingRecording) {
-            return;
-        }
-        
-        // 检查摄像头是否就绪
-        // 以环视为准（规格 §2.2）：以前是「任意一路相机连着」就接
-        if (!surroundHealthy()) {
-            AppLog.w(TAG, "自动录制检查：环视没在出画面，跳过恢复");
-            return;
-        }
-        // 正在等环视的那个检查会处理；额度用完了也不再试
-        if (surroundResumeCheck != null || !resumeBudget.allows()) {
-            return;
-        }
-        
-        // 满足所有条件，自动恢复录制
-        resumeBudget.noteAttempt();
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("30 秒检查：自动接回录像（第 "
-                + resumeBudget.attempts() + " 次）");
-        intent.noteRestoreAttempt();
-        AppLog.d(TAG, "自动录制检查：录制意外停了，接回去（第 "
-                + intent.restoreAttempts() + " 次）");
-        startRecording();
-        Toast.makeText(this, R.string.msg_recording_resumed, Toast.LENGTH_SHORT).show();
-    }
-    
-    /**
-     * 初始化息屏状态广播接收器
-     * 用于检测屏幕开关状态，实现息屏录制功能
-     */
-    private void initScreenStateReceiver() {
-        screenStateHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        
-        screenStateReceiver = new android.content.BroadcastReceiver() {
-            @Override
-            public void onReceive(android.content.Context context, android.content.Intent intent) {
-                String action = intent.getAction();
-                if (action == null) return;
-                
-                if (android.content.Intent.ACTION_SCREEN_OFF.equals(action)) {
-                    onScreenOff();
-                } else if (android.content.Intent.ACTION_SCREEN_ON.equals(action)) {
-                    onScreenOn();
-                }
-            }
-        };
-        
-        // 注册广播接收器
-        android.content.IntentFilter filter = new android.content.IntentFilter();
-        filter.addAction(android.content.Intent.ACTION_SCREEN_OFF);
-        filter.addAction(android.content.Intent.ACTION_SCREEN_ON);
-        registerReceiver(screenStateReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
-        
-        AppLog.d(TAG, "息屏状态广播接收器已注册");
-        
-        initStorageReceiver();
-        
-        // 初始化录制切换广播接收器（来自悬浮窗）
-        initToggleRecordingReceiver();
-    }
-    
     /**
      * 初始化录制切换广播接收器
      * 用于接收录制悬浮按钮的录制切换指令
@@ -2898,195 +2376,49 @@ public class MainActivity extends AppCompatActivity {
                     runOnUiThread(() -> {
                         toggleRecording();
                     });
-                } else if (ACTION_TAKE_PHOTO.equals(action)) {
-                    AppLog.d(TAG, "收到拍照广播（来自悬浮按钮）");
-                    runOnUiThread(MainActivity.this::takePicture);
                 }
             }
         };
         
         android.content.IntentFilter filter = new android.content.IntentFilter();
         filter.addAction("com.kooo.evcam.action.TOGGLE_RECORDING");
-        filter.addAction(ACTION_TAKE_PHOTO);
         registerReceiver(toggleRecordingReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
         
         AppLog.d(TAG, "录制切换广播接收器已注册");
     }
     
-    /** U 盘插拔：录制键的「可不可录」和状态条的余量跟着变。 */
-    private void initStorageReceiver() {
-        storageReceiver = new android.content.BroadcastReceiver() {
-            @Override
-            public void onReceive(android.content.Context context, android.content.Intent intent) {
-                // 存储探测结果有缓存，插拔之后得先作废
-                StorageHelper.clearCache();
-                refreshRecordAvailability();
-                updateStatusLine();
-            }
-        };
-        android.content.IntentFilter filter = new android.content.IntentFilter();
-        filter.addAction(android.content.Intent.ACTION_MEDIA_MOUNTED);
-        filter.addAction(android.content.Intent.ACTION_MEDIA_UNMOUNTED);
-        filter.addAction(android.content.Intent.ACTION_MEDIA_REMOVED);
-        filter.addAction(android.content.Intent.ACTION_MEDIA_BAD_REMOVAL);
-        filter.addAction(android.content.Intent.ACTION_MEDIA_EJECT);
-        // 这几条系统广播带的是卷的路径，不加 file 这个 scheme 收不到
-        filter.addDataScheme("file");
-        registerReceiver(storageReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
-    }
     
     /**
-     * 息屏时的处理逻辑
-     */
-    private void onScreenOff() {
-        isScreenOff = true;
-        AppLog.d(TAG, "检测到息屏");
-        
-// 取消可能存在的亮屏恢复录制任务
-        if (screenOnStartRunnable != null) {
-            screenStateHandler.removeCallbacks(screenOnStartRunnable);
-            screenOnStartRunnable = null;
-        }
-        
-        // 熄屏录制（开发者选项，规格 §3.1）：熄屏后接着录，并拿住唤醒锁不让车机睡。手动、自动都算
-        boolean keepCameraActive = appConfig.isScreenOffRecordingEnabled();
-
-        // 如果正在录制
-        if (isRecording) {
-            if (keepCameraActive) {
-                keepRecordingOffAtElapsed = android.os.SystemClock.elapsedRealtime();
-                keepRecordingOffAtUptime = android.os.SystemClock.uptimeMillis();
-                keepRecordingStops = 0;
-                // 唤醒锁由 ScreenOffRecording 自己拿：它注册了熄屏广播，主界面在不在都一样
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：熄屏录制生效，继续录");
-                return;
-            }
-            
-            // 熄屏持续录制：停车前在录，熄屏后接着录，手动、自动都一样。
-            // 不申请唤醒、不拉住车机 —— 车机睡了录像就停在那一刻，醒来接着录；
-            // 熄屏期间断了也不去抢相机，等亮屏再接（见 armSurroundResume）
-            if (appConfig.isScreenOffKeepRecording()) {
-                keepRecordingOffAtElapsed = android.os.SystemClock.elapsedRealtime();
-                keepRecordingOffAtUptime = android.os.SystemClock.uptimeMillis();
-                keepRecordingStops = 0;
-                AppLog.d(TAG, "熄屏持续录制开着，接着录");
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：熄屏持续录制开着，接着录（不唤醒车机）");
-                return;
-            }
-
-            // 如果未开启自动录制功能，不干预手动录制，也不退后台
-            if (!appConfig.isAutoStartRecording()) {
-                AppLog.d(TAG, "手动录制中，不受息屏影响，保持前台");
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：手动录制，不干预");
-                return;
-            }
-            
-            // 开启了自动录制但未开启息屏录制，10秒后停止录制，15秒后退后台
-            AppLog.d(TAG, "息屏录制未启用，将在10秒后停止录制，15秒后退后台...");
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：自动录制开、熄屏录制没生效"
-                    + (appConfig.isScreenOffRecordingStoredOn() ? "（存着是开，开发者选项没解锁）" : "")
-                    + "，10 秒后停录");
-            wasRecordingBeforeScreenOff = true;
-            
-            screenOffStopRunnable = () -> {
-                // 再次检查是否仍然息屏 —— 问实际状态。深睡时这个计时是停住的，醒来之后才到点，
-                // 而醒来时亮屏广播不来，只看标记会以为还黑着，把刚回到车上的人的录像停掉
-                if (!reconcileScreenState("10s-stop") || !isScreenOff) {
-                    AppLog.d(TAG, "屏幕已亮起，取消停止录制");
-                    return;
-                }
-                
-                // 检查是否仍在录制
-                if (!isRecording) {
-                    AppLog.d(TAG, "已不在录制状态，无需停止");
-                    return;
-                }
-                
-                // 检查是否启用了自动录制（防止在等待期间用户关闭了设置）
-                if (!appConfig.isAutoStartRecording()) {
-                    AppLog.d(TAG, "自动录制功能已关闭，忽略");
-                    return;
-                }
-                
-                // 检查息屏录制设置是否被更改（防止在等待期间用户开启了息屏录制）
-                if (appConfig.isScreenOffRecordingEnabled()) {
-                    AppLog.d(TAG, "息屏录制已被启用，继续录制");
-                    return;
-                }
-                
-                AppLog.d(TAG, "息屏已持续10秒，自动停止录制");
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止：熄屏已 10 秒（自动录制开、熄屏录制没生效）");
-                nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.SCREEN_OFF;
-                stopRecording();
-                runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, R.string.msg_screen_off_stopped, Toast.LENGTH_SHORT).show();
-                });
-            };
-            
-            screenStateHandler.postDelayed(screenOffStopRunnable, SCREEN_OFF_DELAY_MS);
-            
-            // 同时安排15秒后退后台（与停止录制任务并行）
-            scheduleBackgroundTask();
-        } else {
-            // 未在录制
-            if (keepCameraActive) {
-                // 开启了自动录制+息屏录制，保持前台（以便亮屏后可以立即录制）
-                AppLog.d(TAG, "息屏录制模式，保持相机活跃");
-                return;
-            }
-            
-            // 其他情况：15秒后退后台，释放相机资源
-            AppLog.d(TAG, "未在录制，将在15秒后退到后台释放相机资源...");
-            scheduleBackgroundTask();
-        }
-    }
-    
-    /** 亮屏时，熄屏持续录制那一段的结果记一行：熄屏多久、其中车机睡了多久、录像是不是一直在录。 */
-    private void noteKeepRecordingStretch() {
-        if (keepRecordingOffAtElapsed <= 0) {
-            return;
-        }
-        long offMs = android.os.SystemClock.elapsedRealtime() - keepRecordingOffAtElapsed;
-        long awakeMs = android.os.SystemClock.uptimeMillis() - keepRecordingOffAtUptime;
-        keepRecordingOffAtElapsed = 0;
-        keepRecordingOffAtUptime = 0;
-        int stops = keepRecordingStops;
-        keepRecordingStops = 0;
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏：熄屏持续录制这一段结束。熄屏 "
-                + offMs / 1000 + " 秒，其中车机睡了 " + Math.max(0L, offMs - awakeMs) / 1000
-                + " 秒；录像" + (stops == 0 && isRecording ? "一直在录"
-                        : "中途停过 " + stops + " 次（原因见上面的「录像停止原因」），现在"
-                        + (isRecording ? "在录" : "没在录")));
-    }
-
-    /**
-     * 安排息屏后退到后台的任务
+     * 熄屏 15 秒后退到后台 —— 主界面在熄屏这件事上唯一自己管的一步。
+     *
+     * <p>唤醒锁、录像（10 秒停 / 接着录）、1.5 秒没人要就关相机、亮屏接回因熄屏退下去的界面，
+     * 都在 {@link com.kooo.evcam.screen.ScreenState} 里按固定顺序做完了，这里不再有自己的一份。
+     * 到点先问一遍屏幕是不是真的还黑着：深睡时这个计时是停住的，醒来之后才到点，
+     * 而醒来时亮屏广播不来，只信旧标记就会把刚回到车上的人的界面退下去。
+     * 录像还在（或还在等环视接回）、熄屏录制生效，就留在前台。</p>
      */
     private void scheduleBackgroundTask() {
-        // 取消可能存在的退后台任务
-        if (screenOffBackgroundRunnable != null) {
-            screenStateHandler.removeCallbacks(screenOffBackgroundRunnable);
-        }
-        
+        cancelBackgroundTask();
+
         screenOffBackgroundRunnable = () -> {
-            // 再次检查是否仍然息屏 —— 问实际状态：深睡醒来后亮屏广播不来，标记是旧的
-            if (!reconcileScreenState("15s-background") || !isScreenOff) {
+            screenOffBackgroundRunnable = null;
+            if (!com.kooo.evcam.screen.ScreenState.refresh()) {
                 AppLog.d(TAG, "屏幕已亮起，取消退后台");
                 return;
             }
-            
-            // 如果正在录制，不退后台
-            if (isRecording) {
-                AppLog.d(TAG, "正在录制中，不退后台");
+
+            // 正在录制、或在等环视接回：不退后台
+            if (isRecording || recordingCoordinator.isWaiting()) {
+                AppLog.d(TAG, "正在录制中（或在等环视接回），不退后台");
                 return;
             }
-            
+
             // 熄屏录制开着，不退后台
             if (appConfig.isScreenOffRecordingEnabled()) {
                 AppLog.d(TAG, "息屏录制模式已启用，不退后台");
                 return;
             }
-            
+
             // 以前这里直接关相机，不看后视镜也不看悬浮窗 —— 于是开着后视镜时
             // 关掉两秒后又被它的看门狗打开，每次熄屏白做一遍。现在问同一张登记表
             com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
@@ -3099,192 +2431,26 @@ public class MainActivity extends AppCompatActivity {
 
             AppLog.d(TAG, "息屏已持续15秒，退到后台释放相机资源");
 
-            // 留个记号：是我们自己因为熄屏退下去的。亮屏时据此把界面接回来 ——
+            // 留个记号：是我们自己因为熄屏退下去的。亮屏时 Recovery 据此把界面接回来 ——
             // 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标
             appConfig.setUiLeftForScreenOff(true);
-            
-            // 关闭摄像头释放资源
-            if (cameraManager != null) {
-                cameraManager.closeAllCameras("screen off 15s");
-                AppLog.d(TAG, "已让所有摄像头去关");
-            }
-            
+
             // 退到后台
             moveTaskToBack(true);
-            
-            runOnUiThread(() -> {
-                Toast.makeText(MainActivity.this, R.string.msg_screen_off_background, Toast.LENGTH_SHORT).show();
-            });
-        };
-        
-        screenStateHandler.postDelayed(screenOffBackgroundRunnable, SCREEN_OFF_BACKGROUND_DELAY_MS);
 
-        // 相机不等那 15 秒：车机熄屏没几秒就深睡，晚一步就是开着相机睡过去
-        screenOffCameraRunnable = () -> {
-            if (!reconcileScreenState("1.5s-camera") || !isScreenOff || isRecording) {
-                return;
-            }
-            if (appConfig.isScreenOffRecordingEnabled()) {
-                return;
-            }
-            com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
-            if (needs.heldByAnyone()) {
-                AppLog.d(TAG, "熄屏，但相机还有人要: " + needs.describe() + "，等退后台那一步再说");
-                return;
-            }
-            if (cameraManager != null) {
-                // 关是相机线程去做的，这里不等；每一路关完时各自记一行「相机 X 已关」，带用时 ——
-                // 深睡前到底关没关好，看那几行
-                cameraManager.closeAllCameras("screen off");
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：让相机去关（深睡前）");
-                AppLog.i(TAG, "熄屏，没人要相机，先关掉 —— 别开着相机睡过去");
-            }
+            Toast.makeText(MainActivity.this, R.string.msg_screen_off_background, Toast.LENGTH_SHORT).show();
         };
-        screenStateHandler.postDelayed(screenOffCameraRunnable, SCREEN_OFF_CAMERA_DELAY_MS);
+
+        screenStateHandler.postDelayed(screenOffBackgroundRunnable, SCREEN_OFF_BACKGROUND_DELAY_MS);
     }
-    
-    /**
-     * 亮屏时的处理逻辑
-     */
-    private void onScreenOn() {
-        isScreenOff = false;
-        AppLog.d(TAG, "检测到亮屏");
-        noteKeepRecordingStretch();
-        
-// 取消可能存在的息屏停止录制任务
-        if (screenOffStopRunnable != null) {
-            screenStateHandler.removeCallbacks(screenOffStopRunnable);
-            screenOffStopRunnable = null;
-            // 如果仍在录制，说明息屏停止任务没有执行，重置标记
-            if (isRecording) {
-                AppLog.d(TAG, "息屏期间录制未被停止（亮屏及时），重置标记");
-                wasRecordingBeforeScreenOff = false;
-            }
-        }
-        
-        // 取消可能存在的退后台任务
+
+    private void cancelBackgroundTask() {
         if (screenOffBackgroundRunnable != null) {
             screenStateHandler.removeCallbacks(screenOffBackgroundRunnable);
             screenOffBackgroundRunnable = null;
-            AppLog.d(TAG, "亮屏，取消退后台任务");
         }
-        if (screenOffCameraRunnable != null) {
-            screenStateHandler.removeCallbacks(screenOffCameraRunnable);
-            screenOffCameraRunnable = null;
-        }
-
-        // 因为熄屏自己退下去的，亮屏就自己回来。界面已经被系统收走的那种情况
-        // 由 KeepAliveReceiver 接手（那时候这里根本不会被调用）
-        if (appConfig.didUiLeaveForScreenOff()) {
-            appConfig.setUiLeftForScreenOff(false);
-            AppLog.i(TAG, "亮屏，把因熄屏退下去的主界面接回前台");
-            try {
-                Intent back = new Intent(this, MainActivity.class);
-                back.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                startActivity(back);
-            } catch (Exception e) {
-                AppLog.w(TAG, "接回前台失败: " + e);
-            }
-        }
-        
-        // 检查是否启用了自动录制功能
-        if (!appConfig.isAutoStartRecording()) {
-            AppLog.d(TAG, "未启用自动录制功能，忽略亮屏事件");
-            return;
-        }
-        
-        // 检查息屏录制设置
-        if (appConfig.isScreenOffRecordingEnabled()) {
-            // 息屏录制已启用，无需恢复（一直在录制）
-            AppLog.d(TAG, "息屏录制已启用，无需恢复录制");
-            return;
-        }
-        
-        // 检查是否需要恢复录制（之前因息屏而停止了录制）
-        if (!wasRecordingBeforeScreenOff) {
-            AppLog.d(TAG, "息屏前未在录制或录制未被中断，无需恢复");
-            return;
-        }
-        
-        // 如果已经在录制，无需恢复（这种情况理论上不会发生，因为上面已经处理）
-        if (isRecording) {
-            AppLog.d(TAG, "已在录制中，无需恢复");
-            wasRecordingBeforeScreenOff = false;
-            return;
-        }
-        
-        AppLog.d(TAG, "亮屏后将在10秒后恢复录制...");
-        
-        // 如果摄像头已关闭，先重新打开
-        if (cameraManager != null && !cameraManager.hasConnectedCameras()) {
-            AppLog.d(TAG, "摄像头已关闭，先重新打开摄像头");
-            try {
-                cameraManager.openAllCameras();
-            } catch (Exception e) {
-                AppLog.e(TAG, "重新打开摄像头失败: " + e.getMessage(), e);
-            }
-        }
-        
-        screenOnStartRunnable = () -> {
-            // 再次检查是否仍然亮屏
-            if (isScreenOff) {
-                AppLog.d(TAG, "屏幕又息屏了，取消恢复录制");
-                return;
-            }
-            
-            // 重置标记
-            wasRecordingBeforeScreenOff = false;
-            
-            // 检查是否启用了自动录制（防止在等待期间用户关闭了设置）
-            if (!appConfig.isAutoStartRecording()) {
-                AppLog.d(TAG, "自动录制功能已关闭，不恢复录制");
-                return;
-            }
-            
-            // 检查息屏录制设置
-            if (appConfig.isScreenOffRecordingEnabled()) {
-                AppLog.d(TAG, "息屏录制已被启用，无需处理");
-                return;
-            }
-            
-            // 检查是否已在录制
-            if (isRecording) {
-                AppLog.d(TAG, "已在录制中，无需恢复");
-                return;
-            }
-            
-            // 检查摄像头是否就绪
-            if (cameraManager == null || !cameraManager.hasConnectedCameras()) {
-                AppLog.w(TAG, "摄像头未就绪，尝试重新打开...");
-                // 再次尝试打开摄像头
-                if (cameraManager != null) {
-                    try {
-                        cameraManager.openAllCameras();
-                        // 延迟2秒后再次尝试恢复录制
-                        screenStateHandler.postDelayed(() -> {
-                            if (!isScreenOff && !isRecording && cameraManager.hasConnectedCameras()) {
-                                AppLog.d(TAG, "摄像头已就绪，开始恢复录制");
-                                startRecording();
-                                Toast.makeText(MainActivity.this, R.string.msg_recording_resumed, Toast.LENGTH_SHORT).show();
-                            }
-                        }, 2000);
-                    } catch (Exception e) {
-                        AppLog.e(TAG, "打开摄像头失败: " + e.getMessage(), e);
-                    }
-                }
-                return;
-            }
-            
-            AppLog.d(TAG, "亮屏已持续10秒，自动恢复录制");
-            startRecording();
-            runOnUiThread(() -> {
-                Toast.makeText(MainActivity.this, R.string.msg_screen_on_resumed, Toast.LENGTH_SHORT).show();
-            });
-        };
-        
-        screenStateHandler.postDelayed(screenOnStartRunnable, SCREEN_ON_DELAY_MS);
     }
+
     /**
      * 切换录制状态（开始/停止）
      */
@@ -3329,53 +2495,41 @@ public class MainActivity extends AppCompatActivity {
         lastRecordButtonClickTime = currentTime;
         
         if (isRecording) {
-            // 用户手动停止录制，设置手动停止标记
-            // 这样自动录制检查不会自动恢复录制
-            com.kooo.evcam.recording.RecordingIntent.current().noteUserStopped();
+            // 用户手动停止：这一趟里没有任何一条路可以再自动开起来（RecordingIntent），
+            // 协调器收到 USER 也不会去等环视接回
+            RecordingIntent.current().noteUserStopped();
             AppLog.d(TAG, "用户手动停止录制，这一趟不再自动开始");
-            
-            // 用户手动停止录制，重置息屏录制标记
-            // 这样亮屏后不会错误地恢复录制
-            wasRecordingBeforeScreenOff = false;
-            nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.USER;
-            resumeBudget.reset();
-            disarmSurroundResume();
-            stopRecording();
+            recordingCoordinator.stop(RecordingStops.Reason.USER);
         } else {
-            // 用户手动开始录制，重置手动停止标记
-            // 这样后续如果录制异常停止，可以自动恢复
-            com.kooo.evcam.recording.RecordingIntent.current().noteUserStarted();
-            resumeBudget.reset();
+            // 用户手动开始：「停过」的记录作废，前面接回失败的额度也清掉
+            RecordingIntent.current().noteUserStarted();
+            recordingCoordinator.resetBudget();
             AppLog.d(TAG, "用户手动开始录制，自动恢复重新生效");
-            confirmInternalStorageThen(this::startRecording);
+            confirmInternalStorageThen(() -> recordingCoordinator.request(RecordingCoordinator.Why.USER));
         }
     }
 
     /**
      * 录制结果的画面反馈。
      *
-     * <p>协调器只管录不录得起来；指示器、计时器、Toast 都在这里 ——
-     * 它们出错只是看着别扭，和「有没有录上」不是一回事，
-     * 混在一起会让后者也没法单独验证。</p>
+     * <p>所有决定都在 {@link RecordingCoordinator} 里：要不要录、能不能录、什么时候开、
+     * 为什么停、停了接不接、还剩几次额度、黑匣子里的起止记录、前台服务、悬浮按钮的状态。
+     * 这里只把结果画出来 —— 指示器、计时器、Toast。它们出错只是看着别扭，
+     * 和「有没有录上」不是一回事，混在一起会让后者也没法单独验证。回调都在主线程。</p>
      */
     private final RecordingCoordinator.Listener recordingListener =
             new RecordingCoordinator.Listener() {
         @Override
         public void onRecordingStarted(java.util.Set<String> cameras, boolean sdFellBack) {
-            // 录像的起止以前不进黑匣子 —— 「哨兵模式下录像停了」这种问题，没有它就说不出是谁停的
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像开始: " + cameras);
-            recordingStartedAtMs = android.os.SystemClock.elapsedRealtime();
-            disarmSurroundResume();
             lastRefusalShown = null;
             isRecording = true;
             isPreparingRecording = true;
-            isAutoRecordingPending = false;
-            com.kooo.evcam.recording.RecordingIntent.current().noteRecordingStarted();
-            syncRecordingClaim();
 
             // 橙色旋转圈；首次写入回调里换成绿色闪烁。
             // 计时器也在那时才启动 —— 从「真的录上了」开始计，而不是从「尝试录」开始
             showPreparingIndicator();
+            // 等相机放开的那句提示随接回撤掉
+            showCameraTakenHint(false);
 
             if (sdFellBack && !AppConfig.isSdFallbackShownThisSession()) {
                 AppConfig.setSdFallbackShownThisSession(true);
@@ -3389,54 +2543,70 @@ public class MainActivity extends AppCompatActivity {
                                 : getString(R.string.msg_recording_started_n, count),
                         Toast.LENGTH_SHORT).show();
             }
+
+            // 悬浮按钮拉起来开录的：让用户看一眼「录上了」，再把主界面收回后台
+            if (hideMainAfterStart) {
+                hideMainAfterStart = false;
+                preparingHandler.postDelayed(() -> {
+                    if (isRecording && !isFinishing() && !isDestroyed()) {
+                        AppLog.d(TAG, "录制已开始，将 Activity 移到后台");
+                        moveTaskToBack(true);
+                    }
+                }, 1500);
+            }
         }
 
         @Override
-        public void onRecordingStopped() {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止");
+        public void onRecordingStopped(RecordingStops.Reason reason, long lastedMs, boolean willResume) {
             lastRefusalShown = null;
-            preparingHandler.removeCallbacks(preparingWatchdog);
             isRecording = false;
             isPreparingRecording = false;
-            syncRecordingClaim();
             setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
             stopRecordingTimer();
             // 状态条上「录像改写到别的盘」那句随这次录像结束
             updateStatusLine();
 
-            // 为什么停的：停之前有人写下原因的就用它；没人写，就是录制器自己停的
-            com.kooo.evcam.recording.RecordingStops.Reason reason = nextStopReason != null ? nextStopReason
-                    : com.kooo.evcam.recording.RecordingIntent.current().stoppedByUser()
-                    ? com.kooo.evcam.recording.RecordingStops.Reason.USER : com.kooo.evcam.recording.RecordingStops.Reason.UNKNOWN;
-            nextStopReason = null;
-            long lasted = recordingStartedAtMs > 0
-                    ? android.os.SystemClock.elapsedRealtime() - recordingStartedAtMs : 0;
-            recordingStartedAtMs = 0;
-            resumeBudget.noteRecordingLasted(lasted);
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止原因: " + reason
-                    + "，这一段录了 " + (lasted / 1000) + " 秒");
-            if (keepRecordingOffAtElapsed > 0) {
-                keepRecordingStops++;
-            }
-
-            if (reason == com.kooo.evcam.recording.RecordingStops.Reason.USER) {
-                if (!quietStop) {
-                    Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
+            // 为什么停的、接不接，协调器已经定了；这里只按它说的提示
+            String text;
+            int length = Toast.LENGTH_LONG;
+            switch (reason) {
+                case USER:
+                    text = getString(R.string.msg_recording_stopped);
+                    length = Toast.LENGTH_SHORT;
+                    break;
+                case STORAGE_FULL:
+                    text = getString(R.string.msg_storage_full_stopped);
+                    break;
+                case STORAGE_CANNOT_FREE:
+                    text = getString(R.string.msg_storage_cannot_free);
+                    break;
+                case SCREEN_OFF:
+                    text = getString(R.string.msg_screen_off_stopped);
+                    length = Toast.LENGTH_SHORT;
+                    break;
+                case NO_DATA:
+                    text = getString(willResume
+                            ? R.string.msg_record_start_retrying : R.string.msg_record_start_gave_up);
+                    break;
+                default: {
+                    String why = getString(reason == RecordingStops.Reason.WRITE_STALLED
+                            ? R.string.rec_reason_write_stalled
+                            : reason == RecordingStops.Reason.CAMERA_LOST
+                            ? R.string.rec_reason_camera_lost : R.string.rec_reason_unknown);
+                    text = getString(willResume
+                            ? R.string.msg_recording_interrupted_resuming
+                            : R.string.msg_recording_interrupted, why);
+                    break;
                 }
-            } else if (com.kooo.evcam.recording.RecordingStops.resumesOnSurround(reason)) {
-                onRecordingInterrupted(reason);
-            } else if (!quietStop) {
-                // 存储、熄屏那几条各自已经提示过了（它们都是 quietStop）；走到这里的不会重复
-                Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
             }
-            // 熄屏期间停下来的（熄屏持续录制录不下去了，或者别的原因）：照熄屏的规矩放开相机、
-            // 退后台，别开着相机睡过去；亮屏再接回。熄屏 10 秒停录那一条在熄屏时已经安排过了
-            if (reason != com.kooo.evcam.recording.RecordingStops.Reason.SCREEN_OFF) {
-                runOnUiThread(() -> {
-                    if (isScreenOff && reconcileScreenState("recording-stopped")) {
-                        scheduleBackgroundTask();
-                    }
-                });
+            Toast.makeText(MainActivity.this, text, length).show();
+            // 相机被别的程序拿走、正在等它放开：状态条上说一声
+            showCameraTakenHint(reason == RecordingStops.Reason.CAMERA_LOST && willResume);
+
+            // 熄屏期间停下来的（熄屏持续录制录不下去了，或者别的原因）：照熄屏的规矩退后台、
+            // 放开相机，别开着相机睡过去；亮屏再接回。熄屏 10 秒停录那一条协调器在熄屏时已经安排过了
+            if (reason != RecordingStops.Reason.SCREEN_OFF && com.kooo.evcam.screen.ScreenState.refresh()) {
+                scheduleBackgroundTask();
             }
         }
 
@@ -3458,31 +2628,18 @@ public class MainActivity extends AppCompatActivity {
     };
 
     /**
-     * 开始录制。
-     *
-     * <p>要不要录、能不能录、怎么录，都在 {@link RecordingCoordinator} 里；
-     * 这里只剩把结果画到屏幕上。</p>
-     */
-    /**
      * 把当前的相机管理器交给协调器。
      *
      * <p>每一处给 {@code cameraManager} 赋值之后都要调一次：它换了对象而协调器
-     * 还握着旧的，表现会是「按了录制，什么都没发生」—— 这种不报错的失败最难查。</p>
+     * 还握着旧的，表现会是「按了录制，什么都没发生」—— 这种不报错的失败最难查。
+     * 协调器是进程级的那一份（onCreate 里已经取到、挂上了监听）；相机建好之前它收到的「要录」
+     * 会一直等到这里把相机交过去、环视出画面为止。</p>
      */
     private void attachRecordingCoordinator() {
         if (recordingCoordinator == null) {
-            recordingCoordinator = new RecordingCoordinator(this);
-            recordingCoordinator.setListener(recordingListener);
+            recordingCoordinator = RecordingCoordinator.get(this);
         }
         recordingCoordinator.setCameraManager(cameraManager);
-    }
-
-    private void startRecording() {
-        recordingCoordinator.start();
-    }
-
-    private void stopRecording() {
-        recordingCoordinator.stop();
     }
 
     /**
@@ -3510,12 +2667,8 @@ public class MainActivity extends AppCompatActivity {
         // 主动退出之后不该再被亮屏拉回来
         appConfig.setUiLeftForScreenOff(false);
 
-        // 停止录制（如果正在录制）
-        disarmSurroundResume();
-        if (isRecording) {
-            nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.USER;
-            stopRecording();
-        }
+        // 停止录制（在录的停掉，在等环视的也不等了）
+        recordingCoordinator.stop(RecordingStops.Reason.USER);
 
         // 停止前台服务（确保清理）
         CameraForegroundService.stop(this);
@@ -3571,6 +2724,8 @@ public class MainActivity extends AppCompatActivity {
                     + "ms 强制结束。" + (mainDone ? "" : "主线程收尾没做完；")
                     + (stuck.isEmpty() ? "" : "相机 " + stuck + " 还没关好"));
         }
+        // 黑匣子在自己的线程上写：等它把上面几行写完再结束进程
+        com.kooo.evcam.blackbox.BlackBox.flush(1000);
         System.exit(0);
     }
 
@@ -3590,63 +2745,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /** 准备中：点已收成方块、一明一暗，外圈在转 —— 录制器还没起来。 */
+    /**
+     * 准备中：点已收成方块、一明一暗，外圈在转 —— 录制器还没写出第一笔数据。
+     * 迟迟不来怎么办由录制器判（15 秒没写出就报「没收到画面」），这里不再另设看门狗。
+     */
     private void showPreparingIndicator() {
         setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.PREPARING);
-        preparingHandler.removeCallbacks(preparingWatchdog);
-        preparingHandler.postDelayed(preparingWatchdog, PREPARING_TIMEOUT_MS);
-        AppLog.d(TAG, "进入准备中状态，" + PREPARING_TIMEOUT_MS + "ms 内等第一笔数据");
-    }
-
-    /**
-     * 准备中超时：第一笔数据迟迟不来。
-     *
-     * <p>先把这一次当作没录上 —— 停掉录制器（它会清掉那个一个字节都没写进去的分段文件），
-     * 状态回到待机；然后自动再开一次。用户手动做这两下是能恢复的，说明第二次通常能成，
-     * 那就不该让用户来做。重试也超时就停下来，明确告诉用户，不再无限重试。</p>
-     */
-    private void onPreparingTimedOut() {
-        if (!isPreparingRecording) {
-            return;
-        }
-        boolean managerRecording = cameraManager != null && cameraManager.isRecording();
-        boolean connected = cameraManager != null && cameraManager.hasConnectedCameras();
-        AppLog.w(TAG, "准备中超时：" + PREPARING_TIMEOUT_MS + "ms 没收到第一笔数据 " + instanceTag()
-                + " 第" + (preparingTimeouts + 1) + "次 managerRecording=" + managerRecording
-                + " camerasConnected=" + connected
-                + " resumeAfterRecreate=" + shouldResumeRecordingAfterRecreate
-                + " inBackground=" + isInBackground);
-
-        nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.NO_DATA;
-        quietStop = true;
-        suppressRecordErrorToastUntil = System.currentTimeMillis() + 5_000L;
-        try {
-            stopRecording();
-        } catch (Exception e) {
-            AppLog.w(TAG, "准备中超时后停止录制器失败: " + e);
-        } finally {
-            quietStop = false;
-        }
-        // 协调器的停止回调可能不来（录制器本来就没起来）—— 这里自己把状态摆正
-        isRecording = false;
-        isPreparingRecording = false;
-        stopRecordingTimer();
-        setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
-
-        preparingTimeouts++;
-        if (preparingTimeouts <= 1) {
-            Toast.makeText(this, R.string.msg_record_start_retrying, Toast.LENGTH_SHORT).show();
-            preparingHandler.postDelayed(() -> {
-                if (!isRecording && !isFinishing() && !isDestroyed()) {
-                    AppLog.i(TAG, "准备中超时后自动重试录制");
-                    startRecording();
-                }
-            }, 1_500L);
-        } else {
-            AppLog.w(TAG, "准备中连续超时 " + preparingTimeouts + " 次，不再自动重试");
-            preparingTimeouts = 0;
-            Toast.makeText(this, R.string.msg_record_start_gave_up, Toast.LENGTH_LONG).show();
-        }
     }
 
     /**
@@ -3661,15 +2765,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         isRecording = true;
-        // 录制根本没断，不存在「恢复」—— 那条路会以为要重开一次
-        shouldResumeRecordingAfterRecreate = false;
-        savedRecordingStartTime = 0;
-        // 这一段从什么时候开始也要接上：新界面的这个字段是 0，停的时候黑匣子会记成「录了 0 秒」
-        // （2026-09-26：录制中夜间模式切换、界面重建，之后录了 40 分钟，停时记的是 0 秒）
-        long now = android.os.SystemClock.elapsedRealtime();
-        recordingStartedAtMs = cameraManager.hasWrittenFirstData()
-                ? now - Math.max(0L, System.currentTimeMillis() - cameraManager.getFirstDataWrittenAtMs())
-                : now;
+        // 这一段从什么时候开始、停时录了多久，协调器记着（它不随界面重建），这里只画
         if (cameraManager.hasWrittenFirstData()) {
             isPreparingRecording = false;
             startRecordingTimer(cameraManager.getFirstDataWrittenAtMs(),
@@ -3700,8 +2796,6 @@ public class MainActivity extends AppCompatActivity {
         }
         AppLog.w(TAG, "回到前台：界面以为在录，录制器其实没在录 " + instanceTag()
                 + " preparing=" + isPreparingRecording);
-        preparingHandler.removeCallbacks(preparingWatchdog);
-        preparingTimeouts = 0;
         isRecording = false;
         isPreparingRecording = false;
         stopRecordingTimer();
@@ -3720,12 +2814,13 @@ public class MainActivity extends AppCompatActivity {
                 : com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
     }
 
+    /**
+     * 拍照键：交给相机层的拍照入口（悬浮按钮走的也是它）。
+     * 提示按真实结果说 —— 以前按下就弹「已保存」，不管拍没拍到。
+     */
     private void takePicture() {
-        if (cameraManager != null) {
-            cameraManager.takePicture();
-            Toast.makeText(this, R.string.msg_photo_taken, Toast.LENGTH_SHORT).show();
-            AppLog.d(TAG, "Picture taken");
-        }
+        com.kooo.evcam.camera.CameraManagerHolder.getInstance().getOrInit(this)
+                .takePhoto(new com.kooo.evcam.ui.PhotoFeedback(this));
     }
 
 
@@ -3745,44 +2840,22 @@ public class MainActivity extends AppCompatActivity {
     
 
     @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        
-        // 保存录制状态（用于主题切换后恢复）
-        if (isRecording) {
-            outState.putBoolean("wasRecording", true);
-            outState.putLong("recordingStartTime", recordingStartTime);
-            outState.putInt("segmentCount", currentSegmentCount);
-            AppLog.d(TAG, "onSaveInstanceState: 保存录制状态 - startTime=" + recordingStartTime + ", segment=" + currentSegmentCount);
-        } else {
-            outState.putBoolean("wasRecording", false);
-        }
-    }
-
-    @Override
     protected void onPause() {
         super.onPause();
         isInBackground = true;
         com.kooo.evcam.camera.StallWatch.setForeground(false);
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
-        
-        // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表
-        syncRecordingClaim();
-        com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
-        needs.release(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
-        if (cameraManager != null) {
-            if (needs.heldByAnyone()) {
-                AppLog.d(TAG, "退到后台，相机留着 —— 还有人要: " + needs.describe());
-            } else {
-                AppLog.d(TAG, "退到后台，没人要相机，关掉");
-                cameraManager.closeAllCameras("background");
-            }
-        }
+
+        // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表。
+        // 录像那一项由协调器登记（在录、在等环视都算），这里不替它填
+        // 关不关由相机层按登记表判（没人要 1.5 秒后关），这里不再自己关
+        com.kooo.evcam.camera.CameraNeeds.current().release(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        com.kooo.evcam.storage.StorageState.addListener(this, storageListener);
         AppLog.i(TAG, "onStart " + instanceTag() + " surround: " + describeComposite());
     }
 
@@ -3804,6 +2877,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+        com.kooo.evcam.storage.StorageState.removeListener(storageListener);
         // 界面是怎么离开的：关掉？只是切走？还是在重建？三种后果完全不同
         com.kooo.evcam.blackbox.BlackBox.note("主界面 onStop finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations()
@@ -3829,8 +2903,8 @@ public class MainActivity extends AppCompatActivity {
         
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording);
         
-        // 人已经在界面上了，屏幕一定亮着。熄屏标记还挂着就说明亮屏广播没来，补跑一次
-        reconcileScreenState("onResume");
+        // 人已经在界面上了，屏幕一定亮着。ScreenState 记的还是黑着就说明亮屏广播没来，让它补跑一次亮屏
+        com.kooo.evcam.screen.ScreenState.refresh();
 
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，
         // 还是用户自己点回来的
@@ -3838,50 +2912,16 @@ public class MainActivity extends AppCompatActivity {
 
         // 预览又要用相机了
         com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
-        syncRecordingClaim();
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
 
-        // U 盘可能在后台时插拔过
+        // U 盘可能在后台时插拔过：先按上一份快照画，再去后台探测一次（结果经 storageListener 回来）
         refreshRecordAvailability();
         updateStatusLine();
+        com.kooo.evcam.storage.StorageState.refresh(this, "resume");
         
-        // 返回前台时，检查摄像头连接状态
-        if (cameraManager != null && wasInBackground) {
-            // 初始化 Handler（如果需要）
-            if (reopenCameraHandler == null) {
-                reopenCameraHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-            }
-            
-            // 取消之前的延迟任务（防抖：避免 onResume 被多次调用时重复打开摄像头）
-            if (reopenCameraRunnable != null) {
-                reopenCameraHandler.removeCallbacks(reopenCameraRunnable);
-                AppLog.d(TAG, "Cancelled previous camera reopen task (debounce)");
-            }
-            
-            // 创建新的延迟任务
-            reopenCameraRunnable = () -> {
-                // 只在没有正在录制时重新打开（录制时摄像头应该保持连接）
-                if (!isRecording) {
-                    AppLog.d(TAG, "Reopening cameras after returning from background");
-                    cameraManager.openAllCameras();
-
-                    // 这里原本还有一段：只要开着「启动自动录制」，回到前台就开始录。
-                    // 它不看用户停没停过，也不看这一趟有没有录起来过 ——
-                    // 于是「打开视频回放再切回主界面」就会自己录上。
-                    // 回到前台不是开始录制的理由：启动时开一次由 checkAutoStartRecording 管，
-                    // 录着录着意外停了由 checkAndRestoreAutoRecording 接，两条都在
-                    // RecordingIntent 里统一判断。
-                } else {
-                    AppLog.d(TAG, "Recording in progress, cameras should still be connected");
-                }
-                
-            };
-            
-            // 延迟100ms后执行（只有最后一次 onResume 会真正执行）
-            reopenCameraHandler.postDelayed(reopenCameraRunnable, 100);
-        }
+        // 回到前台要用相机：上面 claim(PREVIEW) 那一下相机层自己会开（reconcileCameras）
 }
 
     @Override
@@ -3906,8 +2946,10 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
         final boolean othersNeedCamera = needs.heldByAnyoneExcept(
                 com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+        // 协调器还在等环视开录的（开机自启动、悬浮按钮拉起）也算有人要：管线拆了它就永远开不起来
         final boolean keepPipeline = cameraManager != null && !cameraManager.isReleased()
-                && (cameraManager.isRecording() || isChangingConfigurations() || othersNeedCamera);
+                && (cameraManager.isRecording() || isChangingConfigurations() || othersNeedCamera
+                || recordingCoordinator.isWaiting());
         if (othersNeedCamera && cameraManager != null && !cameraManager.isReleased()) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面销毁，但相机还有人要（"
                     + needs.describe() + "），不释放");
@@ -3937,28 +2979,8 @@ public class MainActivity extends AppCompatActivity {
 
         preparingHandler.removeCallbacksAndMessages(null);
 
-        // 停止自动录制定时检查
-        stopAutoRecordingCheck();
-        disarmSurroundResume();
-        
-        // 清理息屏录制相关资源
-        if (screenStateReceiver != null) {
-            try {
-                unregisterReceiver(screenStateReceiver);
-            } catch (Exception e) {
-                AppLog.w(TAG, "注销息屏广播接收器时出错: " + e.getMessage());
-            }
-            screenStateReceiver = null;
-        }
-        
-        if (storageReceiver != null) {
-            try {
-                unregisterReceiver(storageReceiver);
-            } catch (Exception e) {
-                AppLog.w(TAG, "注销 U 盘插拔广播接收器时出错: " + e.getMessage());
-            }
-            storageReceiver = null;
-        }
+        // 协调器是进程级的，录像和它的等待都不随这个界面走；只把画面反馈摘掉
+        recordingCoordinator.removeListener(recordingListener);
 
         // 清理录制切换广播接收器
         if (toggleRecordingReceiver != null) {
@@ -3969,17 +2991,9 @@ public class MainActivity extends AppCompatActivity {
             }
             toggleRecordingReceiver = null;
         }
-        if (screenStateHandler != null) {
-            if (screenOffStopRunnable != null) {
-                screenStateHandler.removeCallbacks(screenOffStopRunnable);
-            }
-            if (screenOnStartRunnable != null) {
-                screenStateHandler.removeCallbacks(screenOnStartRunnable);
-            }
-            if (screenOffBackgroundRunnable != null) {
-                screenStateHandler.removeCallbacks(screenOffBackgroundRunnable);
-            }
-        }
+        // 熄屏退后台的那一步：界面都没了，不用退
+        com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
+        cancelBackgroundTask();
 
         // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉
         if (!keepPipeline) {
@@ -4054,8 +3068,9 @@ public class MainActivity extends AppCompatActivity {
         // 记录日志（始终记录）
         AppLog.w(TAG, "Recording error, deleted " + deletedFiles.size() + " corrupted files: " + deletedFiles);
 
-        // 准备中超时后看门狗停掉录制器，清掉的正是那个空分段 —— 这是在收拾，不是新的异常
-        if (System.currentTimeMillis() < suppressRecordErrorToastUntil) {
+        // 准备中超时后按「没收到画面」停掉录制器，清掉的正是那个空分段 —— 这是在收拾，不是新的异常。
+        // 这个回调是发到主线程上来的，到这里时协调器已经把停录原因记下了
+        if (recordingCoordinator.lastStopReason() == RecordingStops.Reason.NO_DATA) {
             AppLog.d(TAG, "准备中超时的清理，不弹录制异常");
             return;
         }

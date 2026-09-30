@@ -1,11 +1,373 @@
 # Changelog
 
 Notable changes only, newest first. Each version's section becomes the body of its
-[GitHub release](../../releases).
+[GitHub release](../../releases) and the text of the in-app update dialog.
+
+Alpha sections: one line per change, what changed and nothing else. Beta and stable
+sections: written for users, reviewed before release. Why a change was made lives in the
+commit message, not here.
 
 ## [Unreleased]
 
 Nothing yet.
+
+## [2.0.0] - 2026-09-30
+
+Changes since 1.0.0.
+
+Small updates will follow often for a while. They only refine the driving info bar and leave
+the main features alone. Each one is a stable release, so there is no need to install every one.
+
+### Upgrade notes
+
+- When the installer finishes, tap **Back** at the top left, not **Open**. Otherwise the head
+  unit's installer gets stuck and later installs or updates fail.
+- The "Custom" stream profile is gone. If you used it, the app switches to Zeekr 7X (surround
+  composite).
+- **Keep recording when the screen goes off** and **Timestamp overlay** are now on by default.
+  Recording with the screen off needs the car's Sentry Mode, which keeps the head unit awake;
+  without it the car sleeps and recording pauses until it wakes.
+
+### New and improved
+
+- Malay interface.
+- Fisheye correction (**Straighten**) on every screen: the main screen, photo playback and
+  video playback.
+- Recording can cover the surround view alone, or the surround view plus the cabin cameras,
+  with more detailed camera, quality and frame-rate options (Settings → Recording).
+- Video playback shows all cameras in sync. Tap one to enlarge it, tap again to go back.
+- Photo playback uses the same layout as the main screen. One tap enlarges a view.
+- Super mirror button mode: tap the top, bottom, left or right of the window to switch to the
+  front, rear, left or right camera.
+- The super mirror shows "tap to resume" when its picture stops, and reconnects by itself
+  after the car wakes.
+- An interrupted recording, for example when the USB drive drops out, resumes by itself.
+- Improved stability and smoother operation.
+
+### Experimental
+
+- Driving info bar (off by default, Settings → Recording): a strip under the recorded video
+  with vehicle state such as turn signals, steering, gear, pedals, speed, doors, lights,
+  odometer and position. Only items verified on the car are live; the rest are crossed out.
+- Vehicle info (Settings → System): the vehicle signals the head unit exposes and their
+  current state.
+
+## [1.80.0-alpha] - 2026-09-30
+
+- Info bar: auto hold lights only while the car is standing still.
+- Vehicle info page: dark labels now read "consistent in on-car tests (still
+  cross-checked)"; every signal is an experimental finding.
+- Vehicle info page: Sentry Mode on / off (seen once, shown as unverified).
+
+## [1.79.0-alpha] - 2026-09-30
+
+- Info bar: auto hold lights while the car is actually being held (lab-confirmed holding
+  state), and the fog cell follows the rear fog lamp; both cells are live for everyone.
+- Daytime running lights confirmed as read; the cell stays as it is.
+- Vehicle info page: auto hold holding, indicator display, stock view pop-up, mirror
+  reverse tilt (both sides) and day/night added; light switch shows the low-beam position.
+
+## [1.78.0-alpha] - 2026-09-30
+
+- Signal table has three levels: confirmed, provisional (usable, details pending) and
+  unverified; the info bar activates confirmed and provisional cells by default.
+- Steering, pedals and daytime running lights are provisional, so those three info-bar
+  cells are live for everyone.
+- Vehicle info page shows the three levels by label tone.
+
+## [1.77.0-alpha] - 2026-09-30
+
+- Signal table aligned with the lab handbook: pedal depths and daytime running lights
+  count as unverified until their range and daytime reading are measured (those two
+  info-bar cells are crossed out by default); high beam, odometer, range, battery,
+  temperatures, AEB, lane keeping and rear collision warning count as verified.
+- Forward collision warning read from its sensitivity setting.
+- Vehicle info page: position lamps, light switch position, battery temperature, lane
+  change assist, automatic lane change and door open warning added; indicator status
+  shows hazard.
+
+## [1.76.0-alpha] - 2026-09-30
+
+- Info bar always lays out every cell; cells not verified on the car are drawn crossed
+  out instead of being left off.
+- Developer switch renamed "Activate all items": it turns the unverified cells live so
+  they can be checked on the car.
+- Speed, odometer and position draw the slash when they have no data, like the icons.
+
+## [1.75.0-alpha] - 2026-09-29
+
+- Info bar shows only cells whose signals are verified on the car by default; the three
+  per-cell switches are gone, replaced by "Show all driving info" (developer mode only).
+- Auto hold is no longer lit from the auto-hold setting switch; the cell stays empty until
+  the holding state is found.
+- Throttle depth counted as verified.
+- Steering icon rotation scale is one constant, waiting for lock-to-lock data.
+
+## [1.74.0-alpha] - 2026-09-29
+
+- Speed: the sensor reports m/s; converted to km/h (×3.6) for the info bar and the
+  vehicle info page.
+- Hazard lights taken from the indicator status (3); the dedicated hazard signal, which
+  never reads, removed from the table.
+- Gear N recognised.
+- Vehicle info page: frunk, tailgate and sunroof shade added.
+
+## [1.73.0-alpha] - 2026-09-29
+
+- Vehicle signals now come by subscription from the head unit's vehicle interface (function
+  watcher plus sensor listeners, read once after registering, reconciled every 3 s); float
+  sensors still read every 200 ms.
+- Signal table (`telemetry.Signal`) is the single list of what is read and how it decodes;
+  the info bar is derived from it.
+- Info bar mapping updated: turn signal from the steady indicator status; driver door and
+  driver belt placed by the car's driver side; door zones corrected.
+- Settings › System › Vehicle info (experimental): every known signal with its current
+  state, grouped; reading starts when the page opens and everything is released when it
+  closes.
+
+## [1.72.0-alpha] - 2026-09-29
+
+- Info bar v3: icons redrawn to survive video compression (strokes 6 px and up, solid fills,
+  no translucency, no dashes; unknown = dark fill with a bright slash); larger numbers
+  (steering 32, pedals 30, odometer 28, position 26, badges 20); steering angle centred on
+  the digits with the degree sign to the right, yellow when turned left, white when right,
+  no sign; brake bar red, throttle bar green; daytime running lights drawn from the 7X front
+  (body outline, Stargate band, emblem, the two thin daytime lines below the band, lit with
+  a glow). Cell widths rebalanced, gap 12.
+
+## [1.71.0-alpha] - 2026-09-29
+
+- Driving info bar, second pass on the design: seat belts moved into the cabin cell
+  (top-view car, four doors, five seats: two in front, three behind, an unbuckled seat in
+  red); brake and throttle are one cell with two horizontal bars, brake above, throttle
+  below, the depth in percent to the left of each; the four lamp icons differ by their rays
+  (fan for daytime running, slanted for low beam, straight for high beam, slanted with a
+  wave for fog); icons are outlines when off and filled when on. New cells: hands on the
+  wheel (no reading found on the car yet, shown as no data) and six safety-assist switches
+  read from the car (AEB, forward collision warning, lane departure warning, lane keeping
+  aid, blind spot assist, rear collision warning). Position is shown on two lines.
+
+## [1.70.0-alpha] - 2026-09-29
+
+- Driving info bar: a new cell shows whether the car's own 360 view is on screen (a car
+  with four arcs; lit while the stock view is showing). It is read from the ECARX function
+  the lab verified (2 normally, 1 while the stock view is up in reverse) and sits right after
+  the driving-assist cells, with a high priority, since the stock view is what takes the
+  cameras away from this app.
+
+## [1.69.0-alpha] - 2026-09-29
+
+- **The driving info bar reads the car through ECARX's in-car API**, the route
+  zeekr-shortcut-lab verified on the 7X inside the App Lab container: `Car.create`, then
+  the function and sensor managers, read every 200 ms without any vehicle permission. Turn
+  signals (with a 1.5-second hold across the blink, both sides meaning hazard), gear, brake
+  and throttle depth, steering angle, speed, odometer, doors per zone, seat belts, low and
+  high beam, daytime running and fog lights, auto hold and lane centering now come from the
+  car; position still comes from the location service, which also supplies speed only when
+  the car does not. The first round of readings is written to the black box. The
+  `android.car` source added in 1.68.0 is removed: it cannot work in this container.
+- Verified on the car so far (by the lab app): turn signals, gear P/R/D, brake, driver's
+  door, low beam, daytime running lights, auto hold. Speed and steering units, the other
+  doors' left/right assignment, seat-belt values and lane centering are read but not yet
+  confirmed; there is no known reading for ACC.
+
+## [1.68.0-alpha] - 2026-09-29
+
+- **Driving info bar under the recorded video (experimental, off by default).** Settings →
+  Recording → "Driving info bar" adds a 100-pixel strip below every recorded stream, in the
+  app's dark grey, showing vehicle state as icons, numbers and bars only: turn signals,
+  hazard lights (red triangle), steering wheel (rotates with the angle, degrees in the
+  middle), gear, throttle and brake (pedal icon plus a bar), speed, auto hold, ACC, lane
+  centering, doors, seat belts, daytime running, low beam, high beam and fog lights,
+  odometer, and latitude/longitude. Sub-switches turn speed, the pedals and the steering
+  wheel off individually. A signal that cannot be read is drawn dimmed with a slash, never
+  as "off". Narrower streams keep the higher-priority cells and drop the rest.
+- Where the signals come from: the vehicle property service (`android.car`, read by
+  reflection) and the location service (position, and GPS speed when the car gives none).
+  On this head unit the container is known to refuse vehicle properties, so most cells are
+  expected to show "no data" until another route exists; what each source could and could
+  not read is written to the black box when a recording starts. The app now declares the
+  location permission and asks for it when the bar is switched on.
+- Playback knows the strip: tap-to-enlarge and fisheye correction treat only the picture
+  above it as the 2×2 grid; the strip is shown as recorded. With the bar on, recording uses
+  the MediaCodec path (like the 2×2 grid, it needs GL to compose the frame).
+- Releases are drafts from now on: only the repository owner can see and download them,
+  and the in-app update check no longer sees new versions.
+
+## [1.67.0-beta] - 2026-09-29
+
+Changes since 1.0.0.
+
+### Upgrade notes
+
+- When the installer finishes, tap **Back** at the top left, not **Open**. Otherwise the head
+  unit's installer gets stuck and later installs or updates fail.
+- The "Custom" stream profile is gone. If you used it, the app switches to Zeekr 7X (surround
+  composite).
+- **Keep recording when the screen goes off** and **Timestamp overlay** are now on by default.
+
+### New and improved
+
+- Malay interface.
+- Fisheye correction (**Straighten**) on every screen: the main screen, photo playback and
+  video playback.
+- Recording can cover the surround view alone, or the surround view plus the cabin cameras,
+  with more detailed camera, quality and frame-rate options (Settings → Recording).
+- Video playback shows all cameras in sync. Tap one to enlarge it, tap again to go back.
+- Photo playback uses the same layout as the main screen. One tap enlarges a view.
+- Super mirror button mode: tap the top, bottom, left or right of the window to switch to the
+  front, rear, left or right camera.
+- The super mirror shows "tap to resume" when its picture stops, and reconnects by itself
+  after the car wakes.
+- An interrupted recording, for example when the USB drive drops out, resumes by itself.
+- Improved stability and smoother operation.
+
+## [1.67.0-alpha] - 2026-09-29
+
+- **Taking a photo opens the cameras when they are closed, and says what actually happened.**
+  The floating button's photo action used to ask the main screen to take it, or launch the
+  main screen and try once after 3 seconds; with the cameras closed (main screen in the
+  background, no recording, super mirror off) nothing was taken, yet "Photo saved" was shown.
+  Now the main screen's photo button and the floating button share one photo path: it registers
+  as a camera user, so closed cameras open; a camera with no picture output (main screen in
+  the background) gets an invisible output while the photo is pending; the shutter fires
+  once the cameras deliver frames (up to 10 s, then with the ones that do). The message
+  reports the real result: saved, saved for some cameras, or not taken and why. The cameras
+  close again 1.5 s after the photo if nobody else needs them.
+- Settings -> Storage: a note under the storage location. With Sentry Mode on after you
+  leave the car, only the USB-A port stays powered; a drive on the Type-C port works too,
+  because recording moves to the USB-A drive when the Type-C one loses power.
+
+## [1.66.0-alpha] - 2026-09-28
+
+- **One way to rebuild a camera's capture session.** Whenever a camera's outputs change
+  (recording starts or stops, the super mirror attaches or detaches, the photo channel is
+  dropped, a configuration attempt fails, a surface was abandoned) the request goes through
+  a single entry that keeps at most one rebuild queued. The old session is closed first and
+  the new one is built when the close completes (with one fallback if the close callback
+  never arrives); a request that arrives while a configuration is in flight voids that
+  attempt, which is closed and rebuilt once with the latest outputs, tracked by a
+  generation number. Closing the camera, forcing a reopen and reconnecting after a
+  disconnect all void in-flight work the same way. This replaces five separate entry
+  points with their own delays, a "rebuild pending" flag and a separate fallback task.
+  Fifth step of the consolidation plan, part three.
+
+## [1.65.0-alpha] - 2026-09-28
+
+- **One judge of whether the cameras are open: the registry of who needs them.** The main
+  screen's preview, a recording (running or waiting for the surround view) and the super
+  mirror each register their need; when someone registers, the cameras open, and 1.5
+  seconds after nobody needs them they close. That single rule replaces the four places
+  that used to decide (main screen going to the background, 1.5 s and 15 s after
+  screen-off, the mirror service), the main screen's "reopen after returning from the
+  background" timer and the recording coordinator's own open. The screen-off case works
+  through it: the mirror and the paused main screen unregister, so the cameras close
+  before deep sleep as before.
+- The camera's photo capture and the picture-adjust window's changes are sent from the
+  camera's own thread instead of the main thread, and the "front camera is mirrored" fact
+  is read once when the camera opens instead of on the view thread.
+- Two configuration slots naming the same camera no longer create a second, inert camera
+  object ("secondary instance"); the second slot is left empty and the camera mapping
+  note says so. Fifth step of the consolidation plan, part two.
+
+## [1.64.0-alpha] - 2026-09-28
+
+- **The foreground service lives as long as "keep alive" is on or a recording is running.**
+  Stopping a recording now only switches its notification back to "running in the
+  background" instead of stopping the service (which then restarted itself a second later,
+  flashing the notification and re-running the start-up restore). Its self-restart after
+  being killed or swiped away, the system's sticky restart, and the sticky flag of the
+  super-mirror, floating-button and background-recording services all follow the one
+  "keep alive" switch. The minute tick, the static broadcasts and the accessibility
+  heartbeat start the service only when it is actually missing (they used to restart it
+  every minute). The start-up restore runs once per service start, not twice. Sixth step
+  of the consolidation plan, part two.
+- Super mirror, button mode: the four direction buttons are gone. The window is split along
+  its diagonals into four parts, top, bottom, left and right, which switch to the front, rear,
+  left and right camera. Nothing is drawn on them and a tap works at any time, with no need
+  to bring buttons up first; the tapped part flashes brand orange at 50% as confirmation.
+  Dragging, swiping up and down for framing and pinching work as before. The window no
+  longer has a larger minimum size in this mode.
+  With "Front and rear only" on, the window is split into a top half (front) and a bottom
+  half (rear) instead, so that setting applies to tapping as it does to swiping.
+
+## [1.63.0-alpha] - 2026-09-28
+
+- **One source of screen state.** Screen-off comes from the broadcast; while the screen is
+  dark the app asks the system every two seconds whether it is lit again, which stands in for
+  the screen-on broadcast that never arrives after deep sleep. Everything reacts in one fixed
+  order: the screen-off wake lock, the recording rule (stop after 10 s when "keep recording
+  when the screen is off" is off; on screen-on decide whether to resume), closing the cameras
+  1.5 s after screen-off when nobody needs them, bringing the main screen back after
+  screen-on if it had retreated because of screen-off, then the main screen's own 15-second
+  retreat and the super mirror's unbind/rebind. Removed: the main screen's, the mirror
+  service's and the wake-lock code's separate receivers and flags, the five "ask the system
+  again" corrections, the foreground service's minute check of the screen, and the
+  keep-alive receiver's own copy of "bring the main screen back". Screen-on also runs the
+  normal restore (overlays, recording) as before. Sixth step of the consolidation plan,
+  part one.
+- After a recording stops while the screen is dark, the cameras are closed if nobody needs
+  them, also when the main screen is not showing.
+
+## [1.62.0-alpha] - 2026-09-28
+
+- **One judge of whether a camera is alive.** The frame-age watchdog (8 s without progress,
+  clock that excludes deep sleep, three attempts then a minute's rest, three rounds then
+  stop) is now the only detector: on the first attempt it rebuilds the capture session, after
+  that it reopens the camera, and it also covers an open request that never got an answer.
+  Removed: the foreground service's 10-second "repair loop" (it reopened every closed camera
+  unconditionally, reset the back-off each time and opened cameras nobody was using), each
+  camera's own 2.5-second wall-clock stall check (after deep sleep it saw hours of "stall"),
+  and the recording start's "force reopen all cameras" escalation (recording waits up to two
+  seconds for stable frames, then starts with the cameras that are ready). A forced reopen
+  already under way is no longer started a second time, and a closed camera drops its
+  per-run flags (taken by another app, raised reconnect floor). Fifth step of the
+  consolidation plan, part one; closing policy and session-rebuild coalescing come next.
+- Indentation left behind by the 1.61.0 edits is repaired (whitespace only).
+
+## [1.61.0-alpha] - 2026-09-28
+
+- **One judge of whether recording is healthy: the recorder.** If nothing has been written to
+  the file for 15 seconds, counted from the start or from the last write, the recorder reports
+  it once and the coordinator stops the recording and resumes it through the usual path
+  (nothing ever written counts as "no picture", a stall after writing as "cannot write"). In
+  those 15 seconds the recorder's own repairs run as before: switching drives, rebuilding the
+  encoder, quick retries every 5 s (the old cap of 60 retries is gone; the 15-second judge ends
+  them). Removed: the camera layer's separate 15-second watchdog, the main screen's 10-second
+  "no first data" watchdog and its own retry, and the recorder's 10-second "first write
+  timeout"; the first write is now noticed as it happens instead of by polling the file size
+  every half second. Fourth step of the consolidation plan.
+
+## [1.60.0-alpha] - 2026-09-27
+
+- **One way to start recording.** Every path that wants recording (the record button, the
+  floating button in the foreground or the background, auto-start on launch, resume after
+  an interruption, screen-on) asks one coordinator, which waits for the surround camera to
+  show frames and then starts: one wait, one retry budget. The main screen no longer runs
+  its own start timers (the seven "wait two seconds" chains, the 30-second check, the
+  restore after a theme change and the 10-second screen-on resume are gone) and no longer
+  keeps its own copy of the decision; it paints what the pipeline is doing. The floating
+  button's background start used to bypass the storage checks, the write watchdog and the
+  USB-only rule; it now goes through the same entry. Third step of the consolidation plan.
+- Screen off with "keep recording when the screen is off" switched off: recording stops
+  10 seconds after the screen goes dark whether it was started by hand or automatically (it
+  used to stop only automatic recordings). On screen-on it resumes only when "auto-record on
+  launch" is on.
+- The pipeline's stop reasons (drive full, nothing written, camera taken by another app, no
+  first data) are handled the same way whether or not the main screen is showing; the toast
+  and the status-bar hint follow the reason.
+
+## [1.59.0-alpha] - 2026-09-27
+
+- **No file I/O on the main thread for storage or the black box.** The black box writes on
+  its own thread (every important line used to fsync on the caller's thread: recording
+  start/stop, screen off, every settings switch); quit and crash wait for it briefly.
+  Storage is now a snapshot taken on a background thread (drive present, free space,
+  mounted volumes), refreshed on drive events, recording start/stop, a drive switch, a
+  settings change, return to the main screen and every 30 s while it is showing; the status
+  bar, the record button's availability, the pre-start check and the 30-second free-space
+  check read the snapshot instead of stat-ing the USB drive, which is what stalled the
+  screen when a drive dropped. Second step of the consolidation plan.
 
 ## [1.58.0-alpha] - 2026-09-27
 
@@ -31,7 +393,7 @@ Nothing yet.
   (`fitCorrected`, default fill), ready for per-cell adjustment in the profile editor's
   layout; nothing edits it yet. With correction off nothing changes.
 
-## [1.57.0-beta] - 2026-09-27
+## [1.57.0-alpha] - 2026-09-27
 
 - **Recording keeps going around the car's own camera use.** On this head unit only one of
   the cabin and surround cameras can be open at a time, and the camera service decides by
