@@ -193,6 +193,8 @@ public final class FisheyeGlPipe {
     private final int[] size = new int[2];
     private FloatBuffer quad;
     private volatile long frames;
+    /** swap 成功才加。导出靠这个数等最后一帧，不能在画完之前加。 */
+    private volatile long presented;
     private long startedAtMs;
 
     private FisheyeGlPipe(String name, SurfaceTexture output, int inputWidth, int inputHeight,
@@ -311,9 +313,9 @@ public final class FisheyeGlPipe {
         this.handler = new Handler(thread.getLooper());
     }
 
-    /** 已经画出去的帧数。导出时用来等最后一帧落进编码器。 */
+    /** 已经画进编码器（或屏幕）的帧数。swap 返回之后才算，导出用它等最后一帧。 */
     public long drawn() {
-        return frames;
+        return presented;
     }
 
     /** 给生产者的 Surface。每次给一个新的，用完由生产者那边 release —— 和直连时一样。 */
@@ -517,18 +519,24 @@ public final class FisheyeGlPipe {
             AppLog.i(TAG, name + " 第一帧，距准备好 "
                     + (SystemClock.elapsedRealtime() - startedAtMs) + "ms");
         }
-        drawLatest();
+        if (drawLatest()) {
+            presented++;
+        }
     }
 
-    /** 把最近取到的那一帧画出去。设置变了（比如暂停中拨了开关）也叫它，不用等下一帧。 */
-    private void drawLatest() {
+    /**
+     * 把最近取到的那一帧画出去。设置变了（比如暂停中拨了开关）也叫它，不用等下一帧。
+     *
+     * @return swap 成功。失败或没东西可画时是 false，调用方不要把它算成新的一帧。
+     */
+    private boolean drawLatest() {
         if (released || outputBroken || frames == 0 || surface == EGL14.EGL_NO_SURFACE) {
-            return;
+            return false;
         }
         if (output != null && output.isReleased()) {
             outputBroken = true;
             AppLog.i(TAG, name + " 屏幕上那一块已经释放，只取帧不画");
-            return;
+            return false;
         }
         EGL14.eglQuerySurface(display, surface, EGL14.EGL_WIDTH, size, 0);
         EGL14.eglQuerySurface(display, surface, EGL14.EGL_HEIGHT, size, 1);
@@ -557,7 +565,9 @@ public final class FisheyeGlPipe {
             outputBroken = true;
             AppLog.w(TAG, name + " 画不上屏幕了 0x" + Integer.toHexString(EGL14.eglGetError())
                     + "，之后只取帧不画");
+            return false;
         }
+        return true;
     }
 
     /** 屏幕上那一块释放了就收掉自己：没有人会再来要这条管线。 */

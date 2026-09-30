@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta3] - 2026-09-30
+
+### Fixed
+
+- Straightening a surround clip for USB or Drive finishes. The progress bar no longer stops near the end.
+
 ## [2.0.3-beta2] - 2026-09-30
 
 ### New and improved

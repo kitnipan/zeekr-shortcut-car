@@ -34,6 +34,8 @@ public final class SurroundDefish {
 
     private static final String TAG = "SurroundDefish";
     private static final String AVC = "video/avc";
+    /** 最后一帧迟迟没画上就照样封口，免得进度停在 99% 直到整段超时。 */
+    static final long FRAME_STALL_MS = 8_000L;
 
     private SurroundDefish() {
     }
@@ -213,7 +215,8 @@ public final class SurroundDefish {
                             FisheyeGlPipe pipe, MediaFormat audioFormat, long durationUs,
                             AtomicBoolean cancel, Percent percent)
             throws IOException {
-        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        MediaCodec.BufferInfo decInfo = new MediaCodec.BufferInfo();
+        MediaCodec.BufferInfo encInfo = new MediaCodec.BufferInfo();
         boolean inEos = false;
         boolean decEos = false;
         boolean signaled = false;
@@ -225,6 +228,8 @@ public final class SurroundDefish {
         int audioTrack = -1;
         long budgetMs = Math.max(120_000L, durationUs / 1000L * 4L + 30_000L);
         long deadline = SystemClock.elapsedRealtime() + budgetMs;
+        long lastPresented = -1L;
+        long presentedMovedAt = SystemClock.elapsedRealtime();
 
         while (!encEos) {
             if (cancel != null && cancel.get()) {
@@ -233,41 +238,8 @@ public final class SurroundDefish {
             if (SystemClock.elapsedRealtime() > deadline) {
                 throw new IOException("timeout");
             }
-            if (!inEos) {
-                int in = decoder.dequeueInputBuffer(10_000);
-                if (in >= 0) {
-                    ByteBuffer buf = decoder.getInputBuffer(in);
-                    int n = buf == null ? -1 : videoEx.readSampleData(buf, 0);
-                    if (n < 0) {
-                        decoder.queueInputBuffer(in, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                        inEos = true;
-                    } else {
-                        long sampleUs = Math.max(0L, videoEx.getSampleTime());
-                        decoder.queueInputBuffer(in, 0, n, sampleUs, 0);
-                        lastPercent = report(percent, durationUs, sampleUs, lastPercent);
-                        videoEx.advance();
-                    }
-                }
-            }
-            if (!decEos) {
-                int out = decoder.dequeueOutputBuffer(info, 10_000);
-                if (out >= 0) {
-                    boolean eos = (info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
-                    boolean render = info.size > 0;
-                    decoder.releaseOutputBuffer(out, render);
-                    if (render) {
-                        rendered++;
-                    }
-                    if (eos) {
-                        decEos = true;
-                    }
-                }
-            }
-            if (decEos && !signaled && pipe.drawn() >= rendered) {
-                encoder.signalEndOfInputStream();
-                signaled = true;
-            }
-            int enc = encoder.dequeueOutputBuffer(info, 10_000);
+            // 先腾编码器的缓冲。画线程的 swap 会卡在这上面，不腾的话两边互相等。
+            int enc = encoder.dequeueOutputBuffer(encInfo, 10_000);
             if (enc == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                 if (muxerStarted) {
                     throw new IOException("format twice");
@@ -283,20 +255,66 @@ public final class SurroundDefish {
                     throw new IOException("sample before format");
                 }
                 ByteBuffer buf = encoder.getOutputBuffer(enc);
-                if (buf != null && info.size > 0
-                        && (info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
-                    buf.position(info.offset);
-                    buf.limit(info.offset + info.size);
-                    muxer.writeSampleData(videoTrack, buf, info);
+                if (buf != null && encInfo.size > 0
+                        && (encInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                    buf.position(encInfo.offset);
+                    buf.limit(encInfo.offset + encInfo.size);
+                    muxer.writeSampleData(videoTrack, buf, encInfo);
                 }
-                boolean eos = (info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
-                if (info.size > 0 && (info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
-                    lastPercent = report(percent, durationUs, info.presentationTimeUs, lastPercent);
+                boolean eos = (encInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+                if (encInfo.size > 0 && (encInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                    lastPercent = report(percent, durationUs, encInfo.presentationTimeUs, lastPercent);
                 }
                 encoder.releaseOutputBuffer(enc, false);
                 if (eos) {
                     encEos = true;
+                    break;
                 }
+            }
+            if (!inEos) {
+                int in = decoder.dequeueInputBuffer(10_000);
+                if (in >= 0) {
+                    ByteBuffer buf = decoder.getInputBuffer(in);
+                    int n = buf == null ? -1 : videoEx.readSampleData(buf, 0);
+                    if (n < 0) {
+                        decoder.queueInputBuffer(in, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        inEos = true;
+                    } else {
+                        long sampleUs = Math.max(0L, videoEx.getSampleTime());
+                        decoder.queueInputBuffer(in, 0, n, sampleUs, 0);
+                        videoEx.advance();
+                    }
+                }
+            }
+            long presented = pipe.drawn();
+            if (presented != lastPresented) {
+                lastPresented = presented;
+                presentedMovedAt = SystemClock.elapsedRealtime();
+            }
+            // 一次只放一帧。一次放多帧时 SurfaceTexture 只留最后一帧，画过的帧数永远少于放出去的，
+            // 结束符就发不出去，进度停在最后一帧的 97–99%。
+            if (!decEos && canReleaseFrame(presented, rendered)) {
+                int out = decoder.dequeueOutputBuffer(decInfo, 10_000);
+                if (out >= 0) {
+                    boolean eos = (decInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+                    boolean render = decInfo.size > 0;
+                    decoder.releaseOutputBuffer(out, render);
+                    if (render) {
+                        rendered++;
+                    }
+                    if (eos) {
+                        decEos = true;
+                    }
+                }
+            }
+            if (canSignalEncoder(decEos, signaled, presented, rendered)) {
+                encoder.signalEndOfInputStream();
+                signaled = true;
+            } else if (forceSignalEncoder(decEos, signaled, presented, rendered,
+                    SystemClock.elapsedRealtime() - presentedMovedAt)) {
+                AppLog.w(TAG, "最后一帧没画上，照样封口 rendered=" + rendered + " drawn=" + presented);
+                encoder.signalEndOfInputStream();
+                signaled = true;
             }
         }
         if (rendered == 0) {
@@ -309,6 +327,23 @@ public final class SurroundDefish {
         if (percent != null) {
             percent.onPercent(100);
         }
+    }
+
+    /** 上一帧已经画完，才能再放一帧。多放会被 SurfaceTexture 丢掉。 */
+    static boolean canReleaseFrame(long presented, int released) {
+        return presented >= released;
+    }
+
+    /** 解码结束，而且放出去的帧都画完了，才能通知编码器收尾。 */
+    static boolean canSignalEncoder(boolean decoderDone, boolean signaled,
+                                    long presented, int released) {
+        return decoderDone && !signaled && presented >= released;
+    }
+
+    /** 画线程卡住时不要一直等到整段超时。 */
+    static boolean forceSignalEncoder(boolean decoderDone, boolean signaled,
+                                      long presented, int released, long stalledMs) {
+        return decoderDone && !signaled && presented < released && stalledMs >= FRAME_STALL_MS;
     }
 
     private static int report(Percent percent, long durationUs, long timeUs, int last) {
