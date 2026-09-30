@@ -387,7 +387,6 @@
     <string name="nav_group_system">System</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_header_subtitle">Surround-view dashcam</string>
-    <string name="nav_header_alt_name">极氪即刻</string>
     <string name="lane_surround">Surround</string>
     <string name="player_title">Continuous playback</string>
     <string name="player_prev">Previous</string>
@@ -469,6 +468,7 @@
     <!-- Send to phone -->
     <string name="action_send_to_phone">Send to phone</string>
     <string name="action_save_to_usb">Save to USB</string>
+    <string name="export_pick_views">Which views to export</string>
     <string name="usb_export_no_stick_title">No USB stick found</string>
     <string name="usb_export_no_stick_msg">Plug in a USB stick and try again. The file is copied into the exports folder on the stick, under the same name.</string>
     <string name="usb_export_copying">Copying to USB…</string>
@@ -498,11 +498,12 @@
     <string name="drive_sign_in_failed">Sign-in failed: %1$s</string>
     <string name="drive_uploading">Uploading to Google Drive…</string>
     <string name="drive_progress_title">Upload to Drive</string>
-    <string name="drive_progress_prepare">Preparing %1$s</string>
+    <string name="drive_progress_prepare">Straightening %1$s</string>
     <string name="drive_progress_file">%1$d/%2$d %3$s\n%4$d%% · %5$s / %6$s MB</string>
     <string name="drive_uploading_defish">Uploading. Surround is straightened first. Cabin and the other cameras are sent as recorded</string>
     <string name="drive_uploaded_count">Uploaded %1$d files to Zeekr Shortcut on Google Drive</string>
     <string name="drive_upload_failed">Upload failed: %1$s</string>
+    <string name="drive_upload_cancelled">Upload cancelled</string>
     <string name="drive_busy">The previous upload is still running</string>
     <string name="drive_unfinished">%1$d files were not finished yet, so they were not uploaded</string>
     <string name="share_phone_title">Send to phone</string>

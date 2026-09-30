@@ -11,6 +11,15 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.2-beta1] - 2026-09-30
+
+### New and improved
+
+- Upload to Drive can be cancelled. While a surround clip is being straightened, the dialog says so.
+- Surround clips are straightened on export only when Straighten is on. With it off, the copy is the recorded file.
+- Save to USB and upload to Drive ask which camera views to include when more than one was recorded at that moment.
+- The menu header uses only the name for the language you picked.
+
 ## [2.0.2] - 2026-09-30
 
 Changes since 2.0.0.

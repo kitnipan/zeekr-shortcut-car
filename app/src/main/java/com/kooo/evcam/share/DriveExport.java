@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * 把导出的文件传到 Google Drive 的「Zeekr Shortcut」文件夹。
  *
- * <p>环视先拉直再传，座舱和其他相机按原文件传。录像本身不动。
+ * <p>拉直开关开着时，环视先拉直再传。开关关着，或者座舱和其他相机，按原文件传。录像本身不动。
  * 车机上没有 Drive 应用，所以登录用设备码：手机打开二维码，输入屏幕上的那一串。</p>
  */
 public final class DriveExport {
@@ -236,7 +236,7 @@ public final class DriveExport {
         }
         boolean defish = false;
         for (File file : files) {
-            if (file != null && SurroundDefish.isSurroundVideo(file.getName())) {
+            if (SurroundDefish.wanted(activity, file)) {
                 defish = true;
                 break;
             }
@@ -258,11 +258,16 @@ public final class DriveExport {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         box.addView(bar, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        AtomicBoolean cancelled = new AtomicBoolean(false);
         AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(
                 activity, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.drive_progress_title)
                 .setView(box)
                 .setCancelable(false)
+                .setNegativeButton(R.string.action_cancel, (d, w) -> {
+                    cancelled.set(true);
+                    DriveClient.abortPut();
+                })
                 .create());
         dialog.show();
 
@@ -297,6 +302,9 @@ public final class DriveExport {
                 }
                 int seen = 0;
                 for (File file : files) {
+                    if (cancelled.get()) {
+                        break;
+                    }
                     if (file == null || !file.isFile() || file.length() <= 0) {
                         continue;
                     }
@@ -309,7 +317,7 @@ public final class DriveExport {
                     File temp = null;
                     final int fileIndex = seen;
                     try {
-                        if (SurroundDefish.isSurroundVideo(file.getName())) {
+                        if (SurroundDefish.wanted(app, file)) {
                             main.post(() -> {
                                 if (activity.isFinishing()) {
                                     return;
@@ -322,7 +330,7 @@ public final class DriveExport {
                                 throw new java.io.IOException("mkdir " + dir.getAbsolutePath());
                             }
                             temp = new File(dir, file.getName() + ".part");
-                            SurroundDefish.write(app, file, temp);
+                            SurroundDefish.write(app, file, temp, cancelled);
                             if (!UsbExport.playable(temp)) {
                                 throw new java.io.IOException("unfinished " + file.getName());
                             }
@@ -341,15 +349,21 @@ public final class DriveExport {
                                     file.getName(), overall, shownTotal));
                         };
                         try {
-                            DriveClient.upload(access, folder, payload, file.getName(), progress);
+                            DriveClient.upload(access, folder, payload, file.getName(), progress, cancelled);
                         } catch (DriveClient.AuthExpired expired) {
+                            if (cancelled.get()) {
+                                break;
+                            }
                             access = accessToken(config, true);
                             folder = folder(config, access);
-                            DriveClient.upload(access, folder, payload, file.getName(), progress);
+                            DriveClient.upload(access, folder, payload, file.getName(), progress, cancelled);
                         }
                         bytesDone[0] += payload.length();
                         sent++;
                     } catch (Exception e) {
+                        if (cancelled.get()) {
+                            break;
+                        }
                         AppLog.e(TAG, "上传失败: " + file.getAbsolutePath(), e);
                         failure = String.valueOf(e.getMessage());
                     } finally {
@@ -359,8 +373,10 @@ public final class DriveExport {
                     }
                 }
             } catch (Exception e) {
-                AppLog.e(TAG, "上传准备失败", e);
-                failure = String.valueOf(e.getMessage());
+                if (!cancelled.get()) {
+                    AppLog.e(TAG, "上传准备失败", e);
+                    failure = String.valueOf(e.getMessage());
+                }
             }
             final int sentCount = sent;
             final int unfinishedCount = unfinished;
@@ -369,14 +385,16 @@ public final class DriveExport {
                 if (!activity.isFinishing() && dialog.isShowing()) {
                     dialog.dismiss();
                 }
-                if (sentCount > 0) {
+                if (cancelled.get()) {
+                    toast(app, app.getString(R.string.drive_upload_cancelled));
+                } else if (sentCount > 0) {
                     toast(app, app.getString(R.string.drive_uploaded_count, sentCount));
                 } else if (error != null) {
                     toast(app, app.getString(R.string.drive_upload_failed, error));
                 } else if (unfinishedCount == 0) {
                     toast(app, app.getString(R.string.share_phone_no_file));
                 }
-                if (unfinishedCount > 0) {
+                if (!cancelled.get() && unfinishedCount > 0) {
                     toast(app, app.getString(R.string.drive_unfinished, unfinishedCount));
                 }
                 BUSY.set(false);

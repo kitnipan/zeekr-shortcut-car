@@ -396,26 +396,34 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this, file);
     }
 
-    /** 和 {@link #sendCurrentPhotoToPhone()} 同一张，落到 U 盘的 exports。 */
+    /** 这一组里勾上的照片落到 U 盘的 exports。只有一张时直接存。 */
     private void saveCurrentPhotoToUsb() {
-        File file = currentPhotoFile();
-        if (file == null) {
-            Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-        com.kooo.evcam.share.UsbExport.save(PhotoPlaybackActivity.this, file);
+        com.kooo.evcam.share.ExportChoice.ask(PhotoPlaybackActivity.this, photosInGroup(),
+                R.string.action_save_to_usb, com.kooo.evcam.share.UsbExport::save);
     }
 
-    /** 和存到 U 盘同一张，传到 Google Drive。 */
+    /** 和存到 U 盘同一批可选照片，传到 Google Drive。 */
     private void uploadCurrentPhotoToDrive() {
-        File file = currentPhotoFile();
-        if (file == null) {
-            Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
-                    Toast.LENGTH_SHORT).show();
-            return;
+        com.kooo.evcam.share.ExportChoice.ask(PhotoPlaybackActivity.this, photosInGroup(),
+                R.string.action_upload_drive, com.kooo.evcam.share.DriveExport::upload);
+    }
+
+    /** 这一组里每一张还在的照片。 */
+    private java.util.List<com.kooo.evcam.share.ExportChoice.Item> photosInGroup() {
+        java.util.List<com.kooo.evcam.share.ExportChoice.Item> items = new java.util.ArrayList<>();
+        if (currentGroup == null) {
+            return items;
         }
-        com.kooo.evcam.share.DriveExport.upload(PhotoPlaybackActivity.this, file);
+        for (String position : POSITIONS) {
+            if (!currentGroup.hasPhoto(position)) {
+                continue;
+            }
+            File file = currentGroup.getPhotoFile(position);
+            if (file != null && file.isFile() && file.length() > 0) {
+                items.add(new com.kooo.evcam.share.ExportChoice.Item(getPositionLabel(position), file));
+            }
+        }
+        return items;
     }
 
     /**

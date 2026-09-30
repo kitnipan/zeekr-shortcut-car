@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 跟 Google 说话：设备码登录、刷新令牌、在「Zeekr Shortcut」文件夹里建文件。
@@ -27,6 +28,9 @@ public final class DriveClient {
     private static final String USER_AGENT = "ZeekrShortcut-Drive";
     private static final int CONNECT_MS = 15000;
     private static final int READ_MS = 20000;
+
+    /** 正在 PUT 的连接。取消时从界面线程掐掉它，上传线程才会从 write 里出来。 */
+    private static volatile HttpURLConnection activePut;
 
     private DriveClient() {
     }
@@ -92,9 +96,17 @@ public final class DriveClient {
         void onProgress(long done, long total);
     }
 
+    /** 掐掉正在进行的文件 PUT。没有上传时什么都不做。 */
+    public static void abortPut() {
+        HttpURLConnection connection = activePut;
+        if (connection != null) {
+            connection.disconnect();
+        }
+    }
+
     /** 把 {@code payload} 上传成 {@code displayName}。成功时返回文件 id。 */
     public static String upload(String accessToken, String folderId, File payload, String displayName,
-                                Progress progress) throws IOException {
+                                Progress progress, AtomicBoolean cancel) throws IOException {
         if (payload == null || !payload.isFile() || payload.length() <= 0) {
             throw new IOException("empty");
         }
@@ -107,7 +119,7 @@ public final class DriveClient {
         if (started.location == null || started.location.isEmpty()) {
             throw new IOException(fail("start upload", started));
         }
-        Reply done = putFile(started.location, payload, mime, progress);
+        Reply done = putFile(started.location, payload, mime, progress, cancel);
         if (done.code == 401) {
             throw new AuthExpired();
         }
@@ -187,13 +199,17 @@ public final class DriveClient {
         }
     }
 
-    private static Reply putFile(String url, File payload, String mime, Progress progress)
-            throws IOException {
+    private static Reply putFile(String url, File payload, String mime, Progress progress,
+                                 AtomicBoolean cancel) throws IOException {
+        if (cancel != null && cancel.get()) {
+            throw new IOException("cancelled");
+        }
         HttpURLConnection connection = open(url, "PUT", null, 0);
         connection.setRequestProperty("Content-Type", mime);
         connection.setFixedLengthStreamingMode(payload.length());
         long total = payload.length();
         long done = 0;
+        activePut = connection;
         try {
             OutputStream out = connection.getOutputStream();
             InputStream in = new BufferedInputStream(new FileInputStream(payload));
@@ -201,6 +217,9 @@ public final class DriveClient {
                 byte[] buffer = new byte[256 * 1024];
                 int n;
                 while ((n = in.read(buffer)) != -1) {
+                    if (cancel != null && cancel.get()) {
+                        throw new IOException("cancelled");
+                    }
                     out.write(buffer, 0, n);
                     done += n;
                     if (progress != null) {
@@ -211,11 +230,17 @@ public final class DriveClient {
                 in.close();
                 out.close();
             }
+            if (cancel != null && cancel.get()) {
+                throw new IOException("cancelled");
+            }
             if (progress != null) {
                 progress.onProgress(total, total);
             }
             return read(connection);
         } finally {
+            if (activePut == connection) {
+                activePut = null;
+            }
             connection.disconnect();
         }
     }

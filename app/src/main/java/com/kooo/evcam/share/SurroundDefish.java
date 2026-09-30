@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 把环视录像拉直后再交给 U 盘。
@@ -26,8 +27,8 @@ import java.util.Locale;
  * <p>盘上那份是鱼眼原片，屏幕上的校正只是看着。导出要的是拔下来就能播的直画面，
  * 所以这里解码 → {@link FisheyeGlPipe} 逐像素校正 → 再编码。座舱不是鱼眼，不走这里。</p>
  *
- * <p>校正参数用设置里那一套（投影、视野、强度），不管屏幕上的开关开没开 ——
- * 导出这一步就是要拉直。</p>
+ * <p>校正参数用设置里那一套（投影、视野、强度）。屏幕上的拉直开关关着时不走这里，
+ * 导出的就是录像原片。</p>
  */
 public final class SurroundDefish {
 
@@ -56,10 +57,25 @@ public final class SurroundDefish {
         return CameraSlots.SURROUND.equals(CameraSlots.canonical(suffix));
     }
 
+    /** 环视视频，而且屏幕上的拉直开关开着。关着就按原文件导出。 */
+    public static boolean wanted(Context context, File file) {
+        return file != null
+                && isSurroundVideo(file.getName())
+                && new AppConfig(context).isFisheyeCorrection();
+    }
+
     /**
      * 把 {@code source} 拉直写到 {@code dest}。失败时删掉半成品。
      */
     public static void write(Context context, File source, File dest) throws IOException {
+        write(context, source, dest, null);
+    }
+
+    /**
+     * 同 {@link #write(Context, File, File)}。{@code cancel} 变成 true 时停在下一帧，删掉半成品。
+     */
+    public static void write(Context context, File source, File dest, AtomicBoolean cancel)
+            throws IOException {
         if (dest.exists() && !dest.delete()) {
             throw new IOException("replace " + dest.getAbsolutePath());
         }
@@ -68,7 +84,8 @@ public final class SurroundDefish {
             transcode(source, dest,
                     config.getFisheyeFov(),
                     config.getFisheyeProjection(),
-                    config.getFisheyeStrength() / 100f);
+                    config.getFisheyeStrength() / 100f,
+                    cancel);
         } catch (IOException e) {
             if (dest.exists() && !dest.delete()) {
                 AppLog.w(TAG, "删不掉半成品: " + dest.getAbsolutePath());
@@ -78,7 +95,8 @@ public final class SurroundDefish {
     }
 
     private static void transcode(File source, File dest,
-                                  float fov, String projection, float strength) throws IOException {
+                                  float fov, String projection, float strength,
+                                  AtomicBoolean cancel) throws IOException {
         MediaExtractor videoEx = new MediaExtractor();
         MediaExtractor audioEx = new MediaExtractor();
         MediaCodec decoder = null;
@@ -148,7 +166,7 @@ public final class SurroundDefish {
             decoder.start();
 
             muxer = new MediaMuxer(dest.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            run(videoEx, audioEx, decoder, encoder, muxer, pipe, audioFormat, durationUs);
+            run(videoEx, audioEx, decoder, encoder, muxer, pipe, audioFormat, durationUs, cancel);
             AppLog.i(TAG, "环视已拉直: " + dest.getName() + " " + width + "x" + height);
         } catch (IOException e) {
             throw e;
@@ -180,7 +198,8 @@ public final class SurroundDefish {
 
     private static void run(MediaExtractor videoEx, MediaExtractor audioEx,
                             MediaCodec decoder, MediaCodec encoder, MediaMuxer muxer,
-                            FisheyeGlPipe pipe, MediaFormat audioFormat, long durationUs)
+                            FisheyeGlPipe pipe, MediaFormat audioFormat, long durationUs,
+                            AtomicBoolean cancel)
             throws IOException {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean inEos = false;
@@ -195,6 +214,9 @@ public final class SurroundDefish {
         long deadline = SystemClock.elapsedRealtime() + budgetMs;
 
         while (!encEos) {
+            if (cancel != null && cancel.get()) {
+                throw new IOException("cancelled");
+            }
             if (SystemClock.elapsedRealtime() > deadline) {
                 throw new IOException("timeout");
             }

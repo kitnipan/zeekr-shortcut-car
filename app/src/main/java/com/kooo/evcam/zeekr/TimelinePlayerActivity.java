@@ -1043,33 +1043,25 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     /**
-     * 这一刻每一路都写进 U 盘的 exports：环视拉直，座舱和其他相机原样拷。
-     * 不用先放大某一路。放大只影响发送到手机那一个文件。
+     * 这一刻有录像的每一路列出来，勾上的才写进 U 盘。
+     * 拉直开关开着时环视先拉直，否则按原文件拷。
      */
     private void saveCurrentSegmentToUsb() {
-        java.util.List<File> files = filesAtPlayhead();
-        if (files.isEmpty()) {
-            Toast.makeText(this, R.string.share_phone_no_file, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        com.kooo.evcam.share.UsbExport.save(this, files);
+        com.kooo.evcam.share.ExportChoice.ask(this, viewsAtPlayhead(),
+                R.string.action_save_to_usb, com.kooo.evcam.share.UsbExport::save);
     }
 
-    /** 和存到 U 盘同一批文件，传到 Google Drive。环视先拉直。 */
+    /** 和存到 U 盘同一批可选画面，传到 Google Drive。 */
     private void uploadCurrentSegmentToDrive() {
-        java.util.List<File> files = filesAtPlayhead();
-        if (files.isEmpty()) {
-            Toast.makeText(this, R.string.share_phone_no_file, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        com.kooo.evcam.share.DriveExport.upload(this, files);
+        com.kooo.evcam.share.ExportChoice.ask(this, viewsAtPlayhead(),
+                R.string.action_upload_drive, com.kooo.evcam.share.DriveExport::upload);
     }
 
     /** 播放头这一刻，每一路正在放的那一段。这一刻没录到的路跳过。 */
-    private java.util.List<File> filesAtPlayhead() {
-        java.util.List<File> files = new java.util.ArrayList<>();
+    private java.util.List<com.kooo.evcam.share.ExportChoice.Item> viewsAtPlayhead() {
+        java.util.List<com.kooo.evcam.share.ExportChoice.Item> items = new java.util.ArrayList<>();
         if (sessions.isEmpty() || lanes == null) {
-            return files;
+            return items;
         }
         long epoch = clockEpoch();
         for (Lane lane : lanes) {
@@ -1082,10 +1074,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             }
             File file = new File(path);
             if (file.isFile() && file.length() > 0) {
-                files.add(file);
+                items.add(new com.kooo.evcam.share.ExportChoice.Item(cameraName(lane), file));
             }
         }
-        return files;
+        return items;
     }
 
     /**

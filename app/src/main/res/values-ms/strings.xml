@@ -387,7 +387,6 @@
     <string name="nav_group_system">Sistem</string>
     <string name="nav_settings">Tetapan</string>
     <string name="nav_header_subtitle">Kamera pemandu pandangan keliling</string>
-    <string name="nav_header_alt_name">极氪即刻</string>
     <string name="lane_surround">Keliling</string>
     <string name="player_title">Main balik berterusan</string>
     <string name="player_prev">Sebelum</string>
@@ -469,6 +468,7 @@
     <!-- Hantar ke telefon -->
     <string name="action_send_to_phone">Hantar ke telefon</string>
     <string name="action_save_to_usb">Simpan ke USB</string>
+    <string name="export_pick_views">Paparan mana untuk dieksport</string>
     <string name="usb_export_no_stick_title">Pemacu USB tidak dijumpai</string>
     <string name="usb_export_no_stick_msg">Sambungkan pemacu USB dan cuba lagi. Fail disalin ke folder exports pada pemacu itu, dengan nama yang sama.</string>
     <string name="usb_export_copying">Menyalin ke USB…</string>
@@ -498,11 +498,12 @@
     <string name="drive_sign_in_failed">Log masuk gagal: %1$s</string>
     <string name="drive_uploading">Memuat naik ke Google Drive…</string>
     <string name="drive_progress_title">Muat naik ke Drive</string>
-    <string name="drive_progress_prepare">Menyediakan %1$s</string>
+    <string name="drive_progress_prepare">Meluruskan %1$s</string>
     <string name="drive_progress_file">%1$d/%2$d %3$s\n%4$d%% · %5$s / %6$s MB</string>
     <string name="drive_uploading_defish">Memuat naik. Surround diluruskan dahulu. Kabin dan kamera lain dihantar seperti yang dirakam</string>
     <string name="drive_uploaded_count">%1$d fail dimuat naik ke Zeekr Shortcut di Google Drive</string>
     <string name="drive_upload_failed">Muat naik gagal: %1$s</string>
+    <string name="drive_upload_cancelled">Muat naik dibatalkan</string>
     <string name="drive_busy">Muat naik sebelumnya masih berjalan</string>
     <string name="drive_unfinished">%1$d fail belum siap, jadi tidak dimuat naik</string>
     <string name="share_phone_title">Hantar ke telefon</string>

@@ -182,7 +182,7 @@ public final class UsbExport {
         BUSY.set(true);
         boolean defish = false;
         for (File file : files) {
-            if (file != null && SurroundDefish.isSurroundVideo(file.getName())) {
+            if (SurroundDefish.wanted(activity, file)) {
                 defish = true;
                 break;
             }
@@ -208,7 +208,7 @@ public final class UsbExport {
                         continue;
                     }
                     File out;
-                    if (SurroundDefish.isSurroundVideo(file.getName())) {
+                    if (SurroundDefish.wanted(app, file)) {
                         if (!dir.exists() && !dir.mkdirs()) {
                             throw new IOException("mkdir " + dir.getAbsolutePath());
                         }

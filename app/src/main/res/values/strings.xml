@@ -396,7 +396,6 @@
     <string name="nav_group_system">系统</string>
     <string name="nav_settings">设置</string>
     <string name="nav_header_subtitle">车机版环视记录仪</string>
-    <string name="nav_header_alt_name">Zeekr Shortcut</string>
     <string name="lane_surround">环视</string>
     <string name="player_title">连续回放</string>
     <string name="player_prev">上一段</string>
@@ -478,6 +477,7 @@
     <!-- 发送到手机 -->
     <string name="action_send_to_phone">发送到手机</string>
     <string name="action_save_to_usb">存到U盘</string>
+    <string name="export_pick_views">导出哪些画面</string>
     <string name="usb_export_no_stick_title">没有检测到 U 盘</string>
     <string name="usb_export_no_stick_msg">把 U 盘插上车机后再试。文件会写到 U 盘里的 exports 文件夹，文件名和原来一样。</string>
     <string name="usb_export_copying">正在复制到 U 盘…</string>
@@ -507,11 +507,12 @@
     <string name="drive_sign_in_failed">登录失败：%1$s</string>
     <string name="drive_uploading">正在上传到 Google Drive…</string>
     <string name="drive_progress_title">传到网盘</string>
-    <string name="drive_progress_prepare">正在准备 %1$s</string>
+    <string name="drive_progress_prepare">正在拉直 %1$s</string>
     <string name="drive_progress_file">%1$d/%2$d %3$s\n%4$d%% · %5$s / %6$s MB</string>
     <string name="drive_uploading_defish">正在上传。环视会先拉直，座舱和其他相机按原文件传</string>
     <string name="drive_uploaded_count">已上传 %1$d 个文件到 Google Drive 的 Zeekr Shortcut</string>
     <string name="drive_upload_failed">上传失败：%1$s</string>
+    <string name="drive_upload_cancelled">已取消上传</string>
     <string name="drive_busy">上一次还没完成，请稍等</string>
     <string name="drive_unfinished">%1$d 个文件还没写完，没有上传</string>
     <string name="share_phone_title">发送到手机</string>
