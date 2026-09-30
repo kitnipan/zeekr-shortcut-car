@@ -182,6 +182,8 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return R.drawable.ic_settings;
             case "screen_developer":
                 return R.drawable.ic_developer;
+            case "screen_drive":
+                return R.drawable.ic_drive;
             case "screen_update":
                 return R.drawable.ic_update;
             case "pref_about":

@@ -1,5 +1,27 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
+}
+
+// 电视端 OAuth。设备码登录必须把这对值编进安装包。
+// GitHub 推送保护不允许把 client secret 写进仓库，所以：
+//   - Action 从仓库 Secrets 注入 DRIVE_CLIENT_ID / DRIVE_CLIENT_SECRET
+//   - 本机从 gitignore 的 local.properties 读同名键
+// 两边都空时，设置页里手填的一对仍然生效。
+fun driveCredential(name: String): String {
+    val fromEnv = System.getenv(name)?.trim().orEmpty()
+    if (fromEnv.isNotEmpty()) return fromEnv
+    val propsFile = rootProject.file("local.properties")
+    if (!propsFile.isFile) return ""
+    val props = Properties()
+    propsFile.inputStream().use { props.load(it) }
+    return props.getProperty(name)?.trim().orEmpty()
+}
+
+fun gradleStringLiteral(value: String): String {
+    val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+    return "\"$escaped\""
 }
 
 android {
@@ -36,12 +58,18 @@ android {
         //
         // 这个 fork 的发布后缀是 -kd。检查更新认这一档（见 VersionName）。
         // 上游的 -alpha 仍不推。
-        versionCode = 241
+        versionCode = 242
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "2.0.0-kd"
+        versionName = "2.0.1-kd"
 
+        buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
+        buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {

@@ -461,6 +461,32 @@
       左边选、右边改，和其他分区一个样子。
     -->
     <PreferenceScreen
+        android:key="screen_drive"
+        android:title="@string/set_drive_title">
+
+        <Preference
+            android:key="pref_drive_help"
+            android:selectable="false"
+            android:summary="@string/set_drive_help" />
+
+        <EditTextPreference
+            android:key="pref_drive_client_id"
+            android:title="@string/set_drive_client_id" />
+
+        <EditTextPreference
+            android:key="pref_drive_client_secret"
+            android:title="@string/set_drive_client_secret" />
+
+        <Preference
+            android:key="pref_drive_sign_in"
+            android:title="@string/set_drive_sign_in" />
+
+        <Preference
+            android:key="pref_drive_sign_out"
+            android:title="@string/set_drive_sign_out" />
+    </PreferenceScreen>
+
+    <PreferenceScreen
         android:key="screen_update"
         android:title="@string/set_check_update_title">
 

@@ -54,6 +54,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
     private Button copyButton;
     private Button sendPhoneButton;
     private Button saveUsbButton;
+    private Button uploadDriveButton;
     private Button refreshButton;
 
 
@@ -70,6 +71,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
         copyButton = findViewById(R.id.diagnostics_copy);
         sendPhoneButton = findViewById(R.id.diagnostics_send_phone);
         saveUsbButton = findViewById(R.id.diagnostics_save_usb);
+        uploadDriveButton = findViewById(R.id.diagnostics_upload_drive);
         refreshButton = findViewById(R.id.diagnostics_refresh);
 
         View close = findViewById(R.id.diagnostics_close);
@@ -91,6 +93,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
         if (saveUsbButton != null) {
             saveUsbButton.setOnClickListener(v -> saveToUsb());
         }
+        if (uploadDriveButton != null) {
+            uploadDriveButton.setOnClickListener(v -> uploadToDrive());
+        }
 
         runCollection();
     }
@@ -107,6 +112,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
         if (saveUsbButton != null) {
             saveUsbButton.setVisibility(developerTools);
+        }
+        if (uploadDriveButton != null) {
+            uploadDriveButton.setVisibility(developerTools);
         }
     }
 
@@ -196,6 +204,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
         if (saveUsbButton != null) {
             saveUsbButton.setEnabled(enabled);
+        }
+        if (uploadDriveButton != null) {
+            uploadDriveButton.setEnabled(enabled);
         }
         if (refreshButton != null) {
             refreshButton.setEnabled(enabled);
@@ -301,6 +312,10 @@ public class DiagnosticsActivity extends AppCompatActivity {
     /** 和 {@link #sendToPhone()} 同一份报告，落到 U 盘的 exports。 */
     private void saveToUsb() {
         saveInBackground(file -> com.kooo.evcam.share.UsbExport.save(this, file));
+    }
+
+    private void uploadToDrive() {
+        saveInBackground(file -> com.kooo.evcam.share.DriveExport.upload(this, file));
     }
 
     /**

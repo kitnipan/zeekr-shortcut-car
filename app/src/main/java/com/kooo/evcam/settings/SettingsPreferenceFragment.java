@@ -104,6 +104,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindAdvanced();
         bindDeveloper();
         bindUpdate();
+        bindDrive();
 
         // 行样式在交给列表之前套上（车机系统式：卡片行、开关在前、值在后）
         PreferenceRows.apply(getPreferenceScreen());
@@ -1169,6 +1170,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if ("pref_screen_off_wake_hours".equals(key)) {
             input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         }
+        if ("pref_drive_client_id".equals(key) || "pref_drive_client_secret".equals(key)) {
+            input.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                    | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        }
     }
 
     
@@ -1192,6 +1198,61 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
         bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
                 value -> appConfig.setUpdateBetaEnabled(value));
+    }
+
+    private void bindDrive() {
+        EditTextPreference clientId = findPreference("pref_drive_client_id");
+        if (clientId != null) {
+            clientId.setPersistent(false);
+            clientId.setText(appConfig.getDriveClientId());
+            clientId.setSummary(appConfig.getDriveClientId());
+            clientId.setOnPreferenceChangeListener((preference, newValue) -> {
+                String value = String.valueOf(newValue).trim();
+                appConfig.setDriveClientId(value);
+                clientId.setText(value);
+                clientId.setSummary(value);
+                return false;
+            });
+        }
+        EditTextPreference secret = findPreference("pref_drive_client_secret");
+        if (secret != null) {
+            secret.setPersistent(false);
+            secret.setText(appConfig.getDriveClientSecret());
+            secret.setSummary(getString(appConfig.getDriveClientSecret().isEmpty()
+                    ? R.string.set_drive_secret_empty : R.string.set_drive_secret_saved));
+            secret.setOnPreferenceChangeListener((preference, newValue) -> {
+                String value = String.valueOf(newValue).trim();
+                appConfig.setDriveClientSecret(value);
+                secret.setText(value);
+                secret.setSummary(getString(value.isEmpty()
+                        ? R.string.set_drive_secret_empty : R.string.set_drive_secret_saved));
+                return false;
+            });
+        }
+        refreshDriveSignIn();
+        onClick("pref_drive_sign_in", pref -> {
+            if (getActivity() == null) {
+                return;
+            }
+            com.kooo.evcam.share.DriveExport.signIn(getActivity(), this::refreshDriveSignIn);
+        });
+        onClick("pref_drive_sign_out", pref -> {
+            appConfig.clearDriveSession();
+            refreshDriveSignIn();
+            toast(getString(R.string.drive_signed_out));
+        });
+    }
+
+    private void refreshDriveSignIn() {
+        if (!isAdded()) {
+            return;
+        }
+        androidx.preference.Preference signIn = findPreference("pref_drive_sign_in");
+        if (signIn == null || getContext() == null) {
+            return;
+        }
+        signIn.setSummary(getString(appConfig.hasDriveRefreshToken()
+                ? R.string.drive_signed_in_summary : R.string.drive_signed_out_summary));
     }
 
     // ------------------------------------------------------------------ 小工具

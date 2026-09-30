@@ -320,6 +320,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         if (saveUsbButton != null) {
             saveUsbButton.setOnClickListener(v -> saveCurrentSegmentToUsb());
         }
+        View uploadDriveButton = findViewById(R.id.timeline_upload_drive);
+        if (uploadDriveButton != null) {
+            uploadDriveButton.setOnClickListener(v -> uploadCurrentSegmentToDrive());
+        }
         viewModeButton = findViewById(R.id.timeline_view_mode);
         if (viewModeButton != null) {
             viewModeButton.setOnClickListener(v -> cycleViewMode());
@@ -1049,6 +1053,16 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return;
         }
         com.kooo.evcam.share.UsbExport.save(this, files);
+    }
+
+    /** 和存到 U 盘同一批文件，传到 Google Drive。环视先拉直。 */
+    private void uploadCurrentSegmentToDrive() {
+        java.util.List<File> files = filesAtPlayhead();
+        if (files.isEmpty()) {
+            Toast.makeText(this, R.string.share_phone_no_file, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.kooo.evcam.share.DriveExport.upload(this, files);
     }
 
     /** 播放头这一刻，每一路正在放的那一段。这一刻没录到的路跳过。 */

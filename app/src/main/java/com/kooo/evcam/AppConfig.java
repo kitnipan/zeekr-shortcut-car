@@ -82,6 +82,12 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
     private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
     private static final String KEY_UPDATE_BETA = "update_include_beta";  // 检查更新是否接收 Beta 版
+    private static final String KEY_DRIVE_CLIENT_ID = "drive_client_id";
+    private static final String KEY_DRIVE_CLIENT_SECRET = "drive_client_secret";
+    private static final String KEY_DRIVE_REFRESH = "drive_refresh_token";
+    private static final String KEY_DRIVE_ACCESS = "drive_access_token";
+    private static final String KEY_DRIVE_ACCESS_EXPIRY = "drive_access_expiry";
+    private static final String KEY_DRIVE_FOLDER = "drive_folder_id";
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
@@ -977,6 +983,76 @@ public class AppConfig {
 
     public void setUpdateBetaEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_UPDATE_BETA, enabled).apply();
+    }
+
+    public String getDriveClientId() {
+        String saved = prefs.getString(KEY_DRIVE_CLIENT_ID, "");
+        if (saved != null && !saved.trim().isEmpty()) {
+            return saved.trim();
+        }
+        return BuildConfig.DRIVE_CLIENT_ID;
+    }
+
+    public void setDriveClientId(String value) {
+        prefs.edit().putString(KEY_DRIVE_CLIENT_ID, value == null ? "" : value.trim()).apply();
+    }
+
+    public String getDriveClientSecret() {
+        String saved = prefs.getString(KEY_DRIVE_CLIENT_SECRET, "");
+        if (saved != null && !saved.trim().isEmpty()) {
+            return saved.trim();
+        }
+        return BuildConfig.DRIVE_CLIENT_SECRET;
+    }
+
+    public void setDriveClientSecret(String value) {
+        prefs.edit().putString(KEY_DRIVE_CLIENT_SECRET, value == null ? "" : value.trim()).apply();
+    }
+
+    public boolean hasDriveClient() {
+        return !getDriveClientId().isEmpty() && !getDriveClientSecret().isEmpty();
+    }
+
+    public boolean hasDriveRefreshToken() {
+        return !getDriveRefreshToken().isEmpty();
+    }
+
+    public String getDriveRefreshToken() {
+        return prefs.getString(KEY_DRIVE_REFRESH, "");
+    }
+
+    public String getDriveAccessToken() {
+        return prefs.getString(KEY_DRIVE_ACCESS, "");
+    }
+
+    public long getDriveAccessExpiry() {
+        return prefs.getLong(KEY_DRIVE_ACCESS_EXPIRY, 0L);
+    }
+
+    public String getDriveFolderId() {
+        return prefs.getString(KEY_DRIVE_FOLDER, "");
+    }
+
+    public void setDriveFolderId(String id) {
+        prefs.edit().putString(KEY_DRIVE_FOLDER, id == null ? "" : id).apply();
+    }
+
+    public void setDriveTokens(String accessToken, String refreshToken, long expiresAtMs) {
+        prefs.edit()
+                .putString(KEY_DRIVE_ACCESS, accessToken == null ? "" : accessToken)
+                .putString(KEY_DRIVE_REFRESH, refreshToken == null ? "" : refreshToken)
+                .putLong(KEY_DRIVE_ACCESS_EXPIRY, expiresAtMs)
+                .apply();
+    }
+
+    /** 退出登录。客户端 ID 和密钥留着，下次还能登。 */
+    public void clearDriveSession() {
+        prefs.edit()
+                .remove(KEY_DRIVE_REFRESH)
+                .remove(KEY_DRIVE_ACCESS)
+                .remove(KEY_DRIVE_ACCESS_EXPIRY)
+                .remove(KEY_DRIVE_FOLDER)
+                .apply();
     }
 
     /** 录制时减少装饰性动效。默认开：编码器在用 GPU，界面不跟它抢。 */

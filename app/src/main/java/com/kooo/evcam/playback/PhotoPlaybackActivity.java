@@ -98,6 +98,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private Button btnViewMode;
     private Button btnSendToPhone;
     private Button btnSaveToUsb;
+    private Button btnUploadDrive;
     private View controlsLayout;
 
     // 数据
@@ -215,6 +216,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         btnViewMode = findViewById(R.id.btn_view_mode);
         btnSendToPhone = findViewById(R.id.btn_send_to_phone);
         btnSaveToUsb = findViewById(R.id.btn_save_to_usb);
+        btnUploadDrive = findViewById(R.id.btn_upload_drive);
         controlsLayout = findViewById(R.id.controls_layout);
 
         // 设置列表（竖屏2列，横屏1列，日期头部跨越所有列）
@@ -294,6 +296,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         }
         if (btnSaveToUsb != null) {
             btnSaveToUsb.setOnClickListener(v -> saveCurrentPhotoToUsb());
+        }
+        if (btnUploadDrive != null) {
+            btnUploadDrive.setOnClickListener(v -> uploadCurrentPhotoToDrive());
         }
     }
 
@@ -400,6 +405,17 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             return;
         }
         com.kooo.evcam.share.UsbExport.save(PhotoPlaybackActivity.this, file);
+    }
+
+    /** 和存到 U 盘同一张，传到 Google Drive。 */
+    private void uploadCurrentPhotoToDrive() {
+        File file = currentPhotoFile();
+        if (file == null) {
+            Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.kooo.evcam.share.DriveExport.upload(PhotoPlaybackActivity.this, file);
     }
 
     /**
