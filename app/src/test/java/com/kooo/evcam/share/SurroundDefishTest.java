@@ -1,5 +1,6 @@
 package com.kooo.evcam.share;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -31,5 +32,35 @@ public class SurroundDefishTest {
                 true, false, 3, 4, SurroundDefish.FRAME_STALL_MS));
         assertFalse(SurroundDefish.forceSignalEncoder(
                 true, false, 4, 4, SurroundDefish.FRAME_STALL_MS));
+    }
+
+    @Test
+    public void eachChannelIsWidescreenWithInfoBar() {
+        int[] frame = SurroundDefish.exportFrame(2560, 2560);
+        assertEquals(2560, frame[0]);
+        assertEquals(1440, frame[2]);
+        assertEquals(1440 + com.kooo.evcam.telemetry.InfoBar.HEIGHT, frame[1]);
+        assertEquals(16f / 9f, (frame[0] / 2f) / (frame[2] / 2f), 0.001f);
+    }
+
+    @Test
+    public void stripKeepsItsOwnShape() {
+        int[] frame = SurroundDefish.exportFrame(1280, 5140);
+        assertEquals(1280, frame[0]);
+        assertEquals(5140, frame[1]);
+        assertEquals(5140, frame[2]);
+    }
+
+    @Test
+    public void readsClipStartFromFileName() {
+        long ms = SurroundDefish.clipStartMillis("20250101_120000_surround.mp4");
+        java.util.Calendar calendar = java.util.Calendar.getInstance();
+        calendar.setTimeInMillis(ms);
+        assertEquals(2025, calendar.get(java.util.Calendar.YEAR));
+        assertEquals(java.util.Calendar.JANUARY, calendar.get(java.util.Calendar.MONTH));
+        assertEquals(1, calendar.get(java.util.Calendar.DAY_OF_MONTH));
+        assertEquals(12, calendar.get(java.util.Calendar.HOUR_OF_DAY));
+        assertEquals(0, calendar.get(java.util.Calendar.MINUTE));
+        assertEquals(-1L, SurroundDefish.clipStartMillis("clip.mp4"));
     }
 }

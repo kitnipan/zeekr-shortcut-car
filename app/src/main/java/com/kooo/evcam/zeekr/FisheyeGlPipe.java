@@ -7,8 +7,14 @@ import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
 import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
+import android.opengl.GLUtils;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -20,7 +26,10 @@ import com.kooo.evcam.AppLog;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -96,17 +105,23 @@ public final class FisheyeGlPipe {
             "uniform float uProjection;\n" +
             "uniform float uParam;\n" +
             "uniform float uStrength;\n" +
+            "uniform float uAspect;\n" +
+            "uniform vec4 uSources[4];\n" +
+            "uniform float uPad;\n" +
             "const float HALF_PI = 1.5707963268;\n" +
             "vec2 corrected(vec2 p) {\n" +
+            "    float ay = max(uAspect, 0.01);\n" +
+            "    float nx = p.x * 2.0 - 1.0;\n" +
+            "    float ny = (p.y * 2.0 - 1.0) / ay;\n" +
             "    if (uProjection < 0.5) {\n" +
-            "        vec2 plane = (p * 2.0 - 1.0) * uParam;\n" +
+            "        vec2 plane = vec2(nx, ny) * uParam;\n" +
             "        float r = length(plane);\n" +
             "        if (r < 0.00001) return vec2(0.5);\n" +
             "        float sr = atan(r) / HALF_PI;\n" +
             "        return clamp(0.5 + plane / r * sr * 0.5, 0.0, 1.0);\n" +
             "    } else if (uProjection < 1.5) {\n" +
-            "        float az = (p.x * 2.0 - 1.0) * uParam;\n" +
-            "        float h = (p.y * 2.0 - 1.0) * uParam;\n" +
+            "        float az = nx * uParam;\n" +
+            "        float h = ny * uParam;\n" +
             "        float s = sin(az);\n" +
             "        float cosAngle = clamp(cos(az) / sqrt(1.0 + h * h), -1.0, 1.0);\n" +
             "        float sr = acos(cosAngle) / HALF_PI;\n" +
@@ -114,7 +129,7 @@ public final class FisheyeGlPipe {
             "        vec2 dir = planar > 0.00001 ? vec2(s, h) / planar : vec2(0.0);\n" +
             "        return clamp(0.5 + dir * sr * 0.5, 0.0, 1.0);\n" +
             "    } else {\n" +
-            "        vec2 d = (p * 2.0 - 1.0) * uParam;\n" +
+            "        vec2 d = vec2(nx, ny) * uParam;\n" +
             "        float r = length(d);\n" +
             "        if (r < 0.00001) return vec2(0.5);\n" +
             "        float sr = 2.0 * atan(r) / HALF_PI;\n" +
@@ -122,19 +137,28 @@ public final class FisheyeGlPipe {
             "    }\n" +
             "}\n" +
             "void main() {\n" +
+            "    bool hit = false;\n" +
             "    vec2 src = vPos;\n" +
             "    if (uOn > 0.5) {\n" +
             "        for (int i = 0; i < 4; i++) {\n" +
             "            if (float(i) >= uLaneCount) break;\n" +
             "            vec4 lane = uLanes[i];\n" +
-            "            vec2 local = (vPos - lane.xy) / lane.zw;\n" +
+            "            vec2 local = (vPos - lane.xy) / max(lane.zw, vec2(0.00001));\n" +
             "            if (local.x >= 0.0 && local.x <= 1.0 && local.y >= 0.0 && local.y <= 1.0) {\n" +
+            "                hit = true;\n" +
             "                vec2 s = corrected(local);\n" +
             "                s = local + (s - local) * uStrength;\n" +
-            "                src = lane.xy + s * lane.zw;\n" +
+            "                vec4 from = uSources[i];\n" +
+            "                src = from.xy + s * from.zw;\n" +
             "                break;\n" +
             "            }\n" +
             "        }\n" +
+            "    } else {\n" +
+            "        hit = true;\n" +
+            "    }\n" +
+            "    if (!hit && uPad > 0.5) {\n" +
+            "        gl_FragColor = vec4(0.164706, 0.172549, 0.188235, 1.0);\n" +
+            "        return;\n" +
             "    }\n" +
             // SurfaceTexture 的矩阵按左下为原点的纹理坐标算
             "    vec4 t = uTexMatrix * vec4(src.x, 1.0 - src.y, 0.0, 1.0);\n" +
@@ -142,6 +166,25 @@ public final class FisheyeGlPipe {
             "}\n";
 
     private static final float[] QUAD = {-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f};
+
+    /** 信息条底色和字。和录像信息条同一套深底白字。 */
+    private static final int BAR_BG = 0xFF2A2C30;
+    private static final int BAR_TEXT = 0xFFF0F1F2;
+    private static final String STAMP_VERTEX =
+            "attribute vec2 aPosition;\n" +
+            "attribute vec2 aTex;\n" +
+            "varying vec2 vTex;\n" +
+            "void main() {\n" +
+            "    gl_Position = vec4(aPosition, 0.0, 1.0);\n" +
+            "    vTex = aTex;\n" +
+            "}\n";
+    private static final String STAMP_FRAGMENT =
+            "precision mediump float;\n" +
+            "varying vec2 vTex;\n" +
+            "uniform sampler2D sStamp;\n" +
+            "void main() {\n" +
+            "    gl_FragColor = texture2D(sStamp, vTex);\n" +
+            "}\n";
 
     /** 一次设置的快照：GL 线程每帧读一次，别的线程整个换掉，不会读到一半新一半旧。 */
     private static final class Correction {
@@ -188,6 +231,26 @@ public final class FisheyeGlPipe {
     private int projectionHandle;
     private int parameterHandle;
     private int strengthHandle;
+    private int aspectHandle;
+    private int sourcesHandle;
+    private int padHandle;
+    private float[] sources;
+    private float cellAspect = 1f;
+    private boolean padBar;
+    private int barPx;
+    private String stampLeft = "";
+    private long stampStartMs = Long.MIN_VALUE;
+    private long stampSecond = Long.MIN_VALUE;
+    private int stampProgram;
+    private int stampPosHandle;
+    private int stampTexHandle;
+    private int stampSamplerHandle;
+    private int stampTexture;
+    private Bitmap stampBitmap;
+    private FloatBuffer stampXy;
+    private FloatBuffer stampUv;
+    private final SimpleDateFormat stampClock =
+            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
     private SurfaceTexture input;
     private final float[] texMatrix = new float[16];
     private final int[] size = new int[2];
@@ -362,6 +425,40 @@ public final class FisheyeGlPipe {
         };
     }
 
+    /**
+     * 导出才用。四格改成宽银幕，下面留一条信息条。
+     *
+     * <p>{@code outputLanes} 是画在输出上的位置，{@code sourceLanes} 是从原片取哪一块。
+     * {@code cellAspect} 是一格的宽/高（1 = 正方形）。{@code stampLeft} 写在条的左边
+     * （应用名、版本、车牌），{@code startMs} 加上这一帧的时间写在右边。</p>
+     */
+    public void setExport(float cellAspect, float[] outputLanes, float[] sourceLanes,
+                          int barPx, String stampLeft, long startMs) {
+        float[] out = Arrays.copyOf(outputLanes == null ? GRID_2X2 : outputLanes, MAX_LANES * 4);
+        float[] src = Arrays.copyOf(sourceLanes == null ? out : sourceLanes, MAX_LANES * 4);
+        int count = Math.min(MAX_LANES, (outputLanes == null ? GRID_2X2.length : outputLanes.length) / 4);
+        CountDownLatch done = new CountDownLatch(1);
+        handler.post(() -> {
+            lanes = out;
+            laneCount = count;
+            sources = src;
+            this.cellAspect = cellAspect <= 0f ? 1f : cellAspect;
+            this.barPx = Math.max(0, barPx);
+            this.padBar = this.barPx > 0;
+            this.stampLeft = stampLeft == null ? "" : stampLeft;
+            this.stampStartMs = startMs;
+            stampSecond = Long.MIN_VALUE;
+            done.countDown();
+        });
+        try {
+            if (!done.await(START_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                AppLog.w(TAG, name + " 导出画面没排上");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     public SurfaceTexture output() {
         return output;
     }
@@ -473,9 +570,13 @@ public final class FisheyeGlPipe {
         projectionHandle = GLES20.glGetUniformLocation(program, "uProjection");
         parameterHandle = GLES20.glGetUniformLocation(program, "uParam");
         strengthHandle = GLES20.glGetUniformLocation(program, "uStrength");
+        aspectHandle = GLES20.glGetUniformLocation(program, "uAspect");
+        sourcesHandle = GLES20.glGetUniformLocation(program, "uSources");
+        padHandle = GLES20.glGetUniformLocation(program, "uPad");
         quad = ByteBuffer.allocateDirect(QUAD.length * 4).order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
         quad.put(QUAD).position(0);
+        initStamp();
 
         int[] names = new int[1];
         GLES20.glGenTextures(1, names, 0);
@@ -553,10 +654,14 @@ public final class FisheyeGlPipe {
         GLES20.glUniform1f(projectionHandle, c.projection);
         GLES20.glUniform1f(parameterHandle, c.parameter);
         GLES20.glUniform1f(strengthHandle, c.strength);
+        GLES20.glUniform1f(aspectHandle, cellAspect <= 0f ? 1f : cellAspect);
+        GLES20.glUniform4fv(sourcesHandle, MAX_LANES, sources != null ? sources : lanes, 0);
+        GLES20.glUniform1f(padHandle, padBar ? 1f : 0f);
         GLES20.glEnableVertexAttribArray(positionHandle);
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quad);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         GLES20.glDisableVertexAttribArray(positionHandle);
+        drawStamp();
 
         if (encodeTarget != null && input != null) {
             EGLExt.eglPresentationTimeANDROID(display, surface, input.getTimestamp());
@@ -568,6 +673,87 @@ public final class FisheyeGlPipe {
             return false;
         }
         return true;
+    }
+
+    private void initStamp() {
+        stampProgram = link(STAMP_VERTEX, STAMP_FRAGMENT);
+        stampPosHandle = GLES20.glGetAttribLocation(stampProgram, "aPosition");
+        stampTexHandle = GLES20.glGetAttribLocation(stampProgram, "aTex");
+        stampSamplerHandle = GLES20.glGetUniformLocation(stampProgram, "sStamp");
+        stampXy = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        stampUv = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        stampUv.put(new float[]{0f, 1f, 1f, 1f, 0f, 0f, 1f, 0f}).position(0);
+        int[] names = new int[1];
+        GLES20.glGenTextures(1, names, 0);
+        stampTexture = names[0];
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+    }
+
+    /** 信息条：左边应用名、版本、车牌，右边这一帧的日期时间。 */
+    private void drawStamp() {
+        if (!padBar || barPx <= 0 || stampProgram == 0 || size[0] <= 0 || size[1] <= 0) {
+            return;
+        }
+        long shownMs = stampStartMs;
+        if (shownMs >= 0 && input != null) {
+            long ts = input.getTimestamp();
+            if (ts > 0 && ts < 1_000_000_000_000_000L) {
+                shownMs += ts / 1_000_000L;
+            }
+        }
+        long second = shownMs >= 0 ? shownMs / 1000L : Long.MIN_VALUE;
+        if (stampBitmap == null || stampBitmap.getWidth() != size[0]
+                || stampBitmap.getHeight() != barPx || second != stampSecond) {
+            rebuildStamp(size[0], barPx, shownMs);
+            stampSecond = second;
+        }
+        if (stampBitmap == null) {
+            return;
+        }
+        float top = -1f + 2f * barPx / size[1];
+        stampXy.position(0);
+        stampXy.put(new float[]{-1f, -1f, 1f, -1f, -1f, top, 1f, top}).position(0);
+
+        GLES20.glUseProgram(stampProgram);
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);
+        GLES20.glUniform1i(stampSamplerHandle, 0);
+        GLES20.glEnableVertexAttribArray(stampPosHandle);
+        GLES20.glVertexAttribPointer(stampPosHandle, 2, GLES20.GL_FLOAT, false, 0, stampXy);
+        GLES20.glEnableVertexAttribArray(stampTexHandle);
+        GLES20.glVertexAttribPointer(stampTexHandle, 2, GLES20.GL_FLOAT, false, 0, stampUv);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+        GLES20.glDisableVertexAttribArray(stampPosHandle);
+        GLES20.glDisableVertexAttribArray(stampTexHandle);
+    }
+
+    private void rebuildStamp(int width, int height, long shownMs) {
+        if (stampBitmap != null) {
+            stampBitmap.recycle();
+        }
+        stampBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(stampBitmap);
+        canvas.drawColor(BAR_BG);
+        float textSize = Math.max(28f, Math.min(42f, height * 0.36f));
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(BAR_TEXT);
+        paint.setTextSize(textSize);
+        paint.setTypeface(Typeface.MONOSPACE);
+        Paint.FontMetrics fm = paint.getFontMetrics();
+        float baseline = (height - fm.ascent - fm.descent) / 2f;
+        float pad = textSize * 0.6f;
+        String right = shownMs >= 0 ? stampClock.format(new Date(shownMs)) : "";
+        float rightW = right.isEmpty() ? 0f : paint.measureText(right);
+        canvas.drawText(stampLeft == null ? "" : stampLeft, pad, baseline, paint);
+        if (!right.isEmpty()) {
+            canvas.drawText(right, width - pad - rightW, baseline, paint);
+        }
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, stampBitmap, 0);
     }
 
     /** 屏幕上那一块释放了就收掉自己：没有人会再来要这条管线。 */
@@ -602,9 +788,21 @@ public final class FisheyeGlPipe {
                     GLES20.glDeleteProgram(program);
                     program = 0;
                 }
+                if (stampProgram != 0) {
+                    GLES20.glDeleteProgram(stampProgram);
+                    stampProgram = 0;
+                }
                 if (texture != 0) {
                     GLES20.glDeleteTextures(1, new int[]{texture}, 0);
                     texture = 0;
+                }
+                if (stampTexture != 0) {
+                    GLES20.glDeleteTextures(1, new int[]{stampTexture}, 0);
+                    stampTexture = 0;
+                }
+                if (stampBitmap != null) {
+                    stampBitmap.recycle();
+                    stampBitmap = null;
                 }
                 EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE,
                         EGL14.EGL_NO_CONTEXT);

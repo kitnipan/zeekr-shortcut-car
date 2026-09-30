@@ -12,14 +12,22 @@ import android.view.Surface;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.camera.CameraSlots;
+import com.kooo.evcam.camera.EncodeSize;
+import com.kooo.evcam.camera.WatermarkText;
+import com.kooo.evcam.telemetry.InfoBar;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.zeekr.FisheyeGlPipe;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 把环视录像拉直后再交给 U 盘。
@@ -99,7 +107,9 @@ public final class SurroundDefish {
                     config.getFisheyeProjection(),
                     config.getFisheyeStrength() / 100f,
                     cancel,
-                    percent);
+                    percent,
+                    brandLine(context),
+                    clipStartMillis(source.getName()));
         } catch (IOException e) {
             if (dest.exists() && !dest.delete()) {
                 AppLog.w(TAG, "删不掉半成品: " + dest.getAbsolutePath());
@@ -110,7 +120,8 @@ public final class SurroundDefish {
 
     private static void transcode(File source, File dest,
                                   float fov, String projection, float strength,
-                                  AtomicBoolean cancel, Percent percent) throws IOException {
+                                  AtomicBoolean cancel, Percent percent,
+                                  String stampLeft, long clipStartMs) throws IOException {
         MediaExtractor videoEx = new MediaExtractor();
         MediaExtractor audioEx = new MediaExtractor();
         MediaCodec decoder = null;
@@ -136,6 +147,10 @@ public final class SurroundDefish {
             if ((height & 1) != 0) {
                 height--;
             }
+            int[] frame = exportFrame(width, height);
+            int outW = frame[0];
+            int outH = frame[1];
+            int contentH = frame[2];
             int fps = inFormat.containsKey(MediaFormat.KEY_FRAME_RATE)
                     ? inFormat.getInteger(MediaFormat.KEY_FRAME_RATE) : 30;
             if (fps <= 0) {
@@ -154,7 +169,7 @@ public final class SurroundDefish {
             }
 
             encoder = MediaCodec.createEncoderByType(AVC);
-            MediaFormat outFormat = MediaFormat.createVideoFormat(AVC, width, height);
+            MediaFormat outFormat = MediaFormat.createVideoFormat(AVC, outW, outH);
             outFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
             outFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
@@ -164,11 +179,19 @@ public final class SurroundDefish {
             encoderSurface = encoder.createInputSurface();
             encoder.start();
 
-            pipe = FisheyeGlPipe.start("usb", encoderSurface, width, height, lanesFor(width, height));
+            float[] lanes = lanesFor(width, height);
+            if (contentH < outH) {
+                lanes = FisheyeGlPipe.gridLanes(contentH / (float) outH);
+            }
+            pipe = FisheyeGlPipe.start("usb", encoderSurface, width, height, lanes);
             if (pipe == null) {
                 throw new IOException("defish pipe");
             }
             pipe.setCorrection(true, fov, projection, strength);
+            if (contentH < outH) {
+                pipe.setExport(outW / (float) contentH, lanes, FisheyeGlPipe.GRID_2X2,
+                        outH - contentH, stampLeft, clipStartMs);
+            }
             decoderSurface = pipe.newInputSurface();
             if (decoderSurface == null) {
                 throw new IOException("defish input");
@@ -181,7 +204,7 @@ public final class SurroundDefish {
 
             muxer = new MediaMuxer(dest.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             run(videoEx, audioEx, decoder, encoder, muxer, pipe, audioFormat, durationUs, cancel, percent);
-            AppLog.i(TAG, "环视已拉直: " + dest.getName() + " " + width + "x" + height);
+            AppLog.i(TAG, "环视已拉直: " + dest.getName() + " " + outW + "x" + outH);
         } catch (IOException e) {
             throw e;
         } catch (Exception e) {
@@ -373,6 +396,75 @@ public final class SurroundDefish {
             muxer.writeSampleData(audioTrack, buf, info);
             audioEx.advance();
         }
+    }
+
+    /**
+     * 2×2 的导出尺寸。每一格是 16:9，整幅也是 16:9，下面再加一条信息条。
+     * 合成流长条保持原尺寸。
+     *
+     * @return {@code {宽, 总高, 画面高}}。画面高小于总高时，差出来的是信息条。
+     */
+    static int[] exportFrame(int srcW, int srcH) {
+        int w = srcW & ~1;
+        int h = srcH & ~1;
+        if (w < 2 || h < 2) {
+            return new int[]{Math.max(2, w), Math.max(2, h), Math.max(2, h)};
+        }
+        if (CompositeStreamGeometry.looksLikeCompositeByRatio(w, h)) {
+            return new int[]{w, h, h};
+        }
+        int content = (w * 9 / 16) & ~1;
+        if (content < 2) {
+            content = 2;
+        }
+        int bar = InfoBar.HEIGHT & ~1;
+        int total = content + bar;
+        if (w > EncodeSize.MAX_SIDE || total > EncodeSize.MAX_SIDE) {
+            float scale = Math.min((float) EncodeSize.MAX_SIDE / w,
+                    (float) EncodeSize.MAX_SIDE / total);
+            w = Math.max(2, ((int) (w * scale)) & ~1);
+            content = Math.max(2, ((int) (content * scale)) & ~1);
+            total = content + bar;
+            if (total > EncodeSize.MAX_SIDE) {
+                content = Math.max(2, (EncodeSize.MAX_SIDE - bar) & ~1);
+                total = content + bar;
+            }
+        }
+        return new int[]{w, total, content};
+    }
+
+    /** 文件名里的 {@code yyyyMMdd_HHmmss}。没有就返回 -1，信息条不写时间。 */
+    static long clipStartMillis(String fileName) {
+        if (fileName == null) {
+            return -1L;
+        }
+        Matcher matcher = Pattern.compile("(\\d{8})_(\\d{6})").matcher(fileName);
+        if (!matcher.find()) {
+            return -1L;
+        }
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("yyyyMMddHHmmss", Locale.US);
+            format.setLenient(false);
+            Date date = format.parse(matcher.group(1) + matcher.group(2));
+            return date == null ? -1L : date.getTime();
+        } catch (ParseException e) {
+            return -1L;
+        }
+    }
+
+    /** 和录像左上角同一行：应用名、版本、车牌。 */
+    private static String brandLine(Context context) {
+        String version = "";
+        try {
+            version = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            AppLog.w(TAG, "读版本失败: " + e);
+        }
+        return WatermarkText.brandLine(
+                context.getString(com.kooo.evcam.R.string.app_name),
+                version,
+                new AppConfig(context).getLicensePlate());
     }
 
     /** 录像落盘是 2×2。万一还是合成流长条，按长条的四格来。 */

@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta4] - 2026-10-01
+
+### New and improved
+
+- A straightened surround clip is widescreen, so each camera is 16:9.
+- A bar under the picture shows the app version, the plate, and that clip's date and time.
+
 ## [2.0.3-beta3] - 2026-09-30
 
 ### Fixed
