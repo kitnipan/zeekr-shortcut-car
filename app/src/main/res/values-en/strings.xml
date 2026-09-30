@@ -468,6 +468,16 @@
 
     <!-- Send to phone -->
     <string name="action_send_to_phone">Send to phone</string>
+    <string name="action_save_to_usb">Save to USB</string>
+    <string name="usb_export_no_stick_title">No USB stick found</string>
+    <string name="usb_export_no_stick_msg">Plug in a USB stick and try again. The file is copied into the exports folder on the stick, under the same name.</string>
+    <string name="usb_export_copying">Copying to USB…</string>
+    <string name="usb_export_saved">Saved to %1$s</string>
+    <string name="usb_export_failed">Could not save: %1$s</string>
+    <string name="usb_export_busy">Still copying the previous file</string>
+    <string name="usb_export_defish">Saving to USB. Surround is straightened first. Cabin and the other cameras are copied as recorded</string>
+    <string name="usb_export_saved_count">Saved %1$d files to\n%2$s</string>
+    <string name="usb_export_unfinished">%1$d files were not finished yet, so they were left out</string>
     <string name="share_phone_title">Send to phone</string>
     <string name="share_phone_steps">Scan with your phone → the file opens in the browser → long-press it and choose Save</string>
     <string name="share_phone_steps_file">Scan the QR code with your phone → the download page opens → tap Download to save the file</string>

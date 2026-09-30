@@ -94,10 +94,10 @@ public class DimOverlayService extends Service {
         }
         if (shade == null) {
             attach(config);
+            raiseFloatingButton();
         } else {
             paint(config);
         }
-        raiseFloatingButton();
     }
 
     private void attach(AppConfig config) {

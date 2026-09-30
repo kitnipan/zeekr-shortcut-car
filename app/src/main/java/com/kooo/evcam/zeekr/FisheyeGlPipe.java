@@ -5,6 +5,7 @@ import android.opengl.EGL14;
 import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
+import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
@@ -159,6 +160,8 @@ public final class FisheyeGlPipe {
 
     private final String name;
     private final SurfaceTexture output;
+    /** 非空时画到编码器的 Surface 上，而不是屏幕。时间戳跟着这一帧走。 */
+    private final Surface encodeTarget;
     private final int inputWidth;
     private final int inputHeight;
     /** 四格的位置；只在管线线程上读写（{@link #setLanes} 也是投过去改）。 */
@@ -189,7 +192,7 @@ public final class FisheyeGlPipe {
     private final float[] texMatrix = new float[16];
     private final int[] size = new int[2];
     private FloatBuffer quad;
-    private long frames;
+    private volatile long frames;
     private long startedAtMs;
 
     private FisheyeGlPipe(String name, SurfaceTexture output, int inputWidth, int inputHeight,
@@ -201,6 +204,7 @@ public final class FisheyeGlPipe {
         int count = Math.min(MAX_LANES, lanes == null ? 0 : lanes.length / 4);
         this.laneCount = count;
         this.lanes = Arrays.copyOf(lanes == null ? new float[0] : lanes, MAX_LANES * 4);
+        this.encodeTarget = null;
         this.thread = new HandlerThread("FisheyeGl-" + name);
         this.thread.start();
         this.handler = new Handler(thread.getLooper());
@@ -249,6 +253,67 @@ public final class FisheyeGlPipe {
             return null;
         }
         return pipe;
+    }
+
+    /**
+     * 和 {@link #start(String, SurfaceTexture, int, int, float[])} 同一条管线，
+     * 输出接到编码器的 Surface 上。用来把环视录像拉直后再写盘。
+     */
+    public static FisheyeGlPipe start(String name, Surface encodeTarget,
+                                      int inputWidth, int inputHeight, float[] lanes) {
+        if (encodeTarget == null || inputWidth <= 0 || inputHeight <= 0) {
+            return null;
+        }
+        FisheyeGlPipe pipe = new FisheyeGlPipe(name, encodeTarget, inputWidth, inputHeight, lanes);
+        CountDownLatch ready = new CountDownLatch(1);
+        boolean[] ok = new boolean[1];
+        pipe.handler.post(() -> {
+            try {
+                pipe.init();
+                ok[0] = true;
+            } catch (RuntimeException e) {
+                AppLog.e(TAG, name + " 起不来: " + e);
+                pipe.teardown();
+            } finally {
+                ready.countDown();
+            }
+        });
+        try {
+            if (!ready.await(START_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                AppLog.e(TAG, name + " " + START_TIMEOUT_MS + "ms 内没准备好");
+                pipe.release();
+                return null;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            pipe.release();
+            return null;
+        }
+        if (!ok[0]) {
+            pipe.thread.quitSafely();
+            return null;
+        }
+        return pipe;
+    }
+
+    private FisheyeGlPipe(String name, Surface encodeTarget, int inputWidth, int inputHeight,
+                          float[] lanes) {
+        this.name = name;
+        this.output = null;
+        this.encodeTarget = encodeTarget;
+        this.inputWidth = inputWidth;
+        this.inputHeight = inputHeight;
+        int count = Math.min(MAX_LANES, lanes == null ? 0 : lanes.length / 4);
+        this.laneCount = count;
+        this.lanes = Arrays.copyOf(lanes == null ? new float[0] : lanes, MAX_LANES * 4);
+        this.thread = new HandlerThread("FisheyeGl-" + name);
+        this.thread.start();
+        this.handler = new Handler(thread.getLooper());
+    }
+
+    /** 已经画出去的帧数。导出时用来等最后一帧落进编码器。 */
+    public long drawn() {
+        return frames;
     }
 
     /** 给生产者的 Surface。每次给一个新的，用完由生产者那边 release —— 和直连时一样。 */
@@ -320,11 +385,11 @@ public final class FisheyeGlPipe {
 
     /** 输出多大（像素）。视频知道自己的尺寸之后按它来，放大一格时才不糊。 */
     public void setOutputSize(int width, int height) {
-        if (width <= 0 || height <= 0 || released) {
+        if (width <= 0 || height <= 0 || released || output == null) {
             return;
         }
         handler.post(() -> {
-            if (!released && !output.isReleased()) {
+            if (!released && output != null && !output.isReleased()) {
                 output.setDefaultBufferSize(width, height);
             }
         });
@@ -386,7 +451,8 @@ public final class FisheyeGlPipe {
                     + Integer.toHexString(EGL14.eglGetError()));
         }
         // 屏幕上那一块已经被别的生产者接着的话，这一步会失败 —— 那就照旧直连
-        surface = EGL14.eglCreateWindowSurface(display, configs[0], output,
+        surface = EGL14.eglCreateWindowSurface(display, configs[0],
+                encodeTarget != null ? encodeTarget : output,
                 new int[]{EGL14.EGL_NONE}, 0);
         if (surface == EGL14.EGL_NO_SURFACE) {
             throw new IllegalStateException("eglCreateWindowSurface failed 0x"
@@ -427,7 +493,9 @@ public final class FisheyeGlPipe {
         input.setDefaultBufferSize(inputWidth, inputHeight);
         input.setOnFrameAvailableListener(st -> drawFrame(), handler);
         startedAtMs = SystemClock.elapsedRealtime();
-        handler.postDelayed(this::watchOutput, WATCH_INTERVAL_MS);
+        if (encodeTarget == null) {
+            handler.postDelayed(this::watchOutput, WATCH_INTERVAL_MS);
+        }
         AppLog.i(TAG, name + " 准备好：输入 " + inputWidth + "x" + inputHeight
                 + "，" + laneCount + " 路，GL " + version[0] + "." + version[1]);
     }
@@ -457,7 +525,7 @@ public final class FisheyeGlPipe {
         if (released || outputBroken || frames == 0 || surface == EGL14.EGL_NO_SURFACE) {
             return;
         }
-        if (output.isReleased()) {
+        if (output != null && output.isReleased()) {
             outputBroken = true;
             AppLog.i(TAG, name + " 屏幕上那一块已经释放，只取帧不画");
             return;
@@ -482,6 +550,9 @@ public final class FisheyeGlPipe {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         GLES20.glDisableVertexAttribArray(positionHandle);
 
+        if (encodeTarget != null && input != null) {
+            EGLExt.eglPresentationTimeANDROID(display, surface, input.getTimestamp());
+        }
         if (!EGL14.eglSwapBuffers(display, surface)) {
             outputBroken = true;
             AppLog.w(TAG, name + " 画不上屏幕了 0x" + Integer.toHexString(EGL14.eglGetError())
@@ -494,7 +565,7 @@ public final class FisheyeGlPipe {
         if (released) {
             return;
         }
-        if (output.isReleased()) {
+        if (output != null && output.isReleased()) {
             AppLog.i(TAG, name + " 屏幕上那一块没了，收掉（共 " + frames + " 帧）");
             Runnable action = onReleased;
             release();

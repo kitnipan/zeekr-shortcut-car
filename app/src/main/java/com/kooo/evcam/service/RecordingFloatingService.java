@@ -34,6 +34,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
+import com.kooo.evcam.overlay.DimOverlayService;
 import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 
@@ -108,6 +109,13 @@ public class RecordingFloatingService extends Service {
     /** 录制键 + 间距 + 遮罩键。拖动时按这一整条夹在屏幕里。 */
     private int clusterWidthPx;
     private boolean downOnDim;
+    /** Finger started on the moon and has slid far enough to change the dim, not toggle it. */
+    private boolean dimAdjusting;
+    /** Opacity when the dim drag started. Right and down add to this. */
+    private int dimOrigin;
+    private int dimShown = -1;
+    private static final int DIM_LEVEL_MIN = 10;
+    private static final int DIM_LEVEL_MAX = 100;
 
     // 布局参数
     private WindowManager.LayoutParams layoutParams;
@@ -519,7 +527,11 @@ public class RecordingFloatingService extends Service {
                         isDragging = false;
                         longPressFired = false;
                         downOnDim = hitDim(event);
-                        if (!downOnDim) {
+                        dimAdjusting = false;
+                        dimShown = -1;
+                        if (downOnDim) {
+                            dimOrigin = appConfig.getDimOpacity();
+                        } else {
                             mainHandler.postDelayed(longPressRunnable, LONG_PRESS_MS);
                         }
                         return true;
@@ -527,6 +539,15 @@ public class RecordingFloatingService extends Service {
                     case MotionEvent.ACTION_MOVE:
                         int deltaX = (int) (event.getRawX() - initialTouchX);
                         int deltaY = (int) (event.getRawY() - initialTouchY);
+
+                        if (downOnDim) {
+                            if (Math.abs(deltaX) > CLICK_THRESHOLD || Math.abs(deltaY) > CLICK_THRESHOLD) {
+                                dimAdjusting = true;
+                                mainHandler.removeCallbacks(longPressRunnable);
+                                applyDimLevel(deltaX, deltaY);
+                            }
+                            return true;
+                        }
 
                         if (Math.abs(deltaX) > CLICK_THRESHOLD || Math.abs(deltaY) > CLICK_THRESHOLD) {
                             // 位置锁上时手指照样能滑，只是按钮不跟着走 ——
@@ -562,6 +583,10 @@ public class RecordingFloatingService extends Service {
 
                     case MotionEvent.ACTION_UP:
                         mainHandler.removeCallbacks(longPressRunnable);
+                        if (dimAdjusting) {
+                            dimAdjusting = false;
+                            return true;
+                        }
                         if (slidWhileLocked) {
                             slidWhileLocked = false;
                             return true;
@@ -617,6 +642,36 @@ public class RecordingFloatingService extends Service {
         float y = event.getRawY();
         return x >= location[0] && x <= location[0] + dimButton.getWidth()
                 && y >= location[1] && y <= location[1] + dimButton.getHeight();
+    }
+
+    /**
+     * Drag on the moon changes how dark the veil is. Right or down increases it.
+     * Left or up decreases it. A short tap still toggles the veil on and off.
+     */
+    private void applyDimLevel(int deltaX, int deltaY) {
+        float density = getResources().getDisplayMetrics().density;
+        int step = Math.max(1, Math.round(density * 6f));
+        int level = dimOrigin + (deltaX + deltaY) / step;
+        if (level < DIM_LEVEL_MIN) {
+            level = DIM_LEVEL_MIN;
+        } else if (level > DIM_LEVEL_MAX) {
+            level = DIM_LEVEL_MAX;
+        }
+        if (level == dimShown) {
+            return;
+        }
+        dimShown = level;
+        if (!appConfig.isDimOverlayEnabled()) {
+            if (!OverlayCoordinator.setDimOverlayEnabled(this, true)) {
+                Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (dimButton != null) {
+                dimButton.setDimOn(true);
+            }
+        }
+        appConfig.setDimOpacity(level);
+        DimOverlayService.apply(this);
     }
 
     private void toggleDim() {

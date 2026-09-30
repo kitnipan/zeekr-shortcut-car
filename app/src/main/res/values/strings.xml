@@ -477,6 +477,16 @@
 
     <!-- 发送到手机 -->
     <string name="action_send_to_phone">发送到手机</string>
+    <string name="action_save_to_usb">存到U盘</string>
+    <string name="usb_export_no_stick_title">没有检测到 U 盘</string>
+    <string name="usb_export_no_stick_msg">把 U 盘插上车机后再试。文件会写到 U 盘里的 exports 文件夹，文件名和原来一样。</string>
+    <string name="usb_export_copying">正在复制到 U 盘…</string>
+    <string name="usb_export_saved">已保存到 %1$s</string>
+    <string name="usb_export_failed">保存失败：%1$s</string>
+    <string name="usb_export_busy">上一次还在复制，请稍等</string>
+    <string name="usb_export_defish">正在写入 U 盘。环视会先拉直，座舱和其他相机按原文件拷过去</string>
+    <string name="usb_export_saved_count">已保存 %1$d 个文件到\n%2$s</string>
+    <string name="usb_export_unfinished">%1$d 个文件还没写完，没有拷走</string>
     <string name="share_phone_title">发送到手机</string>
     <string name="share_phone_steps">用手机扫描二维码 → 浏览器会打开这个文件 → 长按图片或视频，选择「保存」</string>
     <string name="share_phone_steps_file">用手机扫描二维码 → 浏览器打开下载页 → 点「下载」，文件就存到手机里了</string>

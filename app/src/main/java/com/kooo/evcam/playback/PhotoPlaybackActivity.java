@@ -97,6 +97,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private TextView placeholderFront;
     private Button btnViewMode;
     private Button btnSendToPhone;
+    private Button btnSaveToUsb;
     private View controlsLayout;
 
     // 数据
@@ -213,6 +214,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         // 摄像头切换按钮和控制栏
         btnViewMode = findViewById(R.id.btn_view_mode);
         btnSendToPhone = findViewById(R.id.btn_send_to_phone);
+        btnSaveToUsb = findViewById(R.id.btn_save_to_usb);
         controlsLayout = findViewById(R.id.controls_layout);
 
         // 设置列表（竖屏2列，横屏1列，日期头部跨越所有列）
@@ -289,6 +291,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         if (btnSendToPhone != null) {
             btnSendToPhone.setOnClickListener(v -> sendCurrentPhotoToPhone());
+        }
+        if (btnSaveToUsb != null) {
+            btnSaveToUsb.setOnClickListener(v -> saveCurrentPhotoToUsb());
         }
     }
 
@@ -377,15 +382,37 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      * <p>这一组没拍到环视时，按 {@link #POSITIONS} 的顺序发第一张有的。</p>
      */
     private void sendCurrentPhotoToPhone() {
-        String position = currentGroup == null ? null
-                : expandedPosition != null ? expandedPosition : firstPhotoPosition();
-        if (position == null) {
+        File file = currentPhotoFile();
+        if (file == null) {
             Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this,
-                currentGroup.getPhotoFile(position));
+        com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this, file);
+    }
+
+    /** 和 {@link #sendCurrentPhotoToPhone()} 同一张，落到 U 盘的 exports。 */
+    private void saveCurrentPhotoToUsb() {
+        File file = currentPhotoFile();
+        if (file == null) {
+            Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.kooo.evcam.share.UsbExport.save(PhotoPlaybackActivity.this, file);
+    }
+
+    /**
+     * 放大着哪一路就用哪一路；什么都没放大时用环视那张。
+     * 这一组没拍到环视时，按 {@link #POSITIONS} 的顺序用第一张有的。一张都没有返回 null。
+     */
+    private File currentPhotoFile() {
+        String position = currentGroup == null ? null
+                : expandedPosition != null ? expandedPosition : firstPhotoPosition();
+        if (position == null) {
+            return null;
+        }
+        return currentGroup.getPhotoFile(position);
     }
 
     /** 这一组里按 {@link #POSITIONS} 顺序第一张有的照片（环视排第一）；一张都没有返回 null。 */

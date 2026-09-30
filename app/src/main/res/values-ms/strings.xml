@@ -468,6 +468,16 @@
 
     <!-- Hantar ke telefon -->
     <string name="action_send_to_phone">Hantar ke telefon</string>
+    <string name="action_save_to_usb">Simpan ke USB</string>
+    <string name="usb_export_no_stick_title">Pemacu USB tidak dijumpai</string>
+    <string name="usb_export_no_stick_msg">Sambungkan pemacu USB dan cuba lagi. Fail disalin ke folder exports pada pemacu itu, dengan nama yang sama.</string>
+    <string name="usb_export_copying">Menyalin ke USB…</string>
+    <string name="usb_export_saved">Disimpan ke %1$s</string>
+    <string name="usb_export_failed">Tidak dapat menyimpan: %1$s</string>
+    <string name="usb_export_busy">Fail sebelumnya masih disalin</string>
+    <string name="usb_export_defish">Menyimpan ke USB. Surround diluruskan dahulu. Kabin dan kamera lain disalin seperti yang dirakam</string>
+    <string name="usb_export_saved_count">%1$d fail disimpan ke\n%2$s</string>
+    <string name="usb_export_unfinished">%1$d fail belum siap, jadi tidak disalin</string>
     <string name="share_phone_title">Hantar ke telefon</string>
     <string name="share_phone_steps">Imbas dengan telefon → fail dibuka dalam pelayar → tekan lama dan pilih Simpan</string>
     <string name="share_phone_steps_file">Imbas kod QR dengan telefon → halaman muat turun dibuka → ketik Muat turun untuk menyimpan fail</string>

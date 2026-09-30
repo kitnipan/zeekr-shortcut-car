@@ -51,16 +51,16 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="monospace"
                 android:text="@string/remote_offline"
-                android:textColor="@color/text_secondary"
-                android:textSize="16sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                android:textColor="@color/text_secondary" />
 
             <TextView
                 android:id="@+id/remote_email"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:textColor="@color/text_tertiary"
-                android:textSize="14sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Micro"
+                android:textColor="@color/text_tertiary" />
 
             <ImageView
                 android:id="@+id/remote_qr"
@@ -76,8 +76,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:fontFamily="monospace"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Micro"
+                android:textColor="@color/text_secondary" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -85,8 +85,8 @@
                 android:layout_marginTop="20dp"
                 android:gravity="center"
                 android:text="@string/remote_hint"
-                android:textColor="@color/text_secondary"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                android:textColor="@color/text_secondary" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

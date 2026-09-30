@@ -37,7 +37,18 @@ public final class VersionName {
             }
         }
 
-        // 数字段一样，再看预发布后缀。按 semver：正式版比同号的预发布版新
+        // 数字段一样。-kd 是这个 fork 的发布线：同号时比正式版、beta、alpha 都新，
+        // 这样一台装着 2.0.0 的车机能被 2.0.0-kd 盖上。
+        boolean kdA = isKd(coreA[1]);
+        boolean kdB = isKd(coreB[1]);
+        if (kdA != kdB) {
+            return kdA ? 1 : -1;
+        }
+        if (kdA) {
+            return coreA[1].compareTo(coreB[1]);
+        }
+
+        // 再看预发布后缀。按 semver：正式版比同号的预发布版新
         boolean preA = !coreA[1].isEmpty();
         boolean preB = !coreB[1].isEmpty();
         if (preA != preB) {
@@ -65,8 +76,9 @@ public final class VersionName {
      * <p>检查更新只推这两档：alpha 是开发过程中随手发的，数量多、稳定性没有保证，
      * 拿它去覆盖一台正在用的车机不合适。</p>
      *
-     * <p>后缀既不是空也不是 beta 的一律不算 —— 包括 rc。真要发 rc，
-     * 得在这里明确加上，而不是靠「看起来比 beta 新」这种默认。</p>
+     * <p>后缀既不是空、也不是 {@code kd}、也不是 beta 的一律不算 —— 包括 rc。
+     * 真要发 rc，得在这里明确加上，而不是靠「看起来比 beta 新」这种默认。
+     * {@code kd} 是这个 fork 的发布线。</p>
      */
     public static boolean isBetaOrRelease(String version) {
         String[] parts = splitCore(version);
@@ -74,20 +86,26 @@ public final class VersionName {
             // 版本号都认不出来，谈不上属于哪一档
             return false;
         }
-        if (parts[1].isEmpty()) {
+        if (parts[1].isEmpty() || isKd(parts[1])) {
             return true;
         }
         return parts[1].toLowerCase(java.util.Locale.US).startsWith("beta");
     }
 
     /**
-     * 是不是正式版：认得出版本号，而且没有预发布后缀。
+     * 是不是正式版：认得出版本号，而且没有预发布后缀。{@code -kd} 也算这一档。
      *
      * <p>设置里关掉「接收 Beta 版」之后，检查更新只认这一档。</p>
      */
     public static boolean isRelease(String version) {
         String[] parts = splitCore(version);
-        return numbers(parts[0]).length > 0 && parts[1].isEmpty();
+        return numbers(parts[0]).length > 0 && (parts[1].isEmpty() || isKd(parts[1]));
+    }
+
+    /** 这个 fork 的发布后缀。{@code kd} 与 {@code kd.2} 都算。 */
+    private static boolean isKd(String pre) {
+        String p = pre.toLowerCase(java.util.Locale.US);
+        return p.equals("kd") || p.startsWith("kd.");
     }
 
     /** 拆成「数字部分」和「预发布后缀」两段，顺便吃掉前导的 v。 */

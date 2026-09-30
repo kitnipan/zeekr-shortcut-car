@@ -316,6 +316,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         if (sendButton != null) {
             sendButton.setOnClickListener(v -> sendCurrentSegment());
         }
+        View saveUsbButton = findViewById(R.id.timeline_save_usb);
+        if (saveUsbButton != null) {
+            saveUsbButton.setOnClickListener(v -> saveCurrentSegmentToUsb());
+        }
         viewModeButton = findViewById(R.id.timeline_view_mode);
         if (viewModeButton != null) {
             viewModeButton.setOnClickListener(v -> cycleViewMode());
@@ -1021,17 +1025,65 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      * 放大了某一路座舱就发那一路。</p>
      */
     private void sendCurrentSegment() {
-        Lane lane = expanded != null ? expanded : surround;
-        if (sessions.isEmpty() || lane.openIndex < 0 || lane.openIndex >= lane.track.size()) {
+        File file = currentSegmentFile();
+        if (file == null) {
             Toast.makeText(this, R.string.share_phone_no_file, Toast.LENGTH_SHORT).show();
             return;
         }
+        Lane lane = expanded != null ? expanded : surround;
         // 各路分段时长可以不一样，取这一路自己的
         int minutes = RecordSpecs.forCameraKey(this, CameraSlots.keyForSuffix(lane.slot)).segmentMinutes;
         String note = getString(R.string.share_video_segment_note,
                 getString(R.string.share_minutes, minutes));
-        com.kooo.evcam.share.PhoneShare.show(this,
-                new File(lane.track.clip(lane.openIndex).path), note);
+        com.kooo.evcam.share.PhoneShare.show(this, file, note);
+    }
+
+    /**
+     * 这一刻每一路都写进 U 盘的 exports：环视拉直，座舱和其他相机原样拷。
+     * 不用先放大某一路。放大只影响发送到手机那一个文件。
+     */
+    private void saveCurrentSegmentToUsb() {
+        java.util.List<File> files = filesAtPlayhead();
+        if (files.isEmpty()) {
+            Toast.makeText(this, R.string.share_phone_no_file, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.kooo.evcam.share.UsbExport.save(this, files);
+    }
+
+    /** 播放头这一刻，每一路正在放的那一段。这一刻没录到的路跳过。 */
+    private java.util.List<File> filesAtPlayhead() {
+        java.util.List<File> files = new java.util.ArrayList<>();
+        if (sessions.isEmpty() || lanes == null) {
+            return files;
+        }
+        long epoch = clockEpoch();
+        for (Lane lane : lanes) {
+            LaneTrack.Hit hit = lane.track.at(epoch);
+            String path = hit != null ? hit.clip.path
+                    : lane.openIndex >= 0 && lane.openIndex < lane.track.size()
+                    ? lane.track.clip(lane.openIndex).path : null;
+            if (path == null) {
+                continue;
+            }
+            File file = new File(path);
+            if (file.isFile() && file.length() > 0) {
+                files.add(file);
+            }
+        }
+        return files;
+    }
+
+    /**
+     * 当前正在看的那一路、正在播的那一段。网格里是环视，放大了某一路就是那一路。
+     * 没有可发的分段时返回 null。
+     */
+    private File currentSegmentFile() {
+        Lane lane = expanded != null ? expanded : surround;
+        if (sessions.isEmpty() || lane.openIndex < 0 || lane.openIndex >= lane.track.size()) {
+            return null;
+        }
+        return new File(lane.track.clip(lane.openIndex).path);
     }
 
     private void cycleSpeed() {

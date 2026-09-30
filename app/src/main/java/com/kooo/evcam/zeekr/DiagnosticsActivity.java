@@ -53,6 +53,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
     private Button saveButton;
     private Button copyButton;
     private Button sendPhoneButton;
+    private Button saveUsbButton;
     private Button refreshButton;
 
 
@@ -68,6 +69,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
         saveButton = findViewById(R.id.diagnostics_save);
         copyButton = findViewById(R.id.diagnostics_copy);
         sendPhoneButton = findViewById(R.id.diagnostics_send_phone);
+        saveUsbButton = findViewById(R.id.diagnostics_save_usb);
         refreshButton = findViewById(R.id.diagnostics_refresh);
 
         View close = findViewById(R.id.diagnostics_close);
@@ -86,6 +88,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
         if (sendPhoneButton != null) {
             sendPhoneButton.setOnClickListener(v -> sendToPhone());
         }
+        if (saveUsbButton != null) {
+            saveUsbButton.setOnClickListener(v -> saveToUsb());
+        }
 
         runCollection();
     }
@@ -95,9 +100,13 @@ public class DiagnosticsActivity extends AppCompatActivity {
         super.onResume();
         // 发送到手机是开发者功能（项目拥有者 2026-09-26 定）。开发者模式在「关于」里开关，
         // 回到这里时按当时的状态显示
+        int developerTools = com.kooo.evcam.settings.DeveloperMode.isUnlocked()
+                ? View.VISIBLE : View.GONE;
         if (sendPhoneButton != null) {
-            sendPhoneButton.setVisibility(com.kooo.evcam.settings.DeveloperMode.isUnlocked()
-                    ? View.VISIBLE : View.GONE);
+            sendPhoneButton.setVisibility(developerTools);
+        }
+        if (saveUsbButton != null) {
+            saveUsbButton.setVisibility(developerTools);
         }
     }
 
@@ -184,6 +193,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
         if (sendPhoneButton != null) {
             sendPhoneButton.setEnabled(enabled);
+        }
+        if (saveUsbButton != null) {
+            saveUsbButton.setEnabled(enabled);
         }
         if (refreshButton != null) {
             refreshButton.setEnabled(enabled);
@@ -284,6 +296,11 @@ public class DiagnosticsActivity extends AppCompatActivity {
     private void sendToPhone() {
         saveInBackground(file -> com.kooo.evcam.share.PhoneShare.show(this, file,
                 getString(R.string.diag_send_phone_note)));
+    }
+
+    /** 和 {@link #sendToPhone()} 同一份报告，落到 U 盘的 exports。 */
+    private void saveToUsb() {
+        saveInBackground(file -> com.kooo.evcam.share.UsbExport.save(this, file));
     }
 
     /**
