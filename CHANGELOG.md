@@ -9,7 +9,9 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+### New and improved
+
+- Signalling pops up that side's camera. Settings, Super mirror, Turn-signal side view. Off until you turn it on.
 
 ## [2.0.3-beta11] - 2026-10-01
 
