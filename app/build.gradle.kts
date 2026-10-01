@@ -58,9 +58,9 @@ android {
         //
         // 正式版不带后缀，GitHub 上显示为 Latest。
         // -kd 仍是这个 fork 的发布线（见 VersionName）。上游的 -alpha 不推。
-        versionCode = 251
+        versionCode = 252
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "2.0.3-beta7"
+        versionName = "2.0.3-beta8"
 
         buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
         buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))

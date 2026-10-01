@@ -399,6 +399,12 @@
     <string name="upd_check_failed">Semakan kemas kini gagal: %1$s</string>
     <string name="upd_none">Tiada keluaran yang boleh dipasang</string>
     <string name="upd_up_to_date">Sudah terkini (%1$s)</string>
+    <string name="upd_pick_title">Pilih versi untuk dipasang</string>
+    <string name="upd_pick_current">%1$s · dipasang</string>
+    <string name="upd_already">%1$s sudah dipasang</string>
+    <string name="upd_older_title">Pasang versi lebih lama</string>
+    <string name="upd_older_msg">%1$s%2$s\n\nVersi semasa %3$s\n\nBinaan ini lebih lama daripada yang ada pada kereta. Sistem biasanya tidak menggantikan apl yang lebih baharu dengan yang lebih lama. Nyahpasang apl ini dahulu jika masih mahu.</string>
+    <string name="upd_older_msg_notes">%1$s%2$s\n\nVersi semasa %3$s\n\nBinaan ini lebih lama daripada yang ada pada kereta. Sistem biasanya tidak menggantikan apl yang lebih baharu dengan yang lebih lama. Nyahpasang apl ini dahulu jika masih mahu.\n\n%4$s</string>
     <string name="upd_found_title">Kemas kini tersedia</string>
     <string name="upd_size_suffix">, lebih kurang %1$s MB</string>
     <string name="upd_found_msg">%1$s%2$s\n\nVersi semasa %3$s\n\nPemasang akan dibuka apabila muat turun selesai.</string>

@@ -23,6 +23,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 
 import java.io.File;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -54,35 +55,51 @@ public final class UpdateFlow {
                 activity.getString(R.string.upd_checking), false);
         final boolean includeBeta = new com.kooo.evcam.AppConfig(activity).isUpdateBetaEnabled();
         new Thread(() -> {
-            GithubReleases.Release release = null;
+            List<GithubReleases.Release> releases = null;
             String error = null;
             try {
-                release = GithubReleases.fetchLatest(includeBeta, currentVersion(activity));
+                releases = GithubReleases.list(includeBeta);
             } catch (Exception e) {
                 AppLog.w(TAG, "检查更新失败: " + e);
                 error = reason(activity, e);
             }
-            final GithubReleases.Release found = release;
+            final List<GithubReleases.Release> found = releases;
             final String failure = error;
             post(activity, () -> {
                 dismiss(checking);
                 if (failure != null) {
                     toast(activity, activity.getString(R.string.upd_check_failed, failure));
-                } else if (found == null) {
-                    // 只查正式版时说清楚：不是「没有新版本」，是「没有正式版」
+                } else if (found == null || found.isEmpty()) {
                     toast(activity, activity.getString(includeBeta
                             ? R.string.upd_none : R.string.upd_none_release));
                 } else {
-                    compareAndOffer(activity, found);
+                    showPicker(activity, found);
                 }
             });
         }, "update-check").start();
     }
 
+    private static void showPicker(Activity activity, List<GithubReleases.Release> releases) {
+        String current = currentVersion(activity);
+        String[] labels = new String[releases.size()];
+        for (int i = 0; i < releases.size(); i++) {
+            String name = displayName(releases.get(i).tagName);
+            labels[i] = VersionName.compare(releases.get(i).tagName, current) == 0
+                    ? activity.getString(R.string.upd_pick_current, name)
+                    : name;
+        }
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.upd_pick_title)
+                .setItems(labels, (d, which) -> compareAndOffer(activity, releases.get(which)))
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
     private static void compareAndOffer(Activity activity, GithubReleases.Release release) {
         String current = currentVersion(activity);
-        if (!VersionName.isNewer(release.tagName, current)) {
-            toast(activity, activity.getString(R.string.upd_up_to_date, current));
+        String name = displayName(release.tagName);
+        int cmp = VersionName.compare(release.tagName, current);
+        if (cmp == 0) {
+            toast(activity, activity.getString(R.string.upd_already, name));
             return;
         }
 
@@ -90,19 +107,37 @@ public final class UpdateFlow {
                 ? activity.getString(R.string.upd_size_suffix,
                         String.format(Locale.US, "%.1f", release.apkBytes / 1024f / 1024f))
                 : "";
-        // 有更新内容就顺带显示出来：用户是在决定「要不要装」，改了什么正是要看的东西。
-        // 说明来自 GitHub 发布页，按仓库的规矩是英文。
-        String message = release.notes.isEmpty()
-                ? activity.getString(R.string.upd_found_msg, release.tagName, size, current)
-                : activity.getString(R.string.upd_found_msg_notes,
-                        release.tagName, size, current, release.notes);
+        String notes = ReleaseNotes.summarise(release.body);
+        boolean older = cmp < 0;
+        String message;
+        if (older) {
+            message = notes.isEmpty()
+                    ? activity.getString(R.string.upd_older_msg, name, size, current)
+                    : activity.getString(R.string.upd_older_msg_notes, name, size, current, notes);
+        } else {
+            message = notes.isEmpty()
+                    ? activity.getString(R.string.upd_found_msg, name, size, current)
+                    : activity.getString(R.string.upd_found_msg_notes, name, size, current, notes);
+        }
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.upd_found_title)
+                .setTitle(older ? R.string.upd_older_title : R.string.upd_found_title)
                 .setMessage(message)
-                // 先看一眼安装提醒，再下载：车机安装界面装完后只能点「返回」，见 UpdateInstallGuide
                 .setPositiveButton(R.string.upd_download, (d, w) -> UpdateInstallGuide.show(
                         activity, () -> download(activity, release)))
                 .setNegativeButton(R.string.upd_later, null));
+    }
+
+    /** 去掉 tag 前面的 v，列表上和本机版本名对齐。 */
+    private static String displayName(String tag) {
+        if (tag == null) {
+            return "";
+        }
+        String s = tag.trim();
+        if (s.length() > 1 && (s.charAt(0) == 'v' || s.charAt(0) == 'V')
+                && Character.isDigit(s.charAt(1))) {
+            return s.substring(1);
+        }
+        return s;
     }
 
     // ------------------------------------------------------------------ 下载
@@ -135,7 +170,7 @@ public final class UpdateFlow {
         bar.setIndeterminate(true);
 
         AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(activity.getString(R.string.upd_download_title, release.tagName))
+                .setTitle(activity.getString(R.string.upd_download_title, displayName(release.tagName)))
                 .setView(box)
                 .setCancelable(false)
                 .create());

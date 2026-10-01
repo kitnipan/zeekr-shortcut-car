@@ -399,6 +399,12 @@
     <string name="upd_check_failed">Update check failed: %1$s</string>
     <string name="upd_none">No installable release found</string>
     <string name="upd_up_to_date">Already up to date (%1$s)</string>
+    <string name="upd_pick_title">Choose a version to install</string>
+    <string name="upd_pick_current">%1$s · installed</string>
+    <string name="upd_already">%1$s is already installed</string>
+    <string name="upd_older_title">Install an older version</string>
+    <string name="upd_older_msg">%1$s%2$s\n\nCurrent version %3$s\n\nThis build is older than the one on the car. The system usually will not replace a newer app with an older one. Uninstall this app first if you still want it.</string>
+    <string name="upd_older_msg_notes">%1$s%2$s\n\nCurrent version %3$s\n\nThis build is older than the one on the car. The system usually will not replace a newer app with an older one. Uninstall this app first if you still want it.\n\n%4$s</string>
     <string name="upd_found_title">Update available</string>
     <string name="upd_size_suffix">, about %1$s MB</string>
     <string name="upd_found_msg">%1$s%2$s\n\nCurrent version %3$s\n\nThe installer opens when the download finishes.</string>

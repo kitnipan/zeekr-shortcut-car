@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta8] - 2026-10-01
+
+### New and improved
+
+- Check for updates lists versions. Pick the one to install.
+
 ## [2.0.3-beta7] - 2026-10-01
 
 ### Fixed
