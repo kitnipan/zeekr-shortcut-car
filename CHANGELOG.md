@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta11] - 2026-10-01
+
+### Fixed
+
+- Straightened surround on upload plays as smoothly as the fisheye recording.
+
 ## [2.0.3-beta10] - 2026-10-01
 
 ### New and improved

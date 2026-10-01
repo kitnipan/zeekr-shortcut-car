@@ -13,6 +13,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.EncodeSize;
+import com.kooo.evcam.camera.TargetBitrate;
 import com.kooo.evcam.camera.WatermarkText;
 import com.kooo.evcam.playback.PlaybackViewport;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +46,70 @@ public final class SurroundDefish {
     private static final String AVC = "video/avc";
     /** 最后一帧迟迟没画上就照样封口，免得进度停在 99% 直到整段超时。 */
     static final long FRAME_STALL_MS = 8_000L;
+
+    /**
+     * 拉直后再压成 H.264 的码率。
+     *
+     * <p>原片多半是 H.265。把那个码率原样套到 H.264 上，拉直后边缘的细节会被压成一块一块，
+     * 看起来比鱼眼原片顿。按输出尺寸走高档，H.265 原片再抬一档，但不超过编码器开始丢帧的上限。</p>
+     */
+    static int exportBitrate(int sourceBitrate, boolean sourceHevc, int outW, int outH, int fps) {
+        int fitted = TargetBitrate.compute(3, outW, outH, Math.max(1, fps), false);
+        if (sourceBitrate <= 0) {
+            return fitted;
+        }
+        long lifted = sourceHevc ? sourceBitrate * 9L / 5L : sourceBitrate;
+        long chosen = Math.max(fitted, lifted);
+        if (chosen > TargetBitrate.MAX) {
+            chosen = TargetBitrate.MAX;
+        }
+        return (int) chosen;
+    }
+
+    /**
+     * 这一帧该用的时间戳。原片时间在走就用原片的；卡住（全是 0，或编码器按编码耗时盖章）
+     * 就按标称帧间隔补，免得成片比鱼眼顿。
+     */
+    static long nextSourcePts(long sampleUs, long lastQueued, long stepUs) {
+        long pts = Math.max(0L, sampleUs);
+        if (lastQueued < 0) {
+            return pts;
+        }
+        if (pts > lastQueued) {
+            return pts;
+        }
+        return lastQueued + Math.max(1L, stepUs);
+    }
+
+    /** 编码输出按放出去的顺序对上原片时间。编码器自己的时间戳是编码花了多久，不是这一帧在片子里的位置。 */
+    static long assignPts(ArrayDeque<Long> pending, long lastWritten) {
+        long pts = pending.isEmpty()
+                ? (lastWritten < 0 ? 0L : lastWritten + 1L)
+                : pending.removeFirst();
+        if (lastWritten >= 0 && pts <= lastWritten) {
+            return lastWritten + 1L;
+        }
+        return pts;
+    }
+
+    private static MediaFormat videoFormat(int width, int height, int bitrate, int fps, boolean tuned) {
+        MediaFormat format = MediaFormat.createVideoFormat(AVC, width, height);
+        format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+        format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, fps);
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+        if (!tuned) {
+            return format;
+        }
+        format.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileHigh);
+        // 0 是实时：跟不上就丢帧。拉直比实时慢，丢了就比鱼眼顿。1 是尽力而为，排队不丢。
+        format.setInteger(MediaFormat.KEY_PRIORITY, 1);
+        format.setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE);
+        format.setInteger(MediaFormat.KEY_BITRATE_MODE,
+                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR);
+        return format;
+    }
 
     private SurroundDefish() {
     }
@@ -157,9 +223,11 @@ public final class SurroundDefish {
             if (fps <= 0) {
                 fps = 30;
             }
-            int bitrate = inFormat.containsKey(MediaFormat.KEY_BIT_RATE)
-                    ? inFormat.getInteger(MediaFormat.KEY_BIT_RATE)
-                    : Math.max(8_000_000, width * height * 2);
+            int sourceRate = inFormat.containsKey(MediaFormat.KEY_BIT_RATE)
+                    ? inFormat.getInteger(MediaFormat.KEY_BIT_RATE) : 0;
+            String inMime = inFormat.getString(MediaFormat.KEY_MIME);
+            boolean sourceHevc = inMime != null && inMime.toLowerCase(Locale.US).contains("hevc");
+            int bitrate = exportBitrate(sourceRate, sourceHevc, outW, outH, fps);
             long durationUs = inFormat.containsKey(MediaFormat.KEY_DURATION)
                     ? inFormat.getLong(MediaFormat.KEY_DURATION) : 0L;
 
@@ -170,13 +238,16 @@ public final class SurroundDefish {
             }
 
             encoder = MediaCodec.createEncoderByType(AVC);
-            MediaFormat outFormat = MediaFormat.createVideoFormat(AVC, outW, outH);
-            outFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
-                    MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-            outFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
-            outFormat.setInteger(MediaFormat.KEY_FRAME_RATE, fps);
-            outFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
-            encoder.configure(outFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            MediaFormat outFormat = videoFormat(outW, outH, bitrate, fps, true);
+            try {
+                encoder.configure(outFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            } catch (MediaCodec.CodecException | IllegalArgumentException e) {
+                AppLog.w(TAG, "编码器不吃画质参数，退回基本设置: " + e.getMessage());
+                encoder.release();
+                encoder = MediaCodec.createEncoderByType(AVC);
+                encoder.configure(videoFormat(outW, outH, bitrate, fps, false),
+                        null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            }
             encoderSurface = encoder.createInputSurface();
             encoder.start();
 
@@ -208,7 +279,8 @@ public final class SurroundDefish {
             decoder.start();
 
             muxer = new MediaMuxer(dest.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            run(videoEx, audioEx, decoder, encoder, muxer, pipe, audioFormat, durationUs, cancel, percent);
+            run(videoEx, audioEx, decoder, encoder, muxer, pipe, audioFormat,
+                    durationUs, fps, cancel, percent);
             AppLog.i(TAG, "环视已拉直: " + dest.getName() + " " + outW + "x" + outH);
         } catch (IOException e) {
             throw e;
@@ -241,7 +313,7 @@ public final class SurroundDefish {
     private static void run(MediaExtractor videoEx, MediaExtractor audioEx,
                             MediaCodec decoder, MediaCodec encoder, MediaMuxer muxer,
                             FisheyeGlPipe pipe, MediaFormat audioFormat, long durationUs,
-                            AtomicBoolean cancel, Percent percent)
+                            int fps, AtomicBoolean cancel, Percent percent)
             throws IOException {
         MediaCodec.BufferInfo decInfo = new MediaCodec.BufferInfo();
         MediaCodec.BufferInfo encInfo = new MediaCodec.BufferInfo();
@@ -258,6 +330,10 @@ public final class SurroundDefish {
         long deadline = SystemClock.elapsedRealtime() + budgetMs;
         long lastPresented = -1L;
         long presentedMovedAt = SystemClock.elapsedRealtime();
+        long stepUs = 1_000_000L / Math.max(1, fps);
+        long lastQueued = -1L;
+        long lastWritten = -1L;
+        ArrayDeque<Long> framePts = new ArrayDeque<>();
 
         while (!encEos) {
             if (cancel != null && cancel.get()) {
@@ -285,6 +361,8 @@ public final class SurroundDefish {
                 ByteBuffer buf = encoder.getOutputBuffer(enc);
                 if (buf != null && encInfo.size > 0
                         && (encInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                    encInfo.presentationTimeUs = assignPts(framePts, lastWritten);
+                    lastWritten = encInfo.presentationTimeUs;
                     buf.position(encInfo.offset);
                     buf.limit(encInfo.offset + encInfo.size);
                     muxer.writeSampleData(videoTrack, buf, encInfo);
@@ -329,6 +407,9 @@ public final class SurroundDefish {
                     decoder.releaseOutputBuffer(out, render);
                     if (render) {
                         rendered++;
+                        long pts = nextSourcePts(decInfo.presentationTimeUs, lastQueued, stepUs);
+                        framePts.addLast(pts);
+                        lastQueued = pts;
                     }
                     if (eos) {
                         decEos = true;
