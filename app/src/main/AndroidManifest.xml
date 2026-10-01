@@ -156,6 +156,13 @@
             android:theme="@style/Theme.Cam"
             android:exported="false" />
 
+        <activity
+            android:name=".input.ControllerProbeActivity"
+            android:label="@string/set_controller_title"
+            android:theme="@style/Theme.Cam"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
         <!-- 关于与致谢：说明本应用两个功能来源及其许可证 -->
         <activity
             android:name=".zeekr.AboutActivity"

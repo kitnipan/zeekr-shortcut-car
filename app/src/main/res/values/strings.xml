@@ -141,6 +141,17 @@
     <!-- 系统信息（试验性）：分组、信号名、值 -->
     <string name="set_vehicle_info_title">系统信息（试验性）</string>
     <string name="set_vehicle_info_summary">车机能读到的车辆信号和此刻的状态；离开这一页即停止读取</string>
+    <string name="set_controller_title">控制器（试验）</string>
+    <string name="set_controller_summary">蓝牙手柄或按钮按下时，记下按键和摇杆信号，供以后做快捷键</string>
+    <string name="ctrl_subtitle">先在车机蓝牙里配对，回到这一页再按实体键</string>
+    <string name="ctrl_devices_none">还没有输入设备。配对之后按一下按钮，设备才会出现。</string>
+    <string name="ctrl_waiting">等待按键…</string>
+    <string name="ctrl_clear">清空</string>
+    <string name="ctrl_pressed">按下</string>
+    <string name="ctrl_released">松开</string>
+    <string name="ctrl_key">%1$s  %2$s  %3$s (%4$d)  scan %5$d  · %6$s</string>
+    <string name="ctrl_axis">%1$s  %2$s  · %3$s</string>
+    <string name="ctrl_paired">已配对的外设</string>
     <string name="vi_legend">名字深色：实车实验中观察一致（持续交叉验证）；中灰：能用，细节待定；浅色：读得到但未验证</string>
     <string name="vi_group_drive">行驶</string>
     <string name="vi_group_lamps">灯光</string>

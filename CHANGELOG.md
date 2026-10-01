@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta9] - 2026-10-01
+
+### New and improved
+
+- Settings, System, Controller shows the keys and sticks a Bluetooth controller or button sends.
+
 ## [2.0.3-beta8] - 2026-10-01
 
 ### New and improved

@@ -123,6 +123,17 @@
     <!-- Vehicle info (experimental): groups, signal names, values -->
     <string name="set_vehicle_info_title">Vehicle info (experimental)</string>
     <string name="set_vehicle_info_summary">Vehicle signals the head unit exposes and their current state; reading stops when you leave</string>
+    <string name="set_controller_title">Controller (experimental)</string>
+    <string name="set_controller_summary">Logs keys and sticks from a Bluetooth controller or button, for shortcuts later</string>
+    <string name="ctrl_subtitle">Pair it in the car Bluetooth settings, come back, then press a button</string>
+    <string name="ctrl_devices_none">No input device yet. Pair it, then press a button so it shows up.</string>
+    <string name="ctrl_waiting">Waiting for a button…</string>
+    <string name="ctrl_clear">Clear</string>
+    <string name="ctrl_pressed">down</string>
+    <string name="ctrl_released">up</string>
+    <string name="ctrl_key">%1$s  %2$s  %3$s (%4$d)  scan %5$d  · %6$s</string>
+    <string name="ctrl_axis">%1$s  %2$s  · %3$s</string>
+    <string name="ctrl_paired">Paired peripherals</string>
     <string name="vi_legend">Dark label: consistent in on-car tests (still cross-checked); grey: usable, details pending; light: readable but unverified</string>
     <string name="vi_group_drive">Driving</string>
     <string name="vi_group_lamps">Lamps</string>

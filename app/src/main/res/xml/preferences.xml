@@ -372,6 +372,11 @@
             android:title="@string/set_vehicle_info_title"
             android:summary="@string/set_vehicle_info_summary" />
 
+        <Preference
+            android:key="pref_controller"
+            android:title="@string/set_controller_title"
+            android:summary="@string/set_controller_summary" />
+
     </PreferenceScreen>
 
     <!--

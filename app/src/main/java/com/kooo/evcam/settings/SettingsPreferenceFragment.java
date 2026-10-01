@@ -30,6 +30,7 @@ import com.kooo.evcam.overlay.DimOverlayService;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.service.RecordingFloatingService;
+import com.kooo.evcam.input.ControllerProbeActivity;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
 
@@ -950,6 +951,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时收，离开就把资源放掉
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
+        onClick("pref_controller", pref ->
+                startActivity(new Intent(getContext(), ControllerProbeActivity.class)));
 
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));
