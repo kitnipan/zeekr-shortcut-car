@@ -32,8 +32,9 @@ public enum Signal {
     /** 行驶中跟着变（开车最大见过 64，像 %），踩到底是多少没测；先按 0–100 画。用户定：保留。 */
     THROTTLE_DEPTH(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101400, 0, R.string.vi_throttle_depth, Trust.PROVISIONAL, Format.PERCENT),
     /**
-     * 开车时跟着变。倒车入库一段读到 -8.9 … 7.3，Lab 判断很可能是弧度（度 = 读数 × 57.3），但左右哪边为负、
-     * 满舵读数还没测（Lab 0.14.0），比例先不改（{@link #STEERING_DEGREES_PER_UNIT}）。用户定：能用，开放。
+     * 开车时跟着变。倒车入库一段读到 -8.9 … 7.3，Lab 判断很可能是弧度（度 = 读数 × 57.3），
+     * 满舵读数还没测（Lab 0.14.0），比例先不改（{@link #STEERING_DEGREES_PER_UNIT}）。
+     * 左转时读数为正；信息条约定顺时针为正，映射时取反。用户定：能用，开放。
      */
     STEERING(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101000, 0, R.string.vi_steering, Trust.PROVISIONAL, Format.DEGREES),
     /** 自动驻车的功能开关（设置项），不是「正在驻车」——信息条不用它。 */

@@ -27,11 +27,15 @@ import java.util.Locale;
  *       亮时带光晕 —— 整条里唯一带光晕、唯一有「画」的一格。</li>
  * </ul>
  *
- * <p>只在编码线程上用；快照版本没变就不重画（{@link #renderIfDue}）。</p>
+ * <p>只在编码线程上用。快照版本没变就不重画（{@link #renderIfDue}），
+ * 但转向灯或双闪亮着时按 {@link #BLINK_HALF_MS} 再画一帧，图标才一闪一闪。</p>
  */
 public final class InfoBarRenderer {
 
     public static final int HEIGHT = InfoBar.HEIGHT;
+
+    /** 转向灯亮、灭各多久。车上大约 730 ms 一个来回。 */
+    static final long BLINK_HALF_MS = 360L;
 
     // 颜色取自 values-night/colors.xml：surface / line / sunken / energy / recording / text_*
     private static final int BG = 0xFF2A2C30;
@@ -72,6 +76,7 @@ public final class InfoBarRenderer {
     private final Path path = new Path();
     private final RectF rect = new RectF();
     private long lastVersion = -1;
+    private long lastBlinkPhase = Long.MIN_VALUE;
     private boolean drawnOnce;
 
     public InfoBarRenderer(int width, InfoBar.Options options) {
@@ -108,12 +113,27 @@ public final class InfoBarRenderer {
      *
      * @return true 表示位图变了，要重新上传
      */
+    /** 这一拍灯该亮着。亮、灭各 {@link #BLINK_HALF_MS}。 */
+    static boolean lampOn(long nowMs) {
+        return Math.floorDiv(nowMs, BLINK_HALF_MS) % 2 == 0;
+    }
+
+    /** 转向灯或双闪开着，图标才要闪。没数据不算。 */
+    static boolean flashing(VehicleState state) {
+        boolean turn = state.turnSignal != null && state.turnSignal != VehicleState.TURN_NONE;
+        return turn || Boolean.TRUE.equals(state.hazard);
+    }
+
     public boolean renderIfDue(VehicleState state) {
-        if (drawnOnce && state.version == lastVersion) {
+        boolean flashing = flashing(state);
+        long now = android.os.SystemClock.elapsedRealtime();
+        long phase = flashing ? Math.floorDiv(now, BLINK_HALF_MS) : 0L;
+        if (drawnOnce && state.version == lastVersion && phase == lastBlinkPhase) {
             return false;
         }
-        draw(state);
+        draw(state, flashing && !lampOn(now));
         lastVersion = state.version;
+        lastBlinkPhase = phase;
         drawnOnce = true;
         return true;
     }
@@ -126,7 +146,7 @@ public final class InfoBarRenderer {
 
     // ================================================================= 整条
 
-    private void draw(VehicleState s) {
+    private void draw(VehicleState s, boolean lampDark) {
         canvas.drawColor(BG);
         fill.setColor(DIVIDER);
         canvas.drawRect(0, 0, width, 2, fill);
@@ -134,23 +154,33 @@ public final class InfoBarRenderer {
             canvas.save();
             canvas.translate(placed.x, 0);
             // 没启用的格（没验证过、开发者也没激活）按没数据画：斜杠划掉
-            drawCell(placed.cell, InfoBarLayout.live(placed.cell, options) ? s : VehicleState.empty());
+            drawCell(placed.cell, InfoBarLayout.live(placed.cell, options) ? s : VehicleState.empty(), lampDark);
             canvas.restore();
         }
     }
 
-    private void drawCell(InfoBarLayout.Cell cell, VehicleState s) {
+    private void drawCell(InfoBarLayout.Cell cell, VehicleState s, boolean lampDark) {
         float cx = cell.width / 2f;
         float cy = HEIGHT / 2f;
+        Integer turn = s.turnSignal;
+        Boolean hazard = s.hazard;
+        if (lampDark) {
+            if (turn != null) {
+                turn = VehicleState.TURN_NONE;
+            }
+            if (hazard != null) {
+                hazard = Boolean.FALSE;
+            }
+        }
         switch (cell) {
             case TURN_LEFT:
-                drawTurn(cx, cy, true, s.turnSignal);
+                drawTurn(cx, cy, true, turn);
                 break;
             case TURN_RIGHT:
-                drawTurn(cx, cy, false, s.turnSignal);
+                drawTurn(cx, cy, false, turn);
                 break;
             case HAZARD:
-                drawHazard(cx, cy, s.hazard);
+                drawHazard(cx, cy, hazard);
                 break;
             case STEERING:
                 drawSteering(cx, cy, s.steeringDegrees);

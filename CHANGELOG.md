@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta7] - 2026-10-01
+
+### Fixed
+
+- The steering wheel on the driving bar turns the same way as the wheel in the car. Left is yellow.
+- Turn signals and the hazard light blink while they are on.
+
 ## [2.0.3-beta6] - 2026-10-01
 
 ### New and improved

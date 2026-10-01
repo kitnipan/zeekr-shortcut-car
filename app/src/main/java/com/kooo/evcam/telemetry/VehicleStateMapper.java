@@ -6,7 +6,9 @@ package com.kooo.evcam.telemetry;
  * <p>规则都在这里，纯函数（{@code VehicleStateMapperTest}）：</p>
  * <ul>
  *   <li>转向灯和双闪优先用不闪的「转向指示状态」（0 关 1 左 2 右 3 双闪）；读不到时退回两盏灯的
- *       闪烁保持判定（双闪 = 两盏同时在闪；专用的双闪功能号一直读 255，不用）。</li>
+ *       闪烁保持判定（双闪 = 两盏同时在闪；专用的双闪功能号一直读 255，不用）。图标的一闪一闪由
+ *       {@link InfoBarRenderer} 按周期画，不靠这个号本身在跳。</li>
+ *   <li>方向盘：车上左转读数为正。快照约定顺时针为正，所以取反（{@link #clockwisePositive}）。</li>
  *   <li>车门和安全带按「主驾在哪一边」落到左右：右舵车主驾门 / 主驾安全带在右前。</li>
  *   <li>刹车 / 油门深度 0–100 → 0..1；雾灯 = 后雾灯（前雾灯这台车多半没装）。车速在 {@link Signal#decode} 里已从 m/s 换成 km/h。</li>
  *   <li>自动驻车看「正在驻车」{@link Signal#AUTO_HOLD_ACTIVE}（停下被接管 1、起步回 0），
@@ -33,7 +35,7 @@ public final class VehicleStateMapper {
             b.hazard(blink.hazard);
         }
 
-        b.steeringDegrees(r.number(Signal.STEERING));
+        b.steeringDegrees(clockwisePositive(r.number(Signal.STEERING)));
         b.gear(r.text(Signal.GEAR));
         b.brake(percent(r.number(Signal.BRAKE_DEPTH)));
         b.throttle(percent(r.number(Signal.THROTTLE_DEPTH)));
@@ -66,6 +68,14 @@ public final class VehicleStateMapper {
                         not(r.bool(Signal.BELT_REAR_RIGHT))},
                 new int[]{driverBit, passengerBit, VehicleState.REAR_LEFT, VehicleState.REAR_CENTER,
                         VehicleState.REAR_RIGHT}));
+    }
+
+    /**
+     * 车上左转时方向盘读数是正的。信息条约定顺时针为正，取反之后左转变成负的，
+     * 图标才跟着往左转、数字才变黄。
+     */
+    static Float clockwisePositive(Float raw) {
+        return raw == null ? null : -raw;
     }
 
     /** 车停着的界限：0.1 m/s。 */
