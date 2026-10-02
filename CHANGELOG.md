@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta13] - 2026-10-02
+
+### Fixed
+
+- The turn-signal side view is flipped left to right, so it matches the side mirror.
+
 ## [2.0.3-beta12] - 2026-10-01
 
 ### New and improved

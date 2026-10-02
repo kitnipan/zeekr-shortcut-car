@@ -275,9 +275,8 @@ public class SideViewPopupView extends ViewGroup {
             return;
         }
         int save = canvas.save();
-        if (LaneCycle.isMirrored(lane)) {
-            canvas.scale(-1f, 1f, width / 2f, height / 2f);
-        }
+        // 后视镜是反的，摄像头不是。左右转向弹窗都要左右对调，才和镜子里看到的一致。
+        canvas.scale(-1f, 1f, width / 2f, height / 2f);
         if (straighten) {
             // 虚拟相机转过去（往后、往上）再拉直，见 SideViewProjection
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
