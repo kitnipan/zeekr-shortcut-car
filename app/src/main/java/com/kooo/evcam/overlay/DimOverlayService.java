@@ -121,6 +121,10 @@ public class DimOverlayService extends Service {
         try {
             windowManager.addView(shade, layoutParams);
             AppLog.i(TAG, "屏幕遮罩已打开 " + real.x + "x" + real.y);
+            com.kooo.evcam.zeekr.SideViewPopupService.raiseAboveShade();
+            if (!DimShade.passTouches(config.isDimPassThrough(), config.getDimOpacity())) {
+                raiseFloatingButton();
+            }
         } catch (Exception e) {
             AppLog.e(TAG, "屏幕遮罩添加失败", e);
             shade = null;
@@ -139,6 +143,9 @@ public class DimOverlayService extends Service {
         shade.setBackgroundColor(color(config));
         try {
             windowManager.updateViewLayout(shade, layoutParams);
+            if (!DimShade.passTouches(config.isDimPassThrough(), config.getDimOpacity())) {
+                raiseFloatingButton();
+            }
         } catch (Exception e) {
             AppLog.e(TAG, "屏幕遮罩更新失败", e);
         }
@@ -178,7 +185,7 @@ public class DimOverlayService extends Service {
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
-        if (config.isDimPassThrough()) {
+        if (DimShade.passTouches(config.isDimPassThrough(), config.getDimOpacity())) {
             flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
         }
         return flags;

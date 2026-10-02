@@ -167,6 +167,20 @@
             android:screenOrientation="landscape"
             android:exported="false" />
 
+        <activity
+            android:name=".input.ShortcutListActivity"
+            android:label="@string/set_shortcuts_title"
+            android:theme="@style/Theme.Cam"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
+        <activity
+            android:name=".input.ShortcutCaptureActivity"
+            android:label="@string/shortcut_add"
+            android:theme="@style/Theme.Cam"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
         <!-- 关于与致谢：说明本应用两个功能来源及其许可证 -->
         <activity
             android:name=".zeekr.AboutActivity"

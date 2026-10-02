@@ -22,6 +22,13 @@ public class DimShadeTest {
     }
 
     @Test
+    public void fullBlackoutTakesTouchesSoTheVeilCanReachOpaque() {
+        assertEquals(true, DimShade.passTouches(true, 90));
+        assertEquals(false, DimShade.passTouches(true, 100));
+        assertEquals(false, DimShade.passTouches(false, 40));
+    }
+
+    @Test
     public void percentsOutsideZeroToHundredAreClamped() {
         assertEquals(DimShade.argb(100, 0, 0), DimShade.argb(150, -5, -1));
     }

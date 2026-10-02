@@ -1012,6 +1012,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
         onClick("pref_controller", pref ->
                 startActivity(new Intent(getContext(), ControllerProbeActivity.class)));
+        onClick("pref_shortcuts", pref ->
+                startActivity(new Intent(getContext(), com.kooo.evcam.input.ShortcutListActivity.class)));
 
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));

@@ -449,6 +449,11 @@
             android:title="@string/set_controller_title"
             android:summary="@string/set_controller_summary" />
 
+        <Preference
+            android:key="pref_shortcuts"
+            android:title="@string/set_shortcuts_title"
+            android:summary="@string/set_shortcuts_summary" />
+
     </PreferenceScreen>
 
     <!--

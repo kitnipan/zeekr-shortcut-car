@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta14] - 2026-10-02
+
+### New and improved
+
+- Settings, System, Shortcuts: press a button, then pick start/stop recording, open/close Super mirror, open the app, or dim the display.
+- Dim display can go fully black. Drag the moon button to change how dark it is.
+- The turn-signal side view shows on top of the dimmed display.
+
 ## [2.0.3-beta13] - 2026-10-02
 
 ### Fixed

@@ -1957,6 +1957,16 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_DIM_ENABLED, enabled).apply();
     }
 
+    private static final String KEY_BUTTON_SHORTCUTS = "button_shortcuts";
+
+    public String getButtonShortcuts() {
+        return prefs.getString(KEY_BUTTON_SHORTCUTS, "");
+    }
+
+    public void setButtonShortcuts(String raw) {
+        prefs.edit().putString(KEY_BUTTON_SHORTCUTS, raw == null ? "" : raw).apply();
+    }
+
     public int getDimOpacity() {
         return clampPercent(prefs.getInt(KEY_DIM_OPACITY, DIM_OPACITY_DEFAULT));
     }

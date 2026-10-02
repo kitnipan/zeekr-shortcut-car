@@ -64,6 +64,8 @@ public class RecordingFloatingService extends Service {
     public static final String ACTION_RAISE = "com.kooo.evcam.action.RAISE_RECORDING_FLOATING";
     /** 「重置悬浮窗布局」：大小和位置回默认，当场挪过去。 */
     public static final String ACTION_RESET_POSITION = "com.kooo.evcam.action.RESET_FLOATING_POSITION";
+    /** A saved external button asked to start or stop recording. Does not show the floating button. */
+    public static final String ACTION_TOGGLE_RECORDING = "com.kooo.evcam.action.SHORTCUT_TOGGLE_RECORDING";
 
     /**
      * 录制状态变了，告诉按钮换颜色。
@@ -336,6 +338,8 @@ public class RecordingFloatingService extends Service {
                 if (floatingContainer != null) {
                     mainHandler.post(this::raiseAboveShade);
                 }
+            } else if (ACTION_TOGGLE_RECORDING.equals(action)) {
+                mainHandler.post(this::toggleRecording);
             } else if (ACTION_RESET_POSITION.equals(action)) {
                 // 同上：没显示就不管，下次显示时自然落在默认位置
                 if (floatingContainer != null) {

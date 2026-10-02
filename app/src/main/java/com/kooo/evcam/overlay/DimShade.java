@@ -26,6 +26,15 @@ public final class DimShade {
         return from + (to - from) * percent / 100;
     }
 
+    /**
+     * Touches pass through the veil only while it is not a full blackout.
+     * Android 12 clamps a not-touchable overlay to 80% alpha, so 100% never
+     * goes black unless the shade takes the touches itself.
+     */
+    public static boolean passTouches(boolean passThrough, int opacityPercent) {
+        return passThrough && clamp(opacityPercent) < 100;
+    }
+
     private static int clamp(int value) {
         if (value < 0) {
             return 0;

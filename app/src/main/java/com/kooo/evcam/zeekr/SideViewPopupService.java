@@ -109,6 +109,26 @@ public class SideViewPopupService extends Service {
         }
     }
 
+    /**
+     * 遮罩窗口后加，会盖住侧视。同类悬浮窗按添加先后叠，只能摘下重挂；
+     * 重挂会重新接相机，所以只在遮罩刚打开时做一次。
+     */
+    public static void raiseAboveShade() {
+        SideViewPopupService svc = instance;
+        if (svc != null) {
+            svc.handler.post(svc::reattachOnTop);
+        }
+    }
+
+    private void reattachOnTop() {
+        if (popup == null || !popup.isAttached()) {
+            return;
+        }
+        AppLog.i(TAG, "侧视弹窗：遮罩打开，重挂到遮罩上面");
+        detachPopup();
+        evaluate();
+    }
+
     private final Telemetry.Listener readingsListener = readings -> evaluate();
 
     private final ScreenState.Listener screenListener = new ScreenState.Listener() {
