@@ -121,11 +121,22 @@ public final class OverlayCoordinator {
         if (enabled && !canShowOverlay(context)) {
             return false;
         }
-        new AppConfig(context).setDimOverlayEnabled(enabled);
+        AppConfig config = new AppConfig(context);
+        config.setDimOverlayEnabled(enabled);
         if (enabled) {
             DimOverlayService.show(context);
         } else {
             DimOverlayService.hide(context);
+        }
+        // 快捷键、设置页也会开关遮罩：让月亮按钮跟着变
+        if (config.isRecordingFloatingEnabled()) {
+            Intent refresh = new Intent(context, RecordingFloatingService.class);
+            refresh.setAction(RecordingFloatingService.ACTION_UPDATE_STYLE);
+            try {
+                context.startService(refresh);
+            } catch (Exception e) {
+                AppLog.e("OverlayCoordinator", "月亮按钮刷新失败", e);
+            }
         }
         return true;
     }

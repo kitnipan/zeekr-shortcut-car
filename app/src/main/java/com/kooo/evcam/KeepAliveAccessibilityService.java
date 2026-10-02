@@ -151,9 +151,6 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         if (ShortcutCapture.isActive() || event == null) {
             return false;
         }
-        if (event.getAction() != KeyEvent.ACTION_DOWN || event.getRepeatCount() > 0) {
-            return false;
-        }
         String device = event.getDevice() == null || event.getDevice().getName() == null
                 ? "" : event.getDevice().getName();
         Shortcut hit = ShortcutBook.match(
@@ -162,7 +159,10 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         if (hit == null) {
             return false;
         }
-        ShortcutPerformer.perform(this, hit.action);
+        // 抬起和长按的重复也吃掉，前台应用不该只收到半个按键
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            ShortcutPerformer.perform(this, hit.action);
+        }
         return true;
     }
 

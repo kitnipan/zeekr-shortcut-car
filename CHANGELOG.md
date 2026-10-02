@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta15] - 2026-10-02
+
+### Fixed
+
+- The moon button lights up and goes dark when a shortcut turns dim on or off.
+- A shortcut button no longer also types into the app in front.
+
 ## [2.0.3-beta14] - 2026-10-02
 
 ### New and improved
