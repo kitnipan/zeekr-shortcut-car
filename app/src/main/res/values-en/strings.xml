@@ -138,7 +138,14 @@
     <string name="shortcut_action_app">Open app</string>
     <string name="shortcut_action_dim">Dim display</string>
     <string name="shortcut_access_title">Turn on accessibility</string>
-    <string name="shortcut_access_msg">For now the button works while this app is in front. To make it work on every screen, the app needs its accessibility service. The head unit has no screen for that, so the app turns it on itself. Run this once from a computer:\n\n%1$s\n\nThen reopen this app.</string>
+    <string name="shortcut_access_msg">For now the button works while this app is in front. To make it work on every screen, the app needs its accessibility service. The head unit has no screen for that, so the app turns it on itself.\n\nStart Shizuku, then tap Grant with Shizuku. Or run this once from a computer:\n\n%1$s\n\nThen reopen this app.</string>
+    <string name="shortcut_shizuku">Grant with Shizuku</string>
+    <string name="shortcut_banner">Shortcuts work only while this app is in front.</string>
+    <string name="shizuku_not_running">Shizuku isn\'t running. Open Shizuku, start it, then try again.</string>
+    <string name="shizuku_too_old">Shizuku is too old. Update it.</string>
+    <string name="shizuku_denied">Shizuku did not allow this app.</string>
+    <string name="shizuku_failed">Grant failed. %1$s</string>
+    <string name="shizuku_done">Done. Shortcuts work on every screen.</string>
     <string name="shortcut_access_open">System settings</string>
     <string name="shortcut_access_ok">Got it</string>
     <string name="ctrl_subtitle">Pair it in the car Bluetooth settings, come back, then press a button</string>

@@ -64,7 +64,9 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
                 this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.shortcut_access_title)
                 .setMessage(getString(R.string.shortcut_access_msg, AccessibilityGate.grantCommand(this)))
-                .setPositiveButton(R.string.shortcut_access_ok, (dialog, which) -> finish())
+                .setPositiveButton(R.string.shortcut_shizuku, (dialog, which) ->
+                        ShizukuGrant.run(this, this::finish))
+                .setNegativeButton(R.string.shortcut_access_ok, (dialog, which) -> finish())
                 .setNeutralButton(R.string.shortcut_access_open, (dialog, which) -> {
                     try {
                         startActivity(new android.content.Intent(

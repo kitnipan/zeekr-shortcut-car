@@ -138,7 +138,14 @@
     <string name="shortcut_action_app">Buka apl</string>
     <string name="shortcut_action_dim">Gelapkan skrin</string>
     <string name="shortcut_access_title">Hidupkan kebolehcapaian</string>
-    <string name="shortcut_access_msg">Buat masa ini butang berfungsi semasa apl ini di hadapan. Untuk semua skrin, apl perlukan perkhidmatan kebolehcapaian. Unit kepala tiada skrin untuknya, jadi apl menghidupkannya sendiri. Jalankan sekali dari komputer:\n\n%1$s\n\nKemudian buka semula apl ini.</string>
+    <string name="shortcut_access_msg">Buat masa ini butang berfungsi semasa apl ini di hadapan. Untuk semua skrin, apl perlukan perkhidmatan kebolehcapaian. Unit kepala tiada skrin untuknya, jadi apl menghidupkannya sendiri.\n\nMulakan Shizuku, kemudian ketik Beri kebenaran dengan Shizuku. Atau jalankan sekali dari komputer:\n\n%1$s\n\nKemudian buka semula apl ini.</string>
+    <string name="shortcut_shizuku">Beri kebenaran dengan Shizuku</string>
+    <string name="shortcut_banner">Pintasan hanya berfungsi semasa apl ini di hadapan.</string>
+    <string name="shizuku_not_running">Shizuku tidak berjalan. Buka Shizuku, mulakannya, kemudian cuba lagi.</string>
+    <string name="shizuku_too_old">Shizuku terlalu lama. Kemas kini.</string>
+    <string name="shizuku_denied">Shizuku tidak membenarkan apl ini.</string>
+    <string name="shizuku_failed">Kebenaran gagal. %1$s</string>
+    <string name="shizuku_done">Siap. Pintasan berfungsi pada setiap skrin.</string>
     <string name="shortcut_access_open">Tetapan sistem</string>
     <string name="shortcut_access_ok">Faham</string>
     <string name="ctrl_subtitle">Pasangkan dalam tetapan Bluetooth kereta, kembali, kemudian tekan butang</string>

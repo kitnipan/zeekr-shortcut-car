@@ -32,12 +32,21 @@ public class ShortcutListActivity extends AppCompatActivity {
         findViewById(R.id.shortcut_close).setOnClickListener(v -> finish());
         findViewById(R.id.shortcut_add).setOnClickListener(v ->
                 startActivity(new Intent(this, ShortcutCaptureActivity.class)));
+        findViewById(R.id.shortcut_shizuku).setOnClickListener(v ->
+                ShizukuGrant.run(this, this::updateBanner));
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         show(ShortcutBook.parse(config.getButtonShortcuts()));
+        updateBanner();
+    }
+
+    private void updateBanner() {
+        boolean everywhere = com.kooo.evcam.KeepAliveAccessibilityService.isRunning()
+                || AccessibilityGate.isEnabled(this);
+        findViewById(R.id.shortcut_banner).setVisibility(everywhere ? View.GONE : View.VISIBLE);
     }
 
     private void show(List<Shortcut> items) {

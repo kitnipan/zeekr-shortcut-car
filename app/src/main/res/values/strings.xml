@@ -156,7 +156,14 @@
     <string name="shortcut_action_app">打开应用</string>
     <string name="shortcut_action_dim">遮罩屏幕</string>
     <string name="shortcut_access_title">打开无障碍服务</string>
-    <string name="shortcut_access_msg">现在快捷键只在本应用在前台时有效。要在别的界面也能用，需要无障碍服务；车机没有它的设置页，就让本应用自己打开。用电脑执行一次：\n\n%1$s\n\n之后重开本应用即可。</string>
+    <string name="shortcut_access_msg">现在快捷键只在本应用在前台时有效。要在别的界面也能用，需要无障碍服务；车机没有它的设置页，就让本应用自己打开。\n\n先启动 Shizuku 再点「用 Shizuku 授权」，或者用电脑执行一次：\n\n%1$s\n\n之后重开本应用即可。</string>
+    <string name="shortcut_shizuku">用 Shizuku 授权</string>
+    <string name="shortcut_banner">快捷键现在只在本应用在前台时有效。</string>
+    <string name="shizuku_not_running">Shizuku 没在运行。打开 Shizuku 启动它，再试一次。</string>
+    <string name="shizuku_too_old">Shizuku 版本太旧，请更新。</string>
+    <string name="shizuku_denied">Shizuku 没有允许本应用。</string>
+    <string name="shizuku_failed">授权失败。%1$s</string>
+    <string name="shizuku_done">好了，快捷键在所有界面都能用。</string>
     <string name="shortcut_access_open">系统设置</string>
     <string name="shortcut_access_ok">知道了</string>
     <string name="ctrl_subtitle">先在车机蓝牙里配对，回到这一页再按实体键</string>

@@ -58,9 +58,9 @@ android {
         //
         // 正式版不带后缀，GitHub 上显示为 Latest。
         // -kd 仍是这个 fork 的发布线（见 VersionName）。上游的 -alpha 不推。
-        versionCode = 260
+        versionCode = 261
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "2.0.3-beta16"
+        versionName = "2.0.3-beta17"
 
         buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
         buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))
@@ -130,6 +130,9 @@ dependencies {
     implementation("androidx.preference:preference:1.2.1")
     // 两栏设置的左右分栏（androidx 自己的 PreferenceHeaderFragmentCompat 也用它）
     implementation("androidx.slidingpanelayout:slidingpanelayout:1.2.0")
+    // 车机没有无障碍设置页：借 Shizuku（shell 身份）给自己授 WRITE_SECURE_SETTINGS
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

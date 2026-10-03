@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta17] - 2026-10-03
+
+### New and improved
+
+- Grant with Shizuku: with Shizuku running on the car, one tap makes shortcuts work on every screen. No computer needed. The button is on the Shortcuts screen and in the dialog after saving a shortcut.
+
 ## [2.0.3-beta16] - 2026-10-03
 
 ### Fixed
