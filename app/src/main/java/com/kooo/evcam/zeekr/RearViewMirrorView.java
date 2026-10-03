@@ -213,11 +213,22 @@ public class RearViewMirrorView extends ViewGroup {
         if (size == null || size.getWidth() <= 0 || size.getHeight() <= 0) {
             return;
         }
-        if (!CompositeStreamGeometry.looksLikeComposite(StreamLayoutTable.compositeCameraId(), size.getWidth(), size.getHeight())) {
+        int w = size.getWidth();
+        int h = size.getHeight();
+        String id = StreamLayoutTable.compositeCameraId();
+        if (CompositeStreamGeometry.looksLikeComposite(id, w, h)) {
+            plan = CompositeStreamGeometry.analyse(id, w, h);
+        } else if (CompositeStreamGeometry.looksLikeCompositeByRatio(w, h)) {
+            // Strip ratio unique to surround; id may not be registered yet
+            plan = CompositeStreamGeometry.analyseAsVertical(w, h);
+        } else if (id != null) {
+            // Known surround camera at a non-strip size (e.g. 3840×2160)
+            plan = CompositeStreamGeometry.analyseAsVertical(w, h);
+        } else {
+            // Tiny HAL tip with no composite id yet — keep prior plan, never show raw strip
             AppLog.d(TAG, "忽略非合成流尺寸 " + size + "（多半是 HAL 的小尺寸提示）");
             return;
         }
-        plan = CompositeStreamGeometry.analyse(StreamLayoutTable.compositeCameraId(), size.getWidth(), size.getHeight());
         AppLog.i(TAG, "后视镜取景: " + plan + " 第 " + laneIndex + " 路");
         invalidate();
     }
@@ -463,8 +474,8 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
         if (plan == null || !plan.isComposite()) {
-            // 还不知道几何，先原样显示，总比全黑好
-            super.dispatchDraw(canvas);
+            // No geometry yet: black, not the jammed surround strip
+            canvas.drawColor(0xFF000000);
             if (frozen) {
                 drawFrozenHint(canvas, width, height);
             }

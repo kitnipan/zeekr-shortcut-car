@@ -1,6 +1,8 @@
 package com.kooo.evcam.zeekr;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -29,5 +31,24 @@ public class RemoteFrameTest {
         assertEquals(1f, window[2], 0.001f);
         assertEquals(9f / 16f, window[3], 0.001f);
         assertEquals((1f - 9f / 16f) / 2f, window[1], 0.001f);
+    }
+
+    @Test
+    public void equalVerticalLanesAreFourBands() {
+        float[] lanes = new float[16];
+        RemoteFrame.equalVerticalLanes(lanes);
+        assertTrue(RemoteFrame.lanesUsable(lanes));
+        assertEquals(0f, lanes[0], 0.001f);
+        assertEquals(0f, lanes[1], 0.001f);
+        assertEquals(1f, lanes[2], 0.001f);
+        assertEquals(0.25f, lanes[3], 0.001f);
+        assertEquals(0.75f, lanes[13], 0.001f);
+        assertEquals(1f, lanes[15], 0.001f);
+    }
+
+    @Test
+    public void emptyLanesAreNotUsable() {
+        assertFalse(RemoteFrame.lanesUsable(null));
+        assertFalse(RemoteFrame.lanesUsable(new float[16]));
     }
 }

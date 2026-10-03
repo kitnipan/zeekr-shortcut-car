@@ -81,12 +81,19 @@ public class SideViewPopupView extends ViewGroup {
         if (size == null || size.getWidth() <= 0 || size.getHeight() <= 0) {
             return;
         }
+        int w = size.getWidth();
+        int h = size.getHeight();
         String id = StreamLayoutTable.compositeCameraId();
-        if (!CompositeStreamGeometry.looksLikeComposite(id, size.getWidth(), size.getHeight())) {
+        if (CompositeStreamGeometry.looksLikeComposite(id, w, h)) {
+            plan = CompositeStreamGeometry.analyse(id, w, h);
+        } else if (CompositeStreamGeometry.looksLikeCompositeByRatio(w, h)) {
+            plan = CompositeStreamGeometry.analyseAsVertical(w, h);
+        } else if (id != null) {
+            plan = CompositeStreamGeometry.analyseAsVertical(w, h);
+        } else {
             AppLog.d(TAG, "忽略非合成流尺寸 " + size);
             return;
         }
-        plan = CompositeStreamGeometry.analyse(id, size.getWidth(), size.getHeight());
         AppLog.i(TAG, "侧视取景: " + plan + " 第 " + lane + " 路");
         invalidate();
     }

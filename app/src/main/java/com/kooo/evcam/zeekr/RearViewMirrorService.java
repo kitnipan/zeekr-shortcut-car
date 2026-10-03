@@ -308,9 +308,12 @@ public class RearViewMirrorService extends Service {
         }
 
         Size previewSize = camera.getPreviewSize();
-        if (previewSize != null) {
-            // 几何按合成流的真实尺寸算，不是按缓冲区尺寸
-            mirrorView.setSourceSize(previewSize);
+        Size bufferSize = camera.getPreviewBufferSize();
+        // Geometry from the real buffer (1280×5140 etc.), not a flattened HAL tip
+        Size forGeom = bufferSize != null && bufferSize.getWidth() > 0
+                ? bufferSize : previewSize;
+        if (forGeom != null) {
+            mirrorView.setSourceSize(forGeom);
         }
         boundCamera = camera;
         restoreBufferSize(surfaceTexture);
@@ -329,7 +332,8 @@ public class RearViewMirrorService extends Service {
         com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.MIRROR);
         StallWatch.armMirror(true);
         AppLog.i(TAG, "后视镜已接到相机，预览尺寸 " + previewSize
-                + "，缓冲区 " + camera.getPreviewBufferSize());
+                + "，缓冲区 " + camera.getPreviewBufferSize()
+                + "，取景 " + forGeom);
     }
 
     /**

@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta22] - 2026-10-03
+
+### Fixes
+
+- Remote watch: rebuild the phone grid from scratch. Always splits the surround strip into a 2×2 (or one channel). Never sends the jammed raw strip. Straighten only when fisheye correction is on.
+- Super mirror: never shows the raw surround strip. Geometry falls back to a vertical 4-split when the composite camera id is late or the size is a known surround shape; uses the real buffer size for framing.
+
 ## [2.0.3-beta21] - 2026-10-03
 
 ### New and improved

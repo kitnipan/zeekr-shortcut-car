@@ -1395,7 +1395,13 @@ public class MainActivity extends AppCompatActivity {
             remoteBusy.set(false);
             return;
         }
-        boolean split = compositeContainer != null && compositeContainer.copyLaneWindows(remoteLanes);
+        boolean hasLanes = compositeContainer != null
+                && compositeContainer.copyLaneWindows(remoteLanes);
+        if (!hasLanes) {
+            // Plan not ready yet: still split as four equal vertical bands.
+            // Never push the raw surround strip — that looks like one jammed picture.
+            com.kooo.evcam.zeekr.RemoteFrame.equalVerticalLanes(remoteLanes);
+        }
         float scale = 960f / Math.max(vw, vh);
         int w = Math.max(2, ((int) (vw * scale)) / 2 * 2);
         int h = Math.max(2, ((int) (vh * scale)) / 2 * 2);
@@ -1404,21 +1410,19 @@ public class MainActivity extends AppCompatActivity {
             remoteBusy.set(false);
             return;
         }
-        if (!split) {
-            remoteBusy.set(false);
-            carLink.pushPreview(source);
-            return;
-        }
         float[] lanes = remoteLanes.clone();
-        int[] order = compositeContainer.getLaneOrder();
+        int[] order = compositeContainer != null
+                ? compositeContainer.getLaneOrder()
+                : new int[]{0, 1, 2, 3};
         int onlyLane = com.kooo.evcam.zeekr.RemoteFrame.laneForSource(carLink.watchSource());
+        boolean straighten = appConfig.isFisheyeCorrection();
         float fov = appConfig.getFisheyeFov();
         String projection = appConfig.getFisheyeProjection();
         float strength = appConfig.getFisheyeStrength() / 100f;
         remoteCompose.execute(() -> {
             try {
                 android.graphics.Bitmap grid = remoteFrame.compose(
-                        source, lanes, order, onlyLane, fov, projection, strength);
+                        source, lanes, order, onlyLane, straighten, fov, projection, strength);
                 java.io.ByteArrayOutputStream jpeg = new java.io.ByteArrayOutputStream(48 * 1024);
                 if (grid.compress(android.graphics.Bitmap.CompressFormat.JPEG, 55, jpeg)) {
                     carLink.pushJpeg(jpeg.toByteArray());
