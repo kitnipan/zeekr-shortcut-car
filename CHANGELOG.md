@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta23] - 2026-10-03
+
+### Fixes
+
+- Revert Super mirror framing changes from beta22. Super mirror was not broken; remote-watch-only fix remains.
+
 ## [2.0.3-beta22] - 2026-10-03
 
 ### Fixes
