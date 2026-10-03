@@ -34,6 +34,12 @@ public class ShortcutListActivity extends AppCompatActivity {
                 startActivity(new Intent(this, ShortcutCaptureActivity.class)));
         findViewById(R.id.shortcut_shizuku).setOnClickListener(v ->
                 ShizukuGrant.run(this, this::updateBanner));
+        android.widget.CompoundButton catcher = findViewById(R.id.shortcut_catch);
+        catcher.setChecked(config.isShortcutCatchEverywhere());
+        catcher.setOnCheckedChangeListener((button, on) -> {
+            config.setShortcutCatchEverywhere(on);
+            updateBanner();
+        });
     }
 
     @Override
@@ -47,6 +53,10 @@ public class ShortcutListActivity extends AppCompatActivity {
         boolean everywhere = com.kooo.evcam.KeepAliveAccessibilityService.isRunning()
                 || AccessibilityGate.isEnabled(this);
         findViewById(R.id.shortcut_banner).setVisibility(everywhere ? View.GONE : View.VISIBLE);
+        findViewById(R.id.shortcut_catch).setVisibility(everywhere ? View.GONE : View.VISIBLE);
+        TextView bannerText = findViewById(R.id.shortcut_banner_text);
+        bannerText.setText(config.isShortcutCatchEverywhere()
+                ? R.string.shortcut_banner_catcher : R.string.shortcut_banner);
     }
 
     private void show(List<Shortcut> items) {

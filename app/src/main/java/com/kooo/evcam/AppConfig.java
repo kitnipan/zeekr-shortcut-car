@@ -1967,6 +1967,17 @@ public class AppConfig {
         prefs.edit().putString(KEY_BUTTON_SHORTCUTS, raw == null ? "" : raw).apply();
     }
 
+    private static final String KEY_SHORTCUT_CATCH_EVERYWHERE = "shortcut_catch_everywhere";
+
+    /** 没有无障碍服务时，用按键捕捉窗让快捷键在任何界面生效（试验）。 */
+    public boolean isShortcutCatchEverywhere() {
+        return prefs.getBoolean(KEY_SHORTCUT_CATCH_EVERYWHERE, true);
+    }
+
+    public void setShortcutCatchEverywhere(boolean on) {
+        prefs.edit().putBoolean(KEY_SHORTCUT_CATCH_EVERYWHERE, on).apply();
+    }
+
     public int getDimOpacity() {
         return clampPercent(prefs.getInt(KEY_DIM_OPACITY, DIM_OPACITY_DEFAULT));
     }

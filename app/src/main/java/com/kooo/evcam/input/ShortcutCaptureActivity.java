@@ -56,7 +56,7 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
                 ShortcutBook.parse(config.getButtonShortcuts()),
                 new Shortcut(captured.keyCode, captured.scanCode, captured.deviceName, action.key));
         config.setButtonShortcuts(ShortcutBook.write(items));
-        if (AccessibilityGate.selfEnable(this)) {
+        if (AccessibilityGate.selfEnable(this) || config.isShortcutCatchEverywhere()) {
             finish();
             return;
         }

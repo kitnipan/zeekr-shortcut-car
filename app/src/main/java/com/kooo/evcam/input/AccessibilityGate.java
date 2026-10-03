@@ -83,6 +83,11 @@ public final class AccessibilityGate {
                 || event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
             return false;
         }
+        return matchAndPerform(context, event);
+    }
+
+    /** 按键对上某条快捷键：按下时执行，抬起和重复吃掉。 */
+    static boolean matchAndPerform(Context context, KeyEvent event) {
         String device = event.getDevice() == null || event.getDevice().getName() == null
                 ? "" : event.getDevice().getName();
         Shortcut hit = ShortcutBook.match(

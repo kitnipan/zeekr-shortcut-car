@@ -141,6 +141,8 @@
     <string name="shortcut_access_msg">Buat masa ini butang berfungsi semasa apl ini di hadapan. Untuk semua skrin, apl perlukan perkhidmatan kebolehcapaian. Unit kepala tiada skrin untuknya, jadi apl menghidupkannya sendiri.\n\nMulakan Shizuku, kemudian ketik Beri kebenaran dengan Shizuku. Atau jalankan sekali dari komputer:\n\n%1$s\n\nKemudian buka semula apl ini.</string>
     <string name="shortcut_shizuku">Beri kebenaran dengan Shizuku</string>
     <string name="shortcut_banner">Pintasan hanya berfungsi semasa apl ini di hadapan.</string>
+    <string name="shortcut_banner_catcher">Kebolehcapaian dimatikan, jadi penangkap kekunci mengendalikan skrin lain. Butang yang ditekan dalam 3 saat selepas menyentuh skrin dilangkau.</string>
+    <string name="shortcut_catch">Berfungsi pada setiap skrin (percubaan)</string>
     <string name="shizuku_not_running">Shizuku tidak berjalan. Buka Shizuku, mulakannya, kemudian cuba lagi.</string>
     <string name="shizuku_too_old">Shizuku terlalu lama. Kemas kini.</string>
     <string name="shizuku_denied">Shizuku tidak membenarkan apl ini.</string>

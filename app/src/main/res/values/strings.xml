@@ -159,6 +159,8 @@
     <string name="shortcut_access_msg">现在快捷键只在本应用在前台时有效。要在别的界面也能用，需要无障碍服务；车机没有它的设置页，就让本应用自己打开。\n\n先启动 Shizuku 再点「用 Shizuku 授权」，或者用电脑执行一次：\n\n%1$s\n\n之后重开本应用即可。</string>
     <string name="shortcut_shizuku">用 Shizuku 授权</string>
     <string name="shortcut_banner">快捷键现在只在本应用在前台时有效。</string>
+    <string name="shortcut_banner_catcher">无障碍服务没开，别的界面由按键捕捉接管。刚碰过屏幕的 3 秒内按键不生效。</string>
+    <string name="shortcut_catch">在任何界面都能用（试验）</string>
     <string name="shizuku_not_running">Shizuku 没在运行。打开 Shizuku 启动它，再试一次。</string>
     <string name="shizuku_too_old">Shizuku 版本太旧，请更新。</string>
     <string name="shizuku_denied">Shizuku 没有允许本应用。</string>

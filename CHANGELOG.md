@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta18] - 2026-10-03
+
+### New and improved
+
+- Shortcuts work on every screen without accessibility or Shizuku. Settings, System, Shortcuts, Work on every screen (experimental), on by default. A button pressed within 3 seconds of touching the screen is skipped, and the hardware Back key may need a second press.
+
 ## [2.0.3-beta17] - 2026-10-03
 
 ### New and improved

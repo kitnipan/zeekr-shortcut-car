@@ -141,6 +141,8 @@
     <string name="shortcut_access_msg">For now the button works while this app is in front. To make it work on every screen, the app needs its accessibility service. The head unit has no screen for that, so the app turns it on itself.\n\nStart Shizuku, then tap Grant with Shizuku. Or run this once from a computer:\n\n%1$s\n\nThen reopen this app.</string>
     <string name="shortcut_shizuku">Grant with Shizuku</string>
     <string name="shortcut_banner">Shortcuts work only while this app is in front.</string>
+    <string name="shortcut_banner_catcher">Accessibility is off, so the key catcher handles other screens. A button pressed within 3 seconds of touching the screen is skipped.</string>
+    <string name="shortcut_catch">Work on every screen (experimental)</string>
     <string name="shizuku_not_running">Shizuku isn\'t running. Open Shizuku, start it, then try again.</string>
     <string name="shizuku_too_old">Shizuku is too old. Update it.</string>
     <string name="shizuku_denied">Shizuku did not allow this app.</string>

@@ -53,6 +53,50 @@ public class ZeekrShortcutApp extends Application {
         }
         Languages.apply(new AppConfig(this).getLanguageMode());
         StallWatch.start(this);
+        trackAppInFront();
+        com.kooo.evcam.input.KeyCatcher.sync(this);
+    }
+
+    /** 本应用有界面在前台时，按键捕捉窗让开焦点。 */
+    private void trackAppInFront() {
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            private int resumed;
+
+            @Override
+            public void onActivityResumed(@NonNull android.app.Activity activity) {
+                resumed++;
+                com.kooo.evcam.input.KeyCatcher.setAppInFront(ZeekrShortcutApp.this, true);
+            }
+
+            @Override
+            public void onActivityPaused(@NonNull android.app.Activity activity) {
+                resumed = Math.max(0, resumed - 1);
+                if (resumed == 0) {
+                    com.kooo.evcam.input.KeyCatcher.setAppInFront(ZeekrShortcutApp.this, false);
+                }
+            }
+
+            @Override
+            public void onActivityCreated(@NonNull android.app.Activity activity, android.os.Bundle state) {
+            }
+
+            @Override
+            public void onActivityStarted(@NonNull android.app.Activity activity) {
+            }
+
+            @Override
+            public void onActivityStopped(@NonNull android.app.Activity activity) {
+            }
+
+            @Override
+            public void onActivitySaveInstanceState(@NonNull android.app.Activity activity,
+                                                    @NonNull android.os.Bundle outState) {
+            }
+
+            @Override
+            public void onActivityDestroyed(@NonNull android.app.Activity activity) {
+            }
+        });
     }
 
     /**

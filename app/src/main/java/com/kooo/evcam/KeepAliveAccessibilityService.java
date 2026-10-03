@@ -193,6 +193,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
             setServiceInfo(info);
         }
         AppLog.d(TAG, "无障碍服务已连接到系统");
+        com.kooo.evcam.input.KeyCatcher.sync(this);
         com.kooo.evcam.blackbox.BlackBox.noteImportant("无障碍服务已连接到系统");
         if (!new AppConfig(this).isKeepAliveEnabled()) {
             return;
@@ -218,6 +219,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         
         instance = null;
         isServiceRunning = false;
+        com.kooo.evcam.input.KeyCatcher.sync(this);
         
         super.onDestroy();
         AppLog.d(TAG, "无障碍服务已销毁");
