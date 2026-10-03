@@ -58,8 +58,9 @@ public class SideViewPopupView extends ViewGroup {
     private int viewFov;
     private int yaw;
     private int pitch;
+    private int roll;
     private final FisheyeMesh.SourceMap turnedMap = (u, v, out) ->
-            SideViewProjection.sourcePoint(u, v, viewFov, yaw, pitch, lane, out, 0);
+            SideViewProjection.sourcePoint(u, v, viewFov, yaw, pitch, roll, lane, out, 0);
 
     public SideViewPopupView(Context context, AppConfig appConfig) {
         super(context);
@@ -160,6 +161,7 @@ public class SideViewPopupView extends ViewGroup {
         viewFov = appConfig.getSidePopupFov();
         yaw = appConfig.getSidePopupYaw();
         pitch = appConfig.getSidePopupPitch();
+        roll = appConfig.getSidePopupRoll();
     }
 
     private void attachAt(int side, boolean show) {
@@ -278,7 +280,7 @@ public class SideViewPopupView extends ViewGroup {
         // 后视镜是反的，摄像头不是。左右转向弹窗都要左右对调，才和镜子里看到的一致。
         canvas.scale(-1f, 1f, width / 2f, height / 2f);
         if (straighten) {
-            // 虚拟相机转过去（往后、往上）再拉直，见 SideViewProjection
+            // 虚拟相机转过去（往后、往上、滚转）再拉直，见 SideViewProjection
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
                     plan, lane, RearViewGeometry.Viewport.full());
             mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
@@ -286,7 +288,15 @@ public class SideViewPopupView extends ViewGroup {
                     r.laneScaleX * width, r.laneScaleY * height, turnedMap);
             mesh.draw(canvas, 0f, 0f, width, height, paintTexture);
         } else {
-            // 不拉直：只能在原图里裁一块挪一挪（见 SideViewAim），角度折算成那边的百分比
+            // 不拉直：只能在原图里裁一块挪一挪（见 SideViewAim），角度折算成那边的百分比；
+            // 滚转用画布转，并放大一点填满转后的方框四角
+            if (roll != 0) {
+                // 前面已经左右翻转：画布上的正旋转和投影里的滚转方向相反，这里取负对齐
+                float rad = (float) Math.toRadians(-roll);
+                float fill = Math.abs((float) Math.cos(rad)) + Math.abs((float) Math.sin(rad));
+                canvas.rotate(-roll, width / 2f, height / 2f);
+                canvas.scale(fill, fill, width / 2f, height / 2f);
+            }
             int zoomPercent = Math.round(180f / viewFov * 100f);
             int backPercent = Math.round(yaw / SideViewProjection.MAX_YAW_DEGREES * 100f);
             int upPercent = Math.round(pitch / SideViewProjection.MAX_PITCH_DEGREES * 100f);

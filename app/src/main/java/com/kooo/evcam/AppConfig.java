@@ -121,10 +121,12 @@ public class AppConfig {
     private static final String KEY_SIDE_POPUP_FOV = "side_popup_fov";  // 虚拟相机视野（度）
     private static final String KEY_SIDE_POPUP_YAW = "side_popup_yaw";  // 往车尾转多少度，负数往车头
     private static final String KEY_SIDE_POPUP_PITCH = "side_popup_pitch";  // 往上（车外）转多少度，负数往下
-    /** 默认值是猜的（见 SideViewProjection）：视野 90°，往车尾转 50°，稍往上 15°。 */
+    private static final String KEY_SIDE_POPUP_ROLL = "side_popup_roll";  // 画面平面内旋转，正数顺时针
+    /** 默认值是猜的（见 SideViewProjection）：视野 90°，往车尾转 50°，稍往上 15°。滚转默认 0。 */
     public static final int SIDE_POPUP_DEFAULT_FOV = 90;
     public static final int SIDE_POPUP_DEFAULT_YAW = 50;
     public static final int SIDE_POPUP_DEFAULT_PITCH = 15;
+    public static final int SIDE_POPUP_DEFAULT_ROLL = 0;
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
@@ -1575,6 +1577,16 @@ public class AppConfig {
 
     public void setSidePopupPitch(int degrees) {
         prefs.edit().putInt(KEY_SIDE_POPUP_PITCH, degrees).apply();
+    }
+
+    /** 侧视画面平面内旋转多少度（正数顺时针，用来拧平地平线）。 */
+    public int getSidePopupRoll() {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_ROLL_DEGREES);
+        return Math.max(-max, Math.min(max, prefs.getInt(KEY_SIDE_POPUP_ROLL, SIDE_POPUP_DEFAULT_ROLL)));
+    }
+
+    public void setSidePopupRoll(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_ROLL, degrees).apply();
     }
 
     public boolean isLicensePlateEnabled() {

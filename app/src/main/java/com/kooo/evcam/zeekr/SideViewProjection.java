@@ -12,7 +12,7 @@ package com.kooo.evcam.zeekr;
  * <h3>方向是猜的（2026-10-01，PR 作者实车反馈「往后不够」后改）</h3>
  *
  * <p>同 {@link SideViewAim}：每一路<b>上边朝车外</b>，左侧那一路<b>左边是车尾</b>、右侧那一路<b>右边是车尾</b>。
- * 往后 = 绕竖轴朝车尾那一边转，往上 = 绕横轴朝画面上边转。猜反了滑块往另一头拉。</p>
+ * 往后 = 绕竖轴朝车尾那一边转，往上 = 绕横轴朝画面上边转，旋转 = 绕光轴拧平地平线。猜反了滑块往另一头拉。</p>
  *
  * <p>纯 Java，见 {@code SideViewProjectionTest}。</p>
  */
@@ -22,6 +22,8 @@ public final class SideViewProjection {
     public static final float MAX_FOV_DEGREES = 130f;
     public static final float MAX_YAW_DEGREES = 80f;
     public static final float MAX_PITCH_DEGREES = 60f;
+    /** In-plane rotate of the straightened view; levels a tilted horizon. */
+    public static final float MAX_ROLL_DEGREES = 45f;
 
     private static final double EPSILON = 1e-9;
 
@@ -36,10 +38,11 @@ public final class SideViewProjection {
      * @param fovDegrees 虚拟相机的视野（左右边缘之间的角度）
      * @param backDegrees 往车尾转多少度，负数往车头
      * @param upDegrees  往上（车外）转多少度，负数往下
+     * @param rollDegrees 画面平面内旋转多少度；正数顺时针，用来把歪掉的地平线拧平
      * @param lane       {@link LaneCycle#LEFT} / {@link LaneCycle#RIGHT}：决定车尾在画面哪一边
      */
     public static void sourcePoint(float u, float v, float fovDegrees, float backDegrees, float upDegrees,
-                                   int lane, float[] out, int offset) {
+                                   float rollDegrees, int lane, float[] out, int offset) {
         double fov = Math.toRadians(clamp(fovDegrees, MIN_FOV_DEGREES, MAX_FOV_DEGREES));
         double t = Math.tan(fov / 2.0);
         // 虚拟相机里的射线：x 右、y 下、z 朝前
@@ -47,19 +50,26 @@ public final class SideViewProjection {
         double y = (v * 2.0 - 1.0) * t;
         double z = 1.0;
 
-        // 先往上（绕 x 轴，朝 −y 转），再往后（绕 y 轴，朝车尾那一边转）
+        // 先绕光轴转（滚转）：正数 = 输出画面顺时针（y 朝下时）
+        double roll = Math.toRadians(clamp(rollDegrees, -MAX_ROLL_DEGREES, MAX_ROLL_DEGREES));
+        double cr = Math.cos(roll);
+        double sr = Math.sin(roll);
+        double xr = x * cr - y * sr;
+        double yr = x * sr + y * cr;
+
+        // 再往上（绕 x 轴，朝 −y 转），再往后（绕 y 轴，朝车尾那一边转）
         double pitch = Math.toRadians(clamp(upDegrees, -MAX_PITCH_DEGREES, MAX_PITCH_DEGREES));
         double cp = Math.cos(pitch);
         double sp = Math.sin(pitch);
-        double y1 = y * cp - z * sp;
-        double z1 = y * sp + z * cp;
+        double y1 = yr * cp - z * sp;
+        double z1 = yr * sp + z * cp;
 
         double towardRear = lane == LaneCycle.RIGHT ? 1.0 : -1.0;
         double yaw = Math.toRadians(clamp(backDegrees, -MAX_YAW_DEGREES, MAX_YAW_DEGREES)) * towardRear;
         double cy = Math.cos(yaw);
         double sy = Math.sin(yaw);
-        double x2 = x * cy + z1 * sy;
-        double z2 = -x * sy + z1 * cy;
+        double x2 = xr * cy + z1 * sy;
+        double z2 = -xr * sy + z1 * cy;
         double y2 = y1;
 
         // 射线偏离鱼眼光轴多少度 → 原图上离中心多远（等距：半径 0.5 = 90°）

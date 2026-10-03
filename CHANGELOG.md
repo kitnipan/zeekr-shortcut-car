@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta20] - 2026-10-03
+
+### New and improved
+
+- Turn-signal side view: Rotate slider (±45°) to level a tilted horizon.
+
 ## [2.0.3-beta19] - 2026-10-03
 
 ### New and improved

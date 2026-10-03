@@ -11,8 +11,18 @@ public class SideViewProjectionTest {
     private static final float EPS = 1e-4f;
 
     private static float[] center(float back, float up, int lane) {
+        return center(back, up, 0f, lane);
+    }
+
+    private static float[] center(float back, float up, float roll, int lane) {
         float[] out = new float[2];
-        SideViewProjection.sourcePoint(0.5f, 0.5f, 90f, back, up, lane, out, 0);
+        SideViewProjection.sourcePoint(0.5f, 0.5f, 90f, back, up, roll, lane, out, 0);
+        return out;
+    }
+
+    private static float[] point(float u, float v, float roll) {
+        float[] out = new float[2];
+        SideViewProjection.sourcePoint(u, v, 90f, 0f, 0f, roll, LaneCycle.LEFT, out, 0);
         return out;
     }
 
@@ -53,7 +63,7 @@ public class SideViewProjectionTest {
         float[] out = new float[2];
         for (float u = 0f; u <= 1f; u += 0.25f) {
             for (float v = 0f; v <= 1f; v += 0.25f) {
-                SideViewProjection.sourcePoint(u, v, 130f, 80f, 60f, LaneCycle.RIGHT, out, 0);
+                SideViewProjection.sourcePoint(u, v, 130f, 80f, 60f, 45f, LaneCycle.RIGHT, out, 0);
                 assertTrue(out[0] >= 0f && out[0] <= 1f && out[1] >= 0f && out[1] <= 1f);
             }
         }
@@ -63,8 +73,25 @@ public class SideViewProjectionTest {
     public void wideViewReachesFurtherOut() {
         float[] narrow = new float[2];
         float[] wide = new float[2];
-        SideViewProjection.sourcePoint(1f, 0.5f, 60f, 0f, 0f, LaneCycle.RIGHT, narrow, 0);
-        SideViewProjection.sourcePoint(1f, 0.5f, 120f, 0f, 0f, LaneCycle.RIGHT, wide, 0);
+        SideViewProjection.sourcePoint(1f, 0.5f, 60f, 0f, 0f, 0f, LaneCycle.RIGHT, narrow, 0);
+        SideViewProjection.sourcePoint(1f, 0.5f, 120f, 0f, 0f, 0f, LaneCycle.RIGHT, wide, 0);
         assertTrue(wide[0] > narrow[0]);
+    }
+
+    @Test
+    public void rollKeepsTheCentreStill() {
+        float[] c = center(0f, 0f, 30f, LaneCycle.LEFT);
+        assertEquals(0.5f, c[0], EPS);
+        assertEquals(0.5f, c[1], EPS);
+    }
+
+    @Test
+    public void ninetyRollSwapsRightEdgeTowardBottom() {
+        // 无俯仰时，输出右边缘中点在鱼眼 90° 处；顺时针滚 90° 封顶 45°，
+        // 所以右边缘中点应往画面下边挪（y 变大、x 仍靠右但变小一点）
+        float[] flat = point(1f, 0.5f, 0f);
+        float[] rolled = point(1f, 0.5f, 45f);
+        assertTrue("roll pushes the right edge downward", rolled[1] > flat[1]);
+        assertTrue("roll pulls the right edge inward from the far right", rolled[0] < flat[0]);
     }
 }

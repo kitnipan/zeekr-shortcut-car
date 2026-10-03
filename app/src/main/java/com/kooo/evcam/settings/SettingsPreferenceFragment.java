@@ -598,6 +598,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setSidePopupPitch(value);
                     com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
                 });
+        int maxRoll = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_ROLL_DEGREES);
+        bindSlider("pref_side_popup_roll", -maxRoll, maxRoll,
+                appConfig.getSidePopupRoll(), "°", value -> {
+                    appConfig.setSidePopupRoll(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
         bindSwitch("pref_side_popup_instant", appConfig.isSidePopupInstant(), value -> {
             appConfig.setSidePopupInstant(value);
             com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();

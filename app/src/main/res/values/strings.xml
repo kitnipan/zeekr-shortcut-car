@@ -331,6 +331,8 @@
     <string name="set_side_popup_yaw_summary">正数朝车尾（盲区）转，负数朝车头。方向是猜的：反了就往另一头拉</string>
     <string name="set_side_popup_pitch_title">往上看（°）</string>
     <string name="set_side_popup_pitch_summary">正数朝车外、远处的路转，负数朝车身和地面。方向是猜的：反了就往另一头拉</string>
+    <string name="set_side_popup_roll_title">旋转（°）</string>
+    <string name="set_side_popup_roll_summary">正数顺时针拧画面，用来把歪掉的地平线拧平。反了就往另一头拉</string>
     <string name="set_side_popup_close_delay_ms_title">灯灭后再留（毫秒）</string>
     <string name="set_side_popup_close_delay_ms_summary">1000 毫秒 = 1 秒。0 表示灯一灭就收。原厂画面出来时照样立刻收</string>
     <string name="set_side_popup_instant_title">即时弹出</string>
