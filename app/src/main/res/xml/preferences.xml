@@ -236,9 +236,16 @@
                 app:showSeekBarValue="true" />
 
             <SeekBarPreference
-                android:key="pref_side_popup_roll"
+                android:key="pref_side_popup_roll_left"
                 android:dependency="pref_side_popup"
-                android:title="@string/set_side_popup_roll_title"
+                android:title="@string/set_side_popup_roll_left_title"
+                android:summary="@string/set_side_popup_roll_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_roll_right"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_roll_right_title"
                 android:summary="@string/set_side_popup_roll_summary"
                 app:showSeekBarValue="true" />
 

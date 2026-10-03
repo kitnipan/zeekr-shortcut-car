@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta21] - 2026-10-03
+
+### New and improved
+
+- Turn-signal side view: separate Rotate left / Rotate right sliders.
+
+### Fixes
+
+- Toasts and UI fall back to English on head units whose system language is not Chinese, English, or Malay (for example Thai), instead of Chinese.
+
 ## [2.0.3-beta20] - 2026-10-03
 
 ### New and improved

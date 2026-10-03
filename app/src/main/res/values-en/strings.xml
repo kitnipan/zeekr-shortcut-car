@@ -1,7 +1,6 @@
 <resources>
-    <!-- 英文环境下的应用名；默认（中文）名见 values/strings.xml -->
+    <!-- English. Default values/ is also English now. -->
     <string name="app_name">Zeekr Shortcut</string>
-    <!-- 完整名只有中文才带「（车机版）」，英文这边两条一样 -->
     <string name="app_name_full">Zeekr Shortcut</string>
 
     <!-- Settings screen -->
@@ -312,8 +311,9 @@
     <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way</string>
     <string name="set_side_popup_pitch_title">Aim up (°)</string>
     <string name="set_side_popup_pitch_summary">Positive turns the view out towards the road further away, negative down at the car and the ground. The direction is a guess: if it turns the wrong way, drag the other way</string>
-    <string name="set_side_popup_roll_title">Rotate (°)</string>
-    <string name="set_side_popup_roll_summary">Positive turns the picture clockwise to level a tilted horizon. If it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_roll_left_title">Rotate left (°)</string>
+    <string name="set_side_popup_roll_right_title">Rotate right (°)</string>
+    <string name="set_side_popup_roll_summary">Positive turns the picture clockwise to level a tilted horizon. Left and right are separate. If it turns the wrong way, drag the other way</string>
     <string name="set_side_popup_close_delay_ms_title">Stay open after the signal (ms)</string>
     <string name="set_side_popup_close_delay_ms_summary">1000 ms = 1 second. 0 closes it as soon as the signal goes off. A stock view still closes it straight away</string>
     <string name="set_side_popup_instant_title">Instant pop-up</string>

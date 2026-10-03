@@ -312,8 +312,9 @@
     <string name="set_side_popup_yaw_summary">Positif memusingkan pandangan ke belakang (titik buta), negatif ke hadapan. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain</string>
     <string name="set_side_popup_pitch_title">Hala ke atas (°)</string>
     <string name="set_side_popup_pitch_summary">Positif memusingkan pandangan ke luar, ke jalan yang lebih jauh, negatif ke bawah ke arah kereta dan tanah. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain</string>
-    <string name="set_side_popup_roll_title">Putar (°)</string>
-    <string name="set_side_popup_roll_summary">Positif memutar gambar ikut jam untuk meratakan ufuk yang condong. Jika berpusing ke arah salah, seret ke arah lain</string>
+    <string name="set_side_popup_roll_left_title">Putar kiri (°)</string>
+    <string name="set_side_popup_roll_right_title">Putar kanan (°)</string>
+    <string name="set_side_popup_roll_summary">Positif memutar gambar ikut jam untuk meratakan ufuk yang condong. Kiri dan kanan berasingan. Jika berpusing ke arah salah, seret ke arah lain</string>
     <string name="set_side_popup_close_delay_ms_title">Kekal dibuka selepas isyarat (ms)</string>
     <string name="set_side_popup_close_delay_ms_summary">1000 ms = 1 saat. 0 menutupnya sebaik sahaja isyarat dimatikan. Paparan asal kereta tetap menutupnya serta-merta</string>
     <string name="set_side_popup_instant_title">Tetingkap timbul segera</string>

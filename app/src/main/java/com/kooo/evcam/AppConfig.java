@@ -121,7 +121,9 @@ public class AppConfig {
     private static final String KEY_SIDE_POPUP_FOV = "side_popup_fov";  // 虚拟相机视野（度）
     private static final String KEY_SIDE_POPUP_YAW = "side_popup_yaw";  // 往车尾转多少度，负数往车头
     private static final String KEY_SIDE_POPUP_PITCH = "side_popup_pitch";  // 往上（车外）转多少度，负数往下
-    private static final String KEY_SIDE_POPUP_ROLL = "side_popup_roll";  // 画面平面内旋转，正数顺时针
+    private static final String KEY_SIDE_POPUP_ROLL = "side_popup_roll";  // 旧：左右共用，读时迁到左右键
+    private static final String KEY_SIDE_POPUP_ROLL_LEFT = "side_popup_roll_left";
+    private static final String KEY_SIDE_POPUP_ROLL_RIGHT = "side_popup_roll_right";
     /** 默认值是猜的（见 SideViewProjection）：视野 90°，往车尾转 50°，稍往上 15°。滚转默认 0。 */
     public static final int SIDE_POPUP_DEFAULT_FOV = 90;
     public static final int SIDE_POPUP_DEFAULT_YAW = 50;
@@ -1579,14 +1581,35 @@ public class AppConfig {
         prefs.edit().putInt(KEY_SIDE_POPUP_PITCH, degrees).apply();
     }
 
-    /** 侧视画面平面内旋转多少度（正数顺时针，用来拧平地平线）。 */
-    public int getSidePopupRoll() {
-        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_ROLL_DEGREES);
-        return Math.max(-max, Math.min(max, prefs.getInt(KEY_SIDE_POPUP_ROLL, SIDE_POPUP_DEFAULT_ROLL)));
+    /** 侧视画面平面内旋转多少度（正数顺时针）。左右分开：镜子安装倾斜往往不一样。 */
+    public int getSidePopupRollLeft() {
+        return readSidePopupRoll(KEY_SIDE_POPUP_ROLL_LEFT);
     }
 
-    public void setSidePopupRoll(int degrees) {
-        prefs.edit().putInt(KEY_SIDE_POPUP_ROLL, degrees).apply();
+    public void setSidePopupRollLeft(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_ROLL_LEFT, degrees).apply();
+    }
+
+    public int getSidePopupRollRight() {
+        return readSidePopupRoll(KEY_SIDE_POPUP_ROLL_RIGHT);
+    }
+
+    public void setSidePopupRollRight(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_ROLL_RIGHT, degrees).apply();
+    }
+
+    /** {@code lane} 为 {@link com.kooo.evcam.zeekr.LaneCycle#LEFT} / {@code RIGHT}。 */
+    public int getSidePopupRollForLane(int lane) {
+        return lane == com.kooo.evcam.zeekr.LaneCycle.RIGHT
+                ? getSidePopupRollRight()
+                : getSidePopupRollLeft();
+    }
+
+    private int readSidePopupRoll(String key) {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_ROLL_DEGREES);
+        int legacy = prefs.getInt(KEY_SIDE_POPUP_ROLL, SIDE_POPUP_DEFAULT_ROLL);
+        int v = prefs.contains(key) ? prefs.getInt(key, legacy) : legacy;
+        return Math.max(-max, Math.min(max, v));
     }
 
     public boolean isLicensePlateEnabled() {

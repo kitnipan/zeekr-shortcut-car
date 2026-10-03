@@ -161,12 +161,13 @@ public class SideViewPopupView extends ViewGroup {
         viewFov = appConfig.getSidePopupFov();
         yaw = appConfig.getSidePopupYaw();
         pitch = appConfig.getSidePopupPitch();
-        roll = appConfig.getSidePopupRoll();
+        roll = appConfig.getSidePopupRollForLane(lane);
     }
 
     private void attachAt(int side, boolean show) {
         boolean sideChanged = side != lane;
         lane = side;
+        roll = appConfig.getSidePopupRollForLane(lane);
         if (attached) {
             boolean visibilityChanged = show != visible;
             visible = show;
