@@ -79,27 +79,10 @@ public final class AccessibilityGate {
      * 返回 true 表示这一下归快捷键（按下时已执行，抬起和重复吃掉）。
      */
     public static boolean handleInApp(Context context, KeyEvent event) {
-        if (KeepAliveAccessibilityService.isRunning() || ShortcutCapture.isActive()
-                || event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+        if (KeepAliveAccessibilityService.isRunning()) {
             return false;
         }
-        return matchAndPerform(context, event);
-    }
-
-    /** 按键对上某条快捷键：按下时执行，抬起和重复吃掉。 */
-    static boolean matchAndPerform(Context context, KeyEvent event) {
-        String device = event.getDevice() == null || event.getDevice().getName() == null
-                ? "" : event.getDevice().getName();
-        Shortcut hit = ShortcutBook.match(
-                ShortcutBook.parse(new AppConfig(context).getButtonShortcuts()),
-                event.getKeyCode(), event.getScanCode(), device);
-        if (hit == null) {
-            return false;
-        }
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            ShortcutPerformer.perform(context, hit.action);
-        }
-        return true;
+        return ShortcutKeys.dispatch(context, event);
     }
 
     static boolean contains(String list, String component) {

@@ -11,38 +11,49 @@ import java.util.Collections;
 public class ShortcutBookTest {
 
     @Test
-    public void roundTripKeepsTheDeviceName() {
-        Shortcut item = new Shortcut(96, 12, "AB Shutter, 3", "toggle_recording");
+    public void roundTripKeepsTheDeviceNameAndPress() {
+        Shortcut item = new Shortcut(96, 12, "AB Shutter, 3", "toggle_recording", "long");
         String raw = ShortcutBook.write(Collections.singletonList(item));
         Shortcut back = ShortcutBook.parse(raw).get(0);
         assertEquals(96, back.keyCode);
         assertEquals(12, back.scanCode);
         assertEquals("AB Shutter, 3", back.deviceName);
         assertEquals("toggle_recording", back.action);
+        assertEquals("long", back.press);
     }
 
     @Test
-    public void sameButtonReplacesTheAction() {
-        Shortcut first = new Shortcut(96, 0, "Pad", "toggle_recording");
-        Shortcut second = new Shortcut(96, 0, "Pad", "toggle_dim");
+    public void oldFourFieldLinesAreTaps() {
+        Shortcut back = ShortcutBook.parse("96,0,toggle_dim,Pad").get(0);
+        assertEquals("toggle_dim", back.action);
+        assertEquals("Pad", back.deviceName);
+        assertEquals("tap", back.press);
+    }
+
+    @Test
+    public void sameButtonDifferentPressKeepsBoth() {
+        Shortcut tap = new Shortcut(96, 0, "Pad", "toggle_recording", "tap");
+        Shortcut hold = new Shortcut(96, 0, "Pad", "toggle_dim", "long");
+        java.util.List<Shortcut> items = ShortcutBook.put(Collections.singletonList(tap), hold);
+        assertEquals(2, items.size());
+    }
+
+    @Test
+    public void sameButtonSamePressReplacesTheAction() {
+        Shortcut first = new Shortcut(96, 0, "Pad", "toggle_recording", "tap");
+        Shortcut second = new Shortcut(96, 0, "Pad", "toggle_dim", "tap");
         java.util.List<Shortcut> items = ShortcutBook.put(Collections.singletonList(first), second);
         assertEquals(1, items.size());
         assertEquals("toggle_dim", items.get(0).action);
     }
 
     @Test
-    public void anotherDeviceKeepsItsOwnRow() {
-        Shortcut pad = new Shortcut(96, 0, "Pad", "open_app");
-        Shortcut shutter = new Shortcut(96, 0, "Shutter", "toggle_mirror");
-        java.util.List<Shortcut> items = ShortcutBook.put(Collections.singletonList(pad), shutter);
-        assertEquals(2, items.size());
-    }
-
-    @Test
-    public void matchUsesKeyCodeAndDevice() {
-        Shortcut pad = new Shortcut(96, 0, "Pad", "open_app");
-        assertEquals("open_app", ShortcutBook.match(Collections.singletonList(pad), 96, 0, "Pad").action);
-        assertNull(ShortcutBook.match(Collections.singletonList(pad), 96, 0, "Other"));
+    public void matchUsesKeyCodeDeviceAndPress() {
+        Shortcut pad = new Shortcut(96, 0, "Pad", "open_app", "double");
+        assertEquals("open_app",
+                ShortcutBook.match(Collections.singletonList(pad), 96, 0, "Pad", PressKind.DOUBLE).action);
+        assertNull(ShortcutBook.match(Collections.singletonList(pad), 96, 0, "Pad", PressKind.TAP));
+        assertNull(ShortcutBook.match(Collections.singletonList(pad), 96, 0, "Other", PressKind.DOUBLE));
     }
 
     @Test

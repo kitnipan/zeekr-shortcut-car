@@ -953,6 +953,10 @@ public class MultiCameraManager {
                             lastNotifiedSegmentIndex = newSegmentIndex;
                             segmentSwitchCallback.onSegmentSwitch(newSegmentIndex);
                         }
+                        if (completedFilePath != null) {
+                            com.kooo.evcam.recording.SaveMoment.onSegmentCompleted(
+                                    context, completedFilePath);
+                        }
                         checkStorage("分段切换");
                         break;
                     }
@@ -1680,6 +1684,10 @@ public class MultiCameraManager {
                     if (segmentSwitchCallback != null && newSegmentIndex > lastNotifiedSegmentIndex) {
                         lastNotifiedSegmentIndex = newSegmentIndex;
                         segmentSwitchCallback.onSegmentSwitch(newSegmentIndex);
+                    }
+                    if (completedFilePath != null) {
+                        com.kooo.evcam.recording.SaveMoment.onSegmentCompleted(
+                                context, completedFilePath);
                     }
                     checkStorage("分段切换");
                 }

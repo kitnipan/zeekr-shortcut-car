@@ -1978,6 +1978,76 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_SHORTCUT_CATCH_EVERYWHERE, on).apply();
     }
 
+    private static final String KEY_SAVED_CLIPS = "saved_clip_groups";
+
+    /** Protected segment stamps ({@code yyyyMMdd_HHmmss}). Auto-delete never removes them. */
+    public java.util.Set<String> getSavedClipGroups() {
+        return com.kooo.evcam.recording.SavedClips.parse(prefs.getString(KEY_SAVED_CLIPS, ""));
+    }
+
+    public void setSavedClipGroups(java.util.Set<String> stamps) {
+        prefs.edit().putString(KEY_SAVED_CLIPS,
+                com.kooo.evcam.recording.SavedClips.write(stamps)).apply();
+    }
+
+    public void addSavedClipGroups(java.util.Collection<String> stamps) {
+        if (stamps == null || stamps.isEmpty()) {
+            return;
+        }
+        java.util.Set<String> all = getSavedClipGroups();
+        boolean changed = false;
+        for (String stamp : stamps) {
+            String n = com.kooo.evcam.recording.SavedClips.normalize(stamp);
+            if (n != null && all.add(n)) {
+                changed = true;
+            }
+        }
+        if (changed) {
+            setSavedClipGroups(all);
+        }
+    }
+
+    private static final String KEY_AUTO_DIM = "auto_dim_enabled";
+    private static final String KEY_AUTO_DIM_START = "auto_dim_start_hour";
+    private static final String KEY_AUTO_DIM_END = "auto_dim_end_hour";
+
+    /** Experimental: dim on by wall-clock night window. */
+    public boolean isAutoDimEnabled() {
+        return prefs.getBoolean(KEY_AUTO_DIM, false);
+    }
+
+    public void setAutoDimEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_AUTO_DIM, on).apply();
+    }
+
+    /** Hour 0–23 when dim turns on (default 19). */
+    public int getAutoDimStartHour() {
+        return clampHour(prefs.getInt(KEY_AUTO_DIM_START, 19));
+    }
+
+    public void setAutoDimStartHour(int hour) {
+        prefs.edit().putInt(KEY_AUTO_DIM_START, clampHour(hour)).apply();
+    }
+
+    /** Hour 0–23 when dim turns off (default 7). */
+    public int getAutoDimEndHour() {
+        return clampHour(prefs.getInt(KEY_AUTO_DIM_END, 7));
+    }
+
+    public void setAutoDimEndHour(int hour) {
+        prefs.edit().putInt(KEY_AUTO_DIM_END, clampHour(hour)).apply();
+    }
+
+    private static int clampHour(int hour) {
+        if (hour < 0) {
+            return 0;
+        }
+        if (hour > 23) {
+            return 23;
+        }
+        return hour;
+    }
+
     public int getDimOpacity() {
         return clampPercent(prefs.getInt(KEY_DIM_OPACITY, DIM_OPACITY_DEFAULT));
     }

@@ -924,6 +924,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             pushDimLook();
             toast(getString(R.string.msg_dim_reset));
         });
+        bindSwitch("pref_auto_dim", appConfig.isAutoDimEnabled(), value -> {
+            appConfig.setAutoDimEnabled(value);
+            com.kooo.evcam.overlay.AutoDim.sync(requireContext());
+        });
+        bindSlider("pref_auto_dim_start", 0, 23, appConfig.getAutoDimStartHour(), ":00", value -> {
+            appConfig.setAutoDimStartHour(value);
+            com.kooo.evcam.overlay.AutoDim.sync(requireContext());
+        });
+        bindSlider("pref_auto_dim_end", 0, 23, appConfig.getAutoDimEndHour(), ":00", value -> {
+            appConfig.setAutoDimEndHour(value);
+            com.kooo.evcam.overlay.AutoDim.sync(requireContext());
+        });
     }
 
     private void pushDimLook() {

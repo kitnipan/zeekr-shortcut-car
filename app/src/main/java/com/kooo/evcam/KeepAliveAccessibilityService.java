@@ -6,11 +6,6 @@ import android.content.Intent;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
-import com.kooo.evcam.input.Shortcut;
-import com.kooo.evcam.input.ShortcutBook;
-import com.kooo.evcam.input.ShortcutCapture;
-import com.kooo.evcam.input.ShortcutPerformer;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -148,22 +143,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
-        if (ShortcutCapture.isActive() || event == null) {
-            return false;
-        }
-        String device = event.getDevice() == null || event.getDevice().getName() == null
-                ? "" : event.getDevice().getName();
-        Shortcut hit = ShortcutBook.match(
-                ShortcutBook.parse(new AppConfig(this).getButtonShortcuts()),
-                event.getKeyCode(), event.getScanCode(), device);
-        if (hit == null) {
-            return false;
-        }
-        // 抬起和长按的重复也吃掉，前台应用不该只收到半个按键
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            ShortcutPerformer.perform(this, hit.action);
-        }
-        return true;
+        return com.kooo.evcam.input.ShortcutKeys.dispatch(this, event);
     }
 
     @Override

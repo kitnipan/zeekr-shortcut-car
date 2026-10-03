@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta19] - 2026-10-03
+
+### New and improved
+
+- Shortcut action: Save this moment. Protects the previous and current recording segments (and the next one when it finishes) so auto-delete skips them. If Drive is signed in, finished files upload in the background; Straighten runs when that setting is on.
+- Shortcuts support tap, long press, and double press on the same button.
+- Auto dim by time (experimental) under Settings, Dim display. Turns dim on and off by the clock, and logs whether the head unit exposes system brightness.
+
 ## [2.0.3-beta18] - 2026-10-03
 
 ### New and improved

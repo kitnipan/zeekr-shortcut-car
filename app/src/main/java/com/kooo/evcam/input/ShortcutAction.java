@@ -8,7 +8,8 @@ public enum ShortcutAction {
     RECORD("toggle_recording", R.string.shortcut_action_record),
     MIRROR("toggle_mirror", R.string.shortcut_action_mirror),
     APP("open_app", R.string.shortcut_action_app),
-    DIM("toggle_dim", R.string.shortcut_action_dim);
+    DIM("toggle_dim", R.string.shortcut_action_dim),
+    SAVE("save_moment", R.string.shortcut_action_save);
 
     public final String key;
     public final int labelRes;

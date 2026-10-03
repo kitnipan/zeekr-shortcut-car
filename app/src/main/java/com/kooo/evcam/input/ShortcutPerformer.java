@@ -45,6 +45,9 @@ public final class ShortcutPerformer {
                     toast(context);
                 }
                 return;
+            case SAVE:
+                com.kooo.evcam.recording.SaveMoment.perform(context);
+                return;
             default:
                 return;
         }

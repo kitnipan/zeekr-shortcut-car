@@ -27,6 +27,12 @@
     <string name="set_dim_passthrough_summary">Buka: peta masih menerima ketikan. Tutup: lapisan menghalangnya</string>
     <string name="set_dim_reset_title">Set semula</string>
     <string name="set_dim_reset_summary">Kelegapan 90%, kecerahan 0, kehangatan 0, sentuhan tembus</string>
+    <string name="set_auto_dim_title">Auto malap ikut masa (percubaan)</string>
+    <string name="set_auto_dim_summary">Hidup/mati malap ikut jam. Mengesan kecerahan sistem sekali ke diagnostik; kebanyakan unit kepala tidak dapat membacanya</string>
+    <string name="set_auto_dim_start_title">Malap dari</string>
+    <string name="set_auto_dim_start_summary">Jam malap dihidupkan</string>
+    <string name="set_auto_dim_end_title">Malap hingga</string>
+    <string name="set_auto_dim_end_summary">Jam malap dimatikan</string>
     <string name="msg_dim_reset">Lapisan malap diset semula</string>
     <string name="dim_button_on">Tutup lapisan malap</string>
     <string name="dim_button_off">Buka lapisan malap</string>
@@ -137,6 +143,14 @@
     <string name="shortcut_action_mirror">Buka/Tutup cermin super</string>
     <string name="shortcut_action_app">Buka apl</string>
     <string name="shortcut_action_dim">Gelapkan skrin</string>
+    <string name="shortcut_action_save">Simpan saat ini</string>
+    <string name="shortcut_press_tap">Ketik</string>
+    <string name="shortcut_press_long">Tekan lama</string>
+    <string name="shortcut_press_double">Dwiklik</string>
+    <string name="save_moment_none">Tiada rakaman untuk disimpan</string>
+    <string name="save_moment_done">Klip terkini dilindungi. Padam auto akan melangkauinya</string>
+    <string name="save_moment_armed">Klip sekitar saat ini dilindungi. Segmen seterusnya dilindungi apabila selesai</string>
+    <string name="save_moment_uploaded">%1$d fail tersimpan dimuat naik ke Drive</string>
     <string name="shortcut_access_title">Hidupkan kebolehcapaian</string>
     <string name="shortcut_access_msg">Buat masa ini butang berfungsi semasa apl ini di hadapan. Untuk semua skrin, apl perlukan perkhidmatan kebolehcapaian. Unit kepala tiada skrin untuknya, jadi apl menghidupkannya sendiri.\n\nMulakan Shizuku, kemudian ketik Beri kebenaran dengan Shizuku. Atau jalankan sekali dari komputer:\n\n%1$s\n\nKemudian buka semula apl ini.</string>
     <string name="shortcut_shizuku">Beri kebenaran dengan Shizuku</string>

@@ -117,6 +117,20 @@ public class StoragePlanTest {
         assertEquals(StoragePlan.Verdict.OK, onlyCurrent.verdict);
     }
 
+    /** 已保护的组永远不进删除名单。 */
+    @Test
+    public void protectedGroupsAreNeverDeleted() {
+        List<StoragePlan.Clip> clips = minutes(30, 100 * MB);
+        java.util.Set<String> protect = new java.util.HashSet<>();
+        protect.add("20260917_100000");
+        protect.add("20260917_100100");
+        StoragePlan.Decision decision = StoragePlan.decide(clips, 5 * GB, 50 * GB, 200 * MB, protect);
+        assertEquals(StoragePlan.Verdict.DELETE, decision.verdict);
+        assertFalse(decision.toDelete.contains("20260917_100000_front.mp4"));
+        assertFalse(decision.toDelete.contains("20260917_100100_back.mp4"));
+        assertTrue(decision.toDelete.contains("20260917_100200_front.mp4"));
+    }
+
     /** 上限没超，但盘快满了（盘比上限小）：同样删旧的，保住余量。 */
     @Test
     public void aDriveSmallerThanTheCapStillKeepsItsMargin() {

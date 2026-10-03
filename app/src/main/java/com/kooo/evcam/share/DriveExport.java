@@ -76,6 +76,78 @@ public final class DriveExport {
         startUpload(activity, batch);
     }
 
+    /**
+     * Background upload with no dialog. Returns how many files were sent.
+     * 0 when Drive is busy, not signed in, or every file failed / unfinished.
+     * Straighten runs when that setting is on.
+     */
+    public static int uploadQuiet(Context context, List<File> files) {
+        if (context == null || files == null || files.isEmpty()) {
+            return 0;
+        }
+        AppConfig config = new AppConfig(context);
+        if (!config.hasDriveClient() || !config.hasDriveRefreshToken()) {
+            return 0;
+        }
+        if (!BUSY.compareAndSet(false, true)) {
+            return 0;
+        }
+        Context app = context.getApplicationContext();
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        int sent = 0;
+        try {
+            String access = accessToken(config, false);
+            String folderId;
+            try {
+                folderId = folder(config, access);
+            } catch (DriveClient.AuthExpired expired) {
+                config.setDriveFolderId("");
+                access = accessToken(config, true);
+                folderId = folder(config, access);
+            }
+            for (File file : files) {
+                if (file == null || !file.isFile() || file.length() <= 0 || !UsbExport.playable(file)) {
+                    continue;
+                }
+                File payload = file;
+                File temp = null;
+                try {
+                    if (SurroundDefish.wanted(app, file)) {
+                        File dir = new File(app.getCacheDir(), "drive");
+                        if (!dir.exists() && !dir.mkdirs()) {
+                            throw new java.io.IOException("mkdir " + dir.getAbsolutePath());
+                        }
+                        temp = new File(dir, file.getName() + ".part");
+                        SurroundDefish.write(app, file, temp, cancelled, null);
+                        if (!UsbExport.playable(temp)) {
+                            throw new java.io.IOException("unfinished " + file.getName());
+                        }
+                        payload = temp;
+                    }
+                    try {
+                        DriveClient.upload(access, folderId, payload, file.getName(), null, cancelled);
+                    } catch (DriveClient.AuthExpired expired) {
+                        access = accessToken(config, true);
+                        folderId = folder(config, access);
+                        DriveClient.upload(access, folderId, payload, file.getName(), null, cancelled);
+                    }
+                    sent++;
+                } catch (Exception e) {
+                    AppLog.e(TAG, "后台上传失败: " + file.getAbsolutePath(), e);
+                } finally {
+                    if (temp != null && temp.exists() && !temp.delete()) {
+                        AppLog.w(TAG, "删不掉临时文件: " + temp.getAbsolutePath());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            AppLog.e(TAG, "后台上传准备失败", e);
+        } finally {
+            BUSY.set(false);
+        }
+        return sent;
+    }
+
     /** 设置里的「登录」。已经登录过的再点一次会换成新账号。 */
     public static void signIn(Activity activity, Runnable after) {
         if (activity == null || activity.isFinishing()) {

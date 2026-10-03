@@ -8,14 +8,17 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.button.MaterialButton;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 
-/** Press the external button, then pick the action it should run. */
+/** Press the external button, pick tap/long/double, then pick the action. */
 public class ShortcutCaptureActivity extends AppCompatActivity {
 
     private Shortcut captured;
+    private PressKind pressKind = PressKind.TAP;
     private TextView prompt;
+    private View pressKinds;
     private View actions;
 
     @Override
@@ -23,12 +26,18 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_shortcut_capture);
         prompt = findViewById(R.id.shortcut_prompt);
+        pressKinds = findViewById(R.id.shortcut_press_kinds);
         actions = findViewById(R.id.shortcut_actions);
         findViewById(R.id.shortcut_capture_close).setOnClickListener(v -> finish());
+        bindPress(R.id.shortcut_press_tap, PressKind.TAP);
+        bindPress(R.id.shortcut_press_long, PressKind.LONG);
+        bindPress(R.id.shortcut_press_double, PressKind.DOUBLE);
         bind(R.id.shortcut_action_record, ShortcutAction.RECORD);
         bind(R.id.shortcut_action_mirror, ShortcutAction.MIRROR);
         bind(R.id.shortcut_action_app, ShortcutAction.APP);
         bind(R.id.shortcut_action_dim, ShortcutAction.DIM);
+        bind(R.id.shortcut_action_save, ShortcutAction.SAVE);
+        highlightPress();
     }
 
     @Override
@@ -43,6 +52,24 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
         super.onPause();
     }
 
+    private void bindPress(int id, PressKind kind) {
+        findViewById(id).setOnClickListener(v -> {
+            pressKind = kind;
+            highlightPress();
+        });
+    }
+
+    private void highlightPress() {
+        paint(R.id.shortcut_press_tap, pressKind == PressKind.TAP);
+        paint(R.id.shortcut_press_long, pressKind == PressKind.LONG);
+        paint(R.id.shortcut_press_double, pressKind == PressKind.DOUBLE);
+    }
+
+    private void paint(int id, boolean on) {
+        MaterialButton button = findViewById(id);
+        button.setAlpha(on ? 1f : 0.45f);
+    }
+
     private void bind(int id, ShortcutAction action) {
         findViewById(id).setOnClickListener(v -> save(action));
     }
@@ -54,8 +81,10 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
         AppConfig config = new AppConfig(this);
         java.util.List<Shortcut> items = ShortcutBook.put(
                 ShortcutBook.parse(config.getButtonShortcuts()),
-                new Shortcut(captured.keyCode, captured.scanCode, captured.deviceName, action.key));
+                new Shortcut(captured.keyCode, captured.scanCode, captured.deviceName,
+                        action.key, pressKind.key));
         config.setButtonShortcuts(ShortcutBook.write(items));
+        KeyCatcher.sync(this);
         if (AccessibilityGate.selfEnable(this) || config.isShortcutCatchEverywhere()) {
             finish();
             return;
@@ -97,7 +126,10 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
         }
         String name = device == null || device.getName() == null ? "" : device.getName();
         captured = new Shortcut(event.getKeyCode(), event.getScanCode(), name, "");
+        pressKind = PressKind.TAP;
+        highlightPress();
         prompt.setText(getString(R.string.shortcut_picked, buttonName(captured)));
+        pressKinds.setVisibility(View.VISIBLE);
         actions.setVisibility(View.VISIBLE);
         return true;
     }

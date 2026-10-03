@@ -4,7 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The saved button list, as lines of {@code key,scan,action,device}.
+ * The saved button list, as lines of {@code key,scan,action,press,device}.
+ * Older lines with four fields are treated as a tap.
  * The device name is the rest of the line, so a comma in the name stays put.
  */
 public final class ShortcutBook {
@@ -40,12 +41,13 @@ public final class ShortcutBook {
                 out.append('\n');
             }
             out.append(item.keyCode).append(',').append(item.scanCode).append(',')
-                    .append(item.action).append(',').append(item.deviceName.replace('\n', ' '));
+                    .append(item.action).append(',').append(item.press).append(',')
+                    .append(item.deviceName.replace('\n', ' '));
         }
         return out.toString();
     }
 
-    /** Same button replaces the old binding. A different device keeps its own row. */
+    /** Same button + same press kind replaces the old binding. */
     public static List<Shortcut> put(List<Shortcut> items, Shortcut next) {
         List<Shortcut> out = new ArrayList<>();
         if (items != null) {
@@ -74,20 +76,31 @@ public final class ShortcutBook {
         return out;
     }
 
-    public static Shortcut match(List<Shortcut> items, int keyCode, int scanCode, String deviceName) {
+    public static Shortcut match(List<Shortcut> items, int keyCode, int scanCode,
+                                 String deviceName, PressKind kind) {
         if (items == null) {
             return null;
         }
+        PressKind want = kind == null ? PressKind.TAP : kind;
         for (Shortcut item : items) {
-            if (item != null && samePress(item, keyCode, scanCode, deviceName)) {
+            if (item != null && item.pressKind() == want
+                    && samePress(item, keyCode, scanCode, deviceName)) {
                 return item;
             }
         }
         return null;
     }
 
+    /** @deprecated use {@link #match(List, int, int, String, PressKind)} */
+    public static Shortcut match(List<Shortcut> items, int keyCode, int scanCode, String deviceName) {
+        return match(items, keyCode, scanCode, deviceName, PressKind.TAP);
+    }
+
     static boolean sameButton(Shortcut saved, Shortcut next) {
         if (saved == null || next == null) {
+            return false;
+        }
+        if (!saved.press.equals(next.press)) {
             return false;
         }
         if (!sameDevice(saved.deviceName, next.deviceName)) {
@@ -121,7 +134,7 @@ public final class ShortcutBook {
         if (line == null || line.isEmpty()) {
             return null;
         }
-        String[] parts = line.split(",", 4);
+        String[] parts = line.split(",", 5);
         if (parts.length < 4) {
             return null;
         }
@@ -132,7 +145,11 @@ public final class ShortcutBook {
             if (ShortcutAction.fromKey(action) == null) {
                 return null;
             }
-            return new Shortcut(key, scan, parts[3].trim(), action);
+            if (parts.length == 4) {
+                // Old format: key,scan,action,device
+                return new Shortcut(key, scan, parts[3].trim(), action, PressKind.TAP.key);
+            }
+            return new Shortcut(key, scan, parts[4].trim(), action, parts[3].trim());
         } catch (NumberFormatException e) {
             return null;
         }

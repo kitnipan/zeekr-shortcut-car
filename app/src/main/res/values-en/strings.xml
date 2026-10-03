@@ -27,6 +27,12 @@
     <string name="set_dim_passthrough_summary">On: maps still receives taps. Off: the veil blocks them</string>
     <string name="set_dim_reset_title">Reset</string>
     <string name="set_dim_reset_summary">Opacity 90%, brightness 0, warmth 0, touches pass through</string>
+    <string name="set_auto_dim_title">Auto dim by time (experimental)</string>
+    <string name="set_auto_dim_summary">Turns dim on and off by the clock. Probes system brightness once into diagnostics; most head units cannot read it</string>
+    <string name="set_auto_dim_start_title">Dim from</string>
+    <string name="set_auto_dim_start_summary">Hour when dim turns on</string>
+    <string name="set_auto_dim_end_title">Dim until</string>
+    <string name="set_auto_dim_end_summary">Hour when dim turns off</string>
     <string name="msg_dim_reset">Dim overlay reset</string>
     <string name="dim_button_on">Turn dim overlay off</string>
     <string name="dim_button_off">Turn dim overlay on</string>
@@ -137,6 +143,14 @@
     <string name="shortcut_action_mirror">Open/Close Super mirror</string>
     <string name="shortcut_action_app">Open app</string>
     <string name="shortcut_action_dim">Dim display</string>
+    <string name="shortcut_action_save">Save this moment</string>
+    <string name="shortcut_press_tap">Tap</string>
+    <string name="shortcut_press_long">Long press</string>
+    <string name="shortcut_press_double">Double</string>
+    <string name="save_moment_none">No recording to save</string>
+    <string name="save_moment_done">Protected the latest clip. Auto-delete will skip it</string>
+    <string name="save_moment_armed">Protected the clips around this moment. The next segment is protected when it finishes</string>
+    <string name="save_moment_uploaded">Uploaded %1$d saved file(s) to Drive</string>
     <string name="shortcut_access_title">Turn on accessibility</string>
     <string name="shortcut_access_msg">For now the button works while this app is in front. To make it work on every screen, the app needs its accessibility service. The head unit has no screen for that, so the app turns it on itself.\n\nStart Shizuku, then tap Grant with Shizuku. Or run this once from a computer:\n\n%1$s\n\nThen reopen this app.</string>
     <string name="shortcut_shizuku">Grant with Shizuku</string>

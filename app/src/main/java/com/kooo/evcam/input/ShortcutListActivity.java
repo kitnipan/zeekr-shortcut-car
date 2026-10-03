@@ -70,7 +70,9 @@ public class ShortcutListActivity extends AppCompatActivity {
     private View row(Shortcut item, int index) {
         View line = LayoutInflater.from(this).inflate(R.layout.item_shortcut_row, rows, false);
         TextView label = line.findViewById(R.id.shortcut_label);
-        label.setText(getString(R.string.shortcut_row, buttonName(item), actionName(item)));
+        label.setText(getString(R.string.shortcut_row,
+                buttonName(item) + " · " + getString(item.pressKind().labelRes),
+                actionName(item)));
         line.findViewById(R.id.shortcut_delete).setOnClickListener(v -> {
             List<Shortcut> next = ShortcutBook.remove(ShortcutBook.parse(config.getButtonShortcuts()), index);
             config.setButtonShortcuts(ShortcutBook.write(next));

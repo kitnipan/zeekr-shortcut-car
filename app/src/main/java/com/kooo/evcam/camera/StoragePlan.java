@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -129,8 +130,17 @@ public final class StoragePlan {
      */
     public static Decision decide(List<Clip> clips, long capBytes, long freeBytes,
                                   long segmentBytes) {
+        return decide(clips, capBytes, freeBytes, segmentBytes, Collections.emptySet());
+    }
+
+    /**
+     * @param protectedGroups 时间戳组（{@code yyyyMMdd_HHmmss}），自动清理永远不碰
+     */
+    public static Decision decide(List<Clip> clips, long capBytes, long freeBytes,
+                                  long segmentBytes, Set<String> protectedGroups) {
         long margin = margin(segmentBytes);
         boolean capless = capBytes <= 0;
+        Set<String> protect = protectedGroups == null ? Collections.emptySet() : protectedGroups;
 
         if (capless) {
             return freeBytes >= margin
@@ -150,7 +160,7 @@ public final class StoragePlan {
             return new Decision(Verdict.OK, Collections.emptyList(), 0, margin, false);
         }
 
-        // 最旧的组在前；最新一组正在写，不可删
+        // 最旧的组在前；最新一组正在写，不可删；已保护的也不可删
         Map<String, List<Clip>> groups = new LinkedHashMap<>();
         List<String> order = new ArrayList<>();
         for (Clip clip : clips) {
@@ -168,6 +178,9 @@ public final class StoragePlan {
 
         long deletable = 0;
         for (String key : order) {
+            if (protect.contains(key)) {
+                continue;
+            }
             for (Clip clip : groups.get(key)) {
                 deletable += Math.max(0, clip.bytes);
             }
@@ -183,13 +196,16 @@ public final class StoragePlan {
             if (freed >= need) {
                 break;
             }
+            if (protect.contains(key)) {
+                continue;
+            }
             for (Clip clip : groups.get(key)) {
                 toDelete.add(clip.name);
                 freed += Math.max(0, clip.bytes);
             }
         }
         if (toDelete.isEmpty()) {
-            // 超了上限但只剩正在写的那一组：没有能删的，这一组写完下次再算
+            // 超了上限但只剩正在写的 / 已保护的：没有能删的，这一组写完下次再算
             return new Decision(Verdict.OK, Collections.emptyList(), 0, margin, false);
         }
         return new Decision(Verdict.DELETE, toDelete, freed, margin, false);

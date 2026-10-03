@@ -163,7 +163,7 @@ public final class KeyCatcher {
             if (ShortcutCapture.isActive()) {
                 return false;
             }
-            if (AccessibilityGate.matchAndPerform(getContext(), event)) {
+            if (ShortcutKeys.dispatch(getContext(), event)) {
                 return true;
             }
             // 不是快捷键（比如返回键）：这一下送不到前台应用了，至少让下一下能送到
