@@ -138,8 +138,9 @@
     <string name="shortcut_action_app">Buka apl</string>
     <string name="shortcut_action_dim">Gelapkan skrin</string>
     <string name="shortcut_access_title">Hidupkan kebolehcapaian</string>
-    <string name="shortcut_access_msg">Butang perlu berfungsi semasa skrin lain di hadapan. Hidupkan perkhidmatan kebolehcapaian apl ini, kemudian pintasan berjalan.</string>
-    <string name="shortcut_access_open">Buka tetapan</string>
+    <string name="shortcut_access_msg">Buat masa ini butang berfungsi semasa apl ini di hadapan. Untuk semua skrin, apl perlukan perkhidmatan kebolehcapaian. Unit kepala tiada skrin untuknya, jadi apl menghidupkannya sendiri. Jalankan sekali dari komputer:\n\n%1$s\n\nKemudian buka semula apl ini.</string>
+    <string name="shortcut_access_open">Tetapan sistem</string>
+    <string name="shortcut_access_ok">Faham</string>
     <string name="ctrl_subtitle">Pasangkan dalam tetapan Bluetooth kereta, kembali, kemudian tekan butang</string>
     <string name="ctrl_devices_none">Belum ada peranti input. Pasangkan, kemudian tekan butang supaya ia muncul.</string>
     <string name="ctrl_waiting">Menunggu butang…</string>

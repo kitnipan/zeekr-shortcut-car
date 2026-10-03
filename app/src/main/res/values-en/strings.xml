@@ -138,8 +138,9 @@
     <string name="shortcut_action_app">Open app</string>
     <string name="shortcut_action_dim">Dim display</string>
     <string name="shortcut_access_title">Turn on accessibility</string>
-    <string name="shortcut_access_msg">The button has to work while another screen is in front. Turn on this app\'s accessibility service, then the shortcut runs.</string>
-    <string name="shortcut_access_open">Open settings</string>
+    <string name="shortcut_access_msg">For now the button works while this app is in front. To make it work on every screen, the app needs its accessibility service. The head unit has no screen for that, so the app turns it on itself. Run this once from a computer:\n\n%1$s\n\nThen reopen this app.</string>
+    <string name="shortcut_access_open">System settings</string>
+    <string name="shortcut_access_ok">Got it</string>
     <string name="ctrl_subtitle">Pair it in the car Bluetooth settings, come back, then press a button</string>
     <string name="ctrl_devices_none">No input device yet. Pair it, then press a button so it shows up.</string>
     <string name="ctrl_waiting">Waiting for a button…</string>

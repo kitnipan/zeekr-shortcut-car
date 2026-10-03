@@ -196,6 +196,9 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     private void openAccessibilitySettings() {
+        if (com.kooo.evcam.input.AccessibilityGate.selfEnable(requireContext())) {
+            return;
+        }
         launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
     }
 

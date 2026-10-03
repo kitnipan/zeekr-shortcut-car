@@ -56,19 +56,24 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
                 ShortcutBook.parse(config.getButtonShortcuts()),
                 new Shortcut(captured.keyCode, captured.scanCode, captured.deviceName, action.key));
         config.setButtonShortcuts(ShortcutBook.write(items));
-        if (com.kooo.evcam.KeepAliveAccessibilityService.isRunning()) {
+        if (AccessibilityGate.selfEnable(this)) {
             finish();
             return;
         }
         com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(
                 this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.shortcut_access_title)
-                .setMessage(R.string.shortcut_access_msg)
-                .setPositiveButton(R.string.shortcut_access_open, (dialog, which) -> {
-                    startActivity(new android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                .setMessage(getString(R.string.shortcut_access_msg, AccessibilityGate.grantCommand(this)))
+                .setPositiveButton(R.string.shortcut_access_ok, (dialog, which) -> finish())
+                .setNeutralButton(R.string.shortcut_access_open, (dialog, which) -> {
+                    try {
+                        startActivity(new android.content.Intent(
+                                android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    } catch (Exception e) {
+                        com.kooo.evcam.AppLog.w("ShortcutCapture", "打不开无障碍设置页: " + e);
+                    }
                     finish();
                 })
-                .setNegativeButton(R.string.action_cancel, (dialog, which) -> finish())
                 .setOnCancelListener(dialog -> finish()));
     }
 

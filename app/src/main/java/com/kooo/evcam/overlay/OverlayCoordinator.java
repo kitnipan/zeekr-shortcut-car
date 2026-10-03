@@ -58,6 +58,7 @@ public final class OverlayCoordinator {
     public static void restoreOnLaunch(Context context, Runnable afterPreviewWindowStarted) {
         AppConfig config = new AppConfig(context);
         boolean allowed = canShowOverlay(context);
+        com.kooo.evcam.input.AccessibilityGate.ensureForShortcuts(context);
 
         if (config.isRearViewEnabled() && allowed) {
             // 这一段以前没有：开关存着「开」，但没人在启动时把服务拉起来，

@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta16] - 2026-10-03
+
+### Fixed
+
+- Shortcuts work while Zeekr Shortcut is in front, with no extra setup.
+- The head unit has no accessibility settings screen. To make shortcuts work on every screen, run the command shown after saving a shortcut once from a computer. The app then turns on its accessibility service by itself.
+
 ## [2.0.3-beta15] - 2026-10-02
 
 ### Fixed
