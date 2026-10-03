@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta24] - 2026-10-03
+
+### Fixes
+
+- Remote watch rebuilt: each surround lane is always defished, PNGs land on the USB stick under 7xDash/live/, and the phone gets the JPEG for the exact source it asked for (drive / ch1–ch4 / driver / backseat).
+- Camera switch on remote watch: car pushes the requested slot immediately from the mailbox; web client clears the previous frame so it does not stick on the old camera.
+
 ## [2.0.3-beta23] - 2026-10-03
 
 ### Fixes

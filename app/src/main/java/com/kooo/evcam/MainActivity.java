@@ -103,11 +103,12 @@ public class MainActivity extends AppCompatActivity {
             new java.util.concurrent.atomic.AtomicBoolean();
     private final java.util.concurrent.ExecutorService remoteCompose =
             java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
-                Thread t = new Thread(r, "remote-grid");
+                Thread t = new Thread(r, "remote-live");
                 t.setPriority(Thread.NORM_PRIORITY - 1);
                 return t;
             });
-    private final com.kooo.evcam.zeekr.RemoteFrame remoteFrame = new com.kooo.evcam.zeekr.RemoteFrame();
+    private final com.kooo.evcam.remote.RemoteLive remoteLive = new com.kooo.evcam.remote.RemoteLive();
+    private final com.kooo.evcam.remote.RemoteSnap remoteSnap = new com.kooo.evcam.remote.RemoteSnap();
     private final float[] remoteLanes = new float[16];
     private final Runnable remotePump = new Runnable() {
         @Override
@@ -1365,7 +1366,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startRemoteLink() {
+        remoteLive.attach(this);
         carLink = new com.kooo.evcam.remote.CarLink(this);
+        carLink.setWatchListener((watching, source) -> {
+            remoteHandler.removeCallbacks(remotePump);
+            if (!watching) {
+                return;
+            }
+            // Instant switch: push cached JPEG for the requested slot, then keep pumping.
+            byte[] cached = remoteLive.jpegFor(source);
+            if (cached != null) {
+                carLink.pushJpeg(cached);
+            }
+            remoteHandler.post(remotePump);
+        });
         carLink.setUi(snap -> {
             lastLink = snap;
             com.kooo.evcam.remote.RemoteViewFragment page =
@@ -1382,11 +1396,25 @@ public class MainActivity extends AppCompatActivity {
         carLink.start();
     }
 
+    /**
+     * Fresh remote path: grab surround (+ cabin) → defish surround → mailbox PNG on USB
+     * + JPEG in RAM → push the slot the phone asked for.
+     */
     private void pushRemoteFrame() {
-        if (textureFront == null || !textureFront.isAvailable() || carLink == null) {
+        if (carLink == null || !carLink.isWatching()) {
             return;
         }
         if (!remoteBusy.compareAndSet(false, true)) {
+            return;
+        }
+        final String source = carLink.watchSource();
+        // Already have a fresh-enough frame for this source? Still refresh captures.
+        if (textureFront == null || !textureFront.isAvailable()) {
+            byte[] cached = remoteLive.jpegFor(source);
+            if (cached != null) {
+                carLink.pushJpeg(cached);
+            }
+            remoteBusy.set(false);
             return;
         }
         int vw = textureFront.getWidth();
@@ -1398,39 +1426,59 @@ public class MainActivity extends AppCompatActivity {
         boolean hasLanes = compositeContainer != null
                 && compositeContainer.copyLaneWindows(remoteLanes);
         if (!hasLanes) {
-            // Plan not ready yet: still split as four equal vertical bands.
-            // Never push the raw surround strip — that looks like one jammed picture.
             com.kooo.evcam.zeekr.RemoteFrame.equalVerticalLanes(remoteLanes);
         }
         float scale = 960f / Math.max(vw, vh);
         int w = Math.max(2, ((int) (vw * scale)) / 2 * 2);
         int h = Math.max(2, ((int) (vh * scale)) / 2 * 2);
-        android.graphics.Bitmap source = textureFront.getBitmap(w, h);
-        if (source == null) {
+        final android.graphics.Bitmap surround = textureFront.getBitmap(w, h);
+        final android.graphics.Bitmap cabinDriver = (textureBack != null && textureBack.isAvailable())
+                ? textureBack.getBitmap(Math.min(640, textureBack.getWidth()),
+                Math.min(360, textureBack.getHeight())) : null;
+        final android.graphics.Bitmap cabinBack = (textureLeft != null && textureLeft.isAvailable())
+                ? textureLeft.getBitmap(Math.min(640, textureLeft.getWidth()),
+                Math.min(360, textureLeft.getHeight())) : null;
+        if (surround == null) {
+            if (cabinDriver != null) {
+                cabinDriver.recycle();
+            }
+            if (cabinBack != null) {
+                cabinBack.recycle();
+            }
             remoteBusy.set(false);
             return;
         }
-        float[] lanes = remoteLanes.clone();
-        int[] order = compositeContainer != null
+        final float[] lanes = remoteLanes.clone();
+        final int[] order = compositeContainer != null
                 ? compositeContainer.getLaneOrder()
                 : new int[]{0, 1, 2, 3};
-        int onlyLane = com.kooo.evcam.zeekr.RemoteFrame.laneForSource(carLink.watchSource());
-        boolean straighten = appConfig.isFisheyeCorrection();
-        float fov = appConfig.getFisheyeFov();
-        String projection = appConfig.getFisheyeProjection();
-        float strength = appConfig.getFisheyeStrength() / 100f;
+        final float fov = appConfig.getFisheyeFov();
+        final String projection = appConfig.getFisheyeProjection();
+        // Surround remote stills are always defished (full strength).
+        final float strength = 1f;
         remoteCompose.execute(() -> {
             try {
-                android.graphics.Bitmap grid = remoteFrame.compose(
-                        source, lanes, order, onlyLane, straighten, fov, projection, strength);
-                java.io.ByteArrayOutputStream jpeg = new java.io.ByteArrayOutputStream(48 * 1024);
-                if (grid.compress(android.graphics.Bitmap.CompressFormat.JPEG, 55, jpeg)) {
-                    carLink.pushJpeg(jpeg.toByteArray());
+                remoteSnap.putSurround(remoteLive, surround, lanes, order, fov, projection, strength);
+                if (cabinDriver != null) {
+                    remoteSnap.putCabin(remoteLive, com.kooo.evcam.remote.RemoteLive.DRIVER, cabinDriver);
+                }
+                if (cabinBack != null) {
+                    remoteSnap.putCabin(remoteLive, com.kooo.evcam.remote.RemoteLive.BACKSEAT, cabinBack);
+                }
+                byte[] jpeg = remoteLive.jpegFor(carLink.watchSource());
+                if (jpeg != null) {
+                    carLink.pushJpeg(jpeg);
                 }
             } catch (RuntimeException e) {
-                AppLog.w(TAG, "remote grid failed: " + e.getMessage());
+                AppLog.w(TAG, "remote live failed: " + e.getMessage());
             } finally {
-                source.recycle();
+                surround.recycle();
+                if (cabinDriver != null) {
+                    cabinDriver.recycle();
+                }
+                if (cabinBack != null) {
+                    cabinBack.recycle();
+                }
                 remoteBusy.set(false);
             }
         });
@@ -2974,6 +3022,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         remoteHandler.removeCallbacks(remotePump);
         remoteCompose.shutdownNow();
+        remoteLive.shutdown();
         if (carLink != null) {
             carLink.setUi(null);
             carLink.stop();

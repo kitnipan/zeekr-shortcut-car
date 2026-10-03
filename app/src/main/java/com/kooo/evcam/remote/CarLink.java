@@ -38,6 +38,11 @@ public final class CarLink {
         void onLink(Snapshot snap);
     }
 
+    /** Fired when the phone starts/stops watch or changes camera source. */
+    public interface WatchListener {
+        void onWatch(boolean watching, String source);
+    }
+
     public static final class Snapshot {
         public final String state;
         public final String code;
@@ -74,6 +79,7 @@ public final class CarLink {
     private volatile String source = "drive";
     private String lastCode = "";
     private Ui ui;
+    private WatchListener watchListener;
 
     private final Runnable reconnect = new Runnable() {
         @Override
@@ -91,6 +97,10 @@ public final class CarLink {
 
     public void setUi(Ui ui) {
         this.ui = ui;
+    }
+
+    public void setWatchListener(WatchListener listener) {
+        this.watchListener = listener;
     }
 
     public void start() {
@@ -199,27 +209,39 @@ public final class CarLink {
                     String type = j.optString("t");
                     if ("hello".equals(type)) {
                         email = j.optString("email");
+                        boolean wasWatching = watching.get();
+                        String prevSource = source;
                         watching.set(j.optBoolean("watch", false));
                         source = norm(j.optString("source", source));
                         if (watching.get()) {
                             lastPushMs = 0L;
                         }
                         publish("ONLINE", j.optString("code"), email);
+                        notifyWatch(wasWatching, prevSource);
                     } else if ("linked".equals(type)) {
                         email = j.optString("email", email);
                         publish("LINKED", "", email);
                     } else if ("unlinked".equals(type)) {
                         email = "";
+                        boolean wasWatching = watching.get();
+                        String prevSource = source;
                         watching.set(false);
                         publish("ONLINE", j.optString("code"), "");
+                        notifyWatch(wasWatching, prevSource);
                     } else if ("watch".equals(type)) {
+                        boolean wasWatching = watching.get();
+                        String prevSource = source;
                         source = norm(j.optString("source", "drive"));
                         watching.set(true);
                         lastPushMs = 0L;
                         publish("ONLINE", "", email);
+                        notifyWatch(wasWatching, prevSource);
                     } else if ("idle".equals(type)) {
+                        boolean wasWatching = watching.get();
+                        String prevSource = source;
                         watching.set(false);
                         publish("ONLINE", "", email);
+                        notifyWatch(wasWatching, prevSource);
                     }
                 } catch (Exception ignored) {
                 }
@@ -275,6 +297,19 @@ public final class CarLink {
         handler.postDelayed(reconnect, 3000);
     }
 
+    private void notifyWatch(boolean wasWatching, String prevSource) {
+        boolean now = watching.get();
+        String src = source;
+        if (now == wasWatching && src.equals(prevSource == null ? "" : prevSource)) {
+            return;
+        }
+        WatchListener listener = watchListener;
+        if (listener == null) {
+            return;
+        }
+        handler.post(() -> listener.onWatch(now, src));
+    }
+
     private String deviceId() {
         String aid = "";
         try {
@@ -288,11 +323,17 @@ public final class CarLink {
         return model + "_" + aid;
     }
 
-    private static String norm(String raw) {
+    /** Same whitelist as the hub / web client. */
+    public static String normalizeSource(String raw) {
         String s = raw == null ? "" : raw.trim().toLowerCase();
-        if ("drive".equals(s) || "driver".equals(s) || "backseat".equals(s) || s.startsWith("ch")) {
+        if ("drive".equals(s) || "driver".equals(s) || "backseat".equals(s)
+                || "ch1".equals(s) || "ch2".equals(s) || "ch3".equals(s) || "ch4".equals(s)) {
             return s;
         }
         return "drive";
+    }
+
+    private static String norm(String raw) {
+        return normalizeSource(raw);
     }
 }
