@@ -43,6 +43,9 @@ public final class UsbExport {
     /** U 盘根目录下的文件夹名。笔记本打开 U 盘就能看见，不必进 DCIM。 */
     public static final String DIR_NAME = "exports";
 
+    /** 保存这一刻另存的文件夹，也在 U 盘根目录。 */
+    public static final String MOMENTS_DIR = "moments";
+
     private static final AtomicBoolean BUSY = new AtomicBoolean(false);
 
     private UsbExport() {
@@ -51,6 +54,11 @@ public final class UsbExport {
     /** {@code usbRoot/exports}。 */
     public static File folder(File usbRoot) {
         return new File(usbRoot, DIR_NAME);
+    }
+
+    /** {@code usbRoot/moments}。 */
+    public static File moments(File usbRoot) {
+        return new File(usbRoot, MOMENTS_DIR);
     }
 
     /**

@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta26] - 2026-10-04
+
+### New and improved
+
+- Save this moment can also copy finished clips into the moments folder on the USB stick. Settings, System, Save moment to USB. Off until you turn it on.
+
 ## [2.0.3-beta25] - 2026-10-04
 
 ### New and improved

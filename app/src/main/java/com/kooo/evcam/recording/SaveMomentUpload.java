@@ -10,6 +10,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.share.DriveExport;
+import com.kooo.evcam.share.SurroundDefish;
 import com.kooo.evcam.share.UsbExport;
 
 import java.io.File;
@@ -21,9 +22,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * After a save-moment, upload finished protected files to Drive in the background.
- * Straighten runs when that setting is on (same rule as the share button).
- * Skips upload when Drive is not signed in.
+ * After a save-moment, copy finished files to the USB moments folder when that
+ * option is on, and upload them to Drive when signed in. Straighten runs when
+ * that setting is on (same rule as the share button).
  */
 public final class SaveMomentUpload {
 
@@ -41,8 +42,9 @@ public final class SaveMomentUpload {
         }
         Context app = context.getApplicationContext();
         AppConfig config = new AppConfig(app);
-        if (!config.hasDriveClient() || !config.hasDriveRefreshToken()) {
-            AppLog.d(TAG, "没登录 Drive，跳过上传");
+        boolean drive = config.hasDriveClient() && config.hasDriveRefreshToken();
+        if (!drive && !config.isSaveMomentUsb()) {
+            AppLog.d(TAG, "没登录 Drive，也没开存到 U 盘，跳过");
             return;
         }
         synchronized (PENDING) {
@@ -110,13 +112,66 @@ public final class SaveMomentUpload {
             AppLog.d(TAG, "还没有可传的成品文件: " + batch);
             return;
         }
-        int sent = DriveExport.uploadQuiet(app, files);
-        AppLog.i(TAG, "保存瞬间上传完成 " + sent + "/" + files.size());
-        if (sent > 0) {
-            final int count = sent;
-            MAIN.post(() -> Toast.makeText(app,
-                    app.getString(R.string.save_moment_uploaded, count),
-                    Toast.LENGTH_SHORT).show());
+        AppConfig config = new AppConfig(app);
+        if (config.isSaveMomentUsb()) {
+            int copied = copyToMoments(app, files);
+            if (copied > 0) {
+                final int count = copied;
+                MAIN.post(() -> Toast.makeText(app,
+                        app.getString(R.string.save_moment_usb, count),
+                        Toast.LENGTH_SHORT).show());
+            }
         }
+        if (config.hasDriveClient() && config.hasDriveRefreshToken()) {
+            int sent = DriveExport.uploadQuiet(app, files);
+            AppLog.i(TAG, "保存瞬间上传完成 " + sent + "/" + files.size());
+            if (sent > 0) {
+                final int count = sent;
+                MAIN.post(() -> Toast.makeText(app,
+                        app.getString(R.string.save_moment_uploaded, count),
+                        Toast.LENGTH_SHORT).show());
+            }
+        }
+    }
+
+    /** Finished clips into {@code <usb>/moments}. Straighten when that setting is on. */
+    private static int copyToMoments(Context app, List<File> files) {
+        File root = StorageHelper.getExternalSdCardRoot(app);
+        if (root == null) {
+            AppLog.w(TAG, "要存到 U 盘，但没有 U 盘");
+            MAIN.post(() -> Toast.makeText(app, R.string.save_moment_no_usb, Toast.LENGTH_SHORT).show());
+            return 0;
+        }
+        File destDir = UsbExport.moments(root);
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        int copied = 0;
+        for (File file : files) {
+            File temp = null;
+            try {
+                File payload = file;
+                if (SurroundDefish.wanted(app, file)) {
+                    File cache = new File(app.getCacheDir(), "moments");
+                    if (!cache.exists() && !cache.mkdirs()) {
+                        throw new java.io.IOException("mkdir " + cache.getAbsolutePath());
+                    }
+                    temp = new File(cache, file.getName());
+                    SurroundDefish.write(app, file, temp, cancelled, null);
+                    if (!UsbExport.playable(temp)) {
+                        throw new java.io.IOException("unfinished " + file.getName());
+                    }
+                    payload = temp;
+                }
+                UsbExport.copy(payload, destDir);
+                copied++;
+            } catch (Exception e) {
+                AppLog.e(TAG, "拷到 moments 失败: " + file.getAbsolutePath(), e);
+            } finally {
+                if (temp != null && temp.exists() && !temp.delete()) {
+                    AppLog.w(TAG, "删不掉临时文件: " + temp.getAbsolutePath());
+                }
+            }
+        }
+        AppLog.i(TAG, "保存瞬间拷到 U 盘 moments " + copied + "/" + files.size());
+        return copied;
     }
 }

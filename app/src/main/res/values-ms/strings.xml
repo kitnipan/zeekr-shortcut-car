@@ -152,6 +152,10 @@
     <string name="save_moment_done">Klip terkini dilindungi. Padam auto akan melangkauinya</string>
     <string name="save_moment_armed">Klip sekitar saat ini dilindungi. Segmen seterusnya dilindungi apabila selesai</string>
     <string name="save_moment_uploaded">%1$d fail tersimpan dimuat naik ke Drive</string>
+    <string name="save_moment_usb">%1$d fail disalin ke folder moments pada USB</string>
+    <string name="save_moment_no_usb">Tiada pemacu USB. Saat ini kekal dalam kereta</string>
+    <string name="set_save_moment_usb_title">Simpan saat ke USB</string>
+    <string name="set_save_moment_usb_summary">Pintasan simpan saat juga menyalin klip siap ke folder moments pada pemacu USB</string>
     <string name="shortcut_access_title">Hidupkan kebolehcapaian</string>
     <string name="shortcut_access_msg">Buat masa ini butang berfungsi semasa apl ini di hadapan. Untuk semua skrin, apl perlukan perkhidmatan kebolehcapaian. Unit kepala tiada skrin untuknya, jadi apl menghidupkannya sendiri.\n\nMulakan Shizuku, kemudian ketik Beri kebenaran dengan Shizuku. Atau jalankan sekali dari komputer:\n\n%1$s\n\nKemudian buka semula apl ini.</string>
     <string name="shortcut_shizuku">Beri kebenaran dengan Shizuku</string>

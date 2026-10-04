@@ -20,6 +20,9 @@ public class UsbExportTest {
         assertEquals(new File("/storage/ABCD-1234/exports"),
                 UsbExport.folder(new File("/storage/ABCD-1234")));
         assertEquals("exports", UsbExport.DIR_NAME);
+        assertEquals(new File("/storage/ABCD-1234/moments"),
+                UsbExport.moments(new File("/storage/ABCD-1234")));
+        assertEquals("moments", UsbExport.MOMENTS_DIR);
     }
 
     @Test

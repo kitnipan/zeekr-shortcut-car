@@ -1037,6 +1037,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 startActivity(new Intent(getContext(), ControllerProbeActivity.class)));
         onClick("pref_shortcuts", pref ->
                 startActivity(new Intent(getContext(), com.kooo.evcam.input.ShortcutListActivity.class)));
+        bindSwitch("pref_save_moment_usb", appConfig.isSaveMomentUsb(),
+                value -> appConfig.setSaveMomentUsb(value));
 
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));

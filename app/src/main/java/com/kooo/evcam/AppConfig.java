@@ -2025,6 +2025,7 @@ public class AppConfig {
     }
 
     private static final String KEY_SAVED_CLIPS = "saved_clip_groups";
+    private static final String KEY_SAVE_MOMENT_USB = "save_moment_usb";
 
     /** Protected segment stamps ({@code yyyyMMdd_HHmmss}). Auto-delete never removes them. */
     public java.util.Set<String> getSavedClipGroups() {
@@ -2034,6 +2035,15 @@ public class AppConfig {
     public void setSavedClipGroups(java.util.Set<String> stamps) {
         prefs.edit().putString(KEY_SAVED_CLIPS,
                 com.kooo.evcam.recording.SavedClips.write(stamps)).apply();
+    }
+
+    /** 保存这一刻时，把已完成的文件再拷一份到 U 盘的 moments。默认关。 */
+    public boolean isSaveMomentUsb() {
+        return prefs.getBoolean(KEY_SAVE_MOMENT_USB, false);
+    }
+
+    public void setSaveMomentUsb(boolean on) {
+        prefs.edit().putBoolean(KEY_SAVE_MOMENT_USB, on).apply();
     }
 
     public void addSavedClipGroups(java.util.Collection<String> stamps) {
