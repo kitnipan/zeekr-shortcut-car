@@ -616,6 +616,9 @@ public class RecordingFloatingService extends Service {
         try {
             windowManager.addView(floatingContainer, layoutParams);
             applyStyle();
+            // 按钮是后建的。广播如果在这之前到了，视图还是空的，颜色就停在待机。
+            // 以协调器此刻的状态再画一次，和主界面那个录制键对齐。
+            updateRecordingState(com.kooo.evcam.recording.RecordingCoordinator.get(this).isRecording());
             AppLog.d(TAG, "录制悬浮窗创建成功");
         } catch (Exception e) {
             AppLog.e(TAG, "添加悬浮窗失败", e);

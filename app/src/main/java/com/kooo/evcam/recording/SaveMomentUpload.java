@@ -111,11 +111,20 @@ public final class SaveMomentUpload {
         }
         if (files.isEmpty()) {
             AppLog.d(TAG, "还没有可传的成品文件: " + batch);
+            if (!unfinished.isEmpty()) {
+                MomentNote.waiting(app);
+            }
             return;
         }
         AppConfig config = new AppConfig(app);
-        if (config.isSaveMomentUsb()) {
-            int copied = copyToMoments(app, files);
+        boolean usb = config.isSaveMomentUsb();
+        boolean drive = config.isSaveMomentDrive()
+                && config.hasDriveClient() && config.hasDriveRefreshToken();
+        int steps = (usb ? files.size() : 0) + (drive ? files.size() : 0);
+        int finished = 0;
+        if (usb) {
+            int copied = copyToMoments(app, files, finished, steps);
+            finished += files.size();
             if (copied > 0) {
                 final int count = copied;
                 MAIN.post(() -> Toast.makeText(app,
@@ -123,9 +132,10 @@ public final class SaveMomentUpload {
                         Toast.LENGTH_SHORT).show());
             }
         }
-        if (config.isSaveMomentDrive()
-                && config.hasDriveClient() && config.hasDriveRefreshToken()) {
+        if (drive) {
+            MomentNote.progress(app, steps == 0 ? 0 : finished * 100 / steps);
             int sent = DriveExport.uploadQuiet(app, files);
+            finished += files.size();
             AppLog.i(TAG, "保存瞬间上传完成 " + sent + "/" + files.size());
             if (sent > 0) {
                 final int count = sent;
@@ -134,10 +144,15 @@ public final class SaveMomentUpload {
                         Toast.LENGTH_SHORT).show());
             }
         }
+        if (unfinished.isEmpty()) {
+            MomentNote.finish(app, R.string.save_moment_done);
+        } else {
+            MomentNote.progress(app, steps == 0 ? 0 : Math.min(99, finished * 100 / steps));
+        }
     }
 
     /** Finished clips into {@code <usb>/moments}. Straighten when that setting is on. */
-    private static int copyToMoments(Context app, List<File> files) {
+    private static int copyToMoments(Context app, List<File> files, int finishedSteps, int totalSteps) {
         File root = StorageHelper.getExternalSdCardRoot(app);
         if (root == null) {
             AppLog.w(TAG, "要存到 U 盘，但没有 U 盘");
@@ -147,7 +162,9 @@ public final class SaveMomentUpload {
         File destDir = UsbExport.moments(root);
         AtomicBoolean cancelled = new AtomicBoolean(false);
         int copied = 0;
-        for (File file : files) {
+        for (int i = 0; i < files.size(); i++) {
+            File file = files.get(i);
+            final int step = finishedSteps + i;
             File temp = null;
             try {
                 File payload = file;
@@ -157,7 +174,8 @@ public final class SaveMomentUpload {
                         throw new java.io.IOException("mkdir " + cache.getAbsolutePath());
                     }
                     temp = new File(cache, file.getName());
-                    SurroundDefish.write(app, file, temp, cancelled, null);
+                    SurroundDefish.write(app, file, temp, cancelled, percent ->
+                            MomentNote.progress(app, slice(step, percent, totalSteps)));
                     if (!UsbExport.playable(temp)) {
                         throw new java.io.IOException("unfinished " + file.getName());
                     }
@@ -165,6 +183,7 @@ public final class SaveMomentUpload {
                 }
                 UsbExport.copy(payload, destDir);
                 copied++;
+                MomentNote.progress(app, slice(step, 100, totalSteps));
             } catch (Exception e) {
                 AppLog.e(TAG, "拷到 moments 失败: " + file.getAbsolutePath(), e);
             } finally {
@@ -175,5 +194,13 @@ public final class SaveMomentUpload {
         }
         AppLog.i(TAG, "保存瞬间拷到 U 盘 moments " + copied + "/" + files.size());
         return copied;
+    }
+
+    /** One file is one slice of the bar. {@code percent} is 0–100 inside that file. */
+    private static int slice(int finishedSteps, int percent, int totalSteps) {
+        if (totalSteps <= 0) {
+            return 0;
+        }
+        return Math.min(100, (finishedSteps * 100 + percent) / totalSteps);
     }
 }

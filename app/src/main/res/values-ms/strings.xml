@@ -148,6 +148,10 @@
     <string name="shortcut_press_tap">Ketik</string>
     <string name="shortcut_press_long">Tekan lama</string>
     <string name="shortcut_press_double">Dwiklik</string>
+    <string name="save_moment_channel">Simpan saat ini</string>
+    <string name="save_moment_starting">Bermula…</string>
+    <string name="save_moment_waiting">Menunggu klip selesai</string>
+    <string name="save_moment_progress">%1$d%%</string>
     <string name="save_moment_none">Tiada rakaman untuk disimpan</string>
     <string name="save_moment_done">Klip terkini dilindungi. Padam auto akan melangkauinya</string>
     <string name="save_moment_armed">Klip sekitar saat ini dilindungi. Segmen seterusnya dilindungi apabila selesai</string>

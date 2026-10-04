@@ -9,7 +9,13 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixes
+
+- The floating record button follows the in-app record button. It was staying idle when the window appeared after recording had already started.
+
+### New and improved
+
+- Save this moment shows a notification as soon as it starts, then a percent while the clips are copied or uploaded.
 
 ## [2.0.3-beta27] - 2026-10-04
 

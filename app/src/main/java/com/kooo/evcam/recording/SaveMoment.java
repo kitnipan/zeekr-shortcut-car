@@ -52,6 +52,7 @@ public final class SaveMoment {
             toast(app, R.string.save_moment_none);
             return;
         }
+        MomentNote.start(app);
         // Newest is current (being written while recording, or last finished).
         toProtect.add(stamps.get(stamps.size() - 1));
         if (stamps.size() >= 2) {
@@ -68,8 +69,14 @@ public final class SaveMoment {
             toast(app, R.string.save_moment_done);
             AppLog.i(TAG, "已保护 " + toProtect + "（当前没在录）");
         }
-        // Drive upload of finished files among the protected set
-        SaveMomentUpload.enqueueFinished(app, toProtect);
+        boolean usb = config.isSaveMomentUsb();
+        boolean drive = config.isSaveMomentDrive()
+                && config.hasDriveClient() && config.hasDriveRefreshToken();
+        if (usb || drive) {
+            SaveMomentUpload.enqueueFinished(app, toProtect);
+        } else {
+            MomentNote.finish(app, recording ? R.string.save_moment_armed : R.string.save_moment_done);
+        }
     }
 
     /** Call from the recording segment-switch path with the file that just finished. */

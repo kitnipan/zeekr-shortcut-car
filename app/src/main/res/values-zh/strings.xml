@@ -166,6 +166,10 @@
     <string name="shortcut_press_tap">短按</string>
     <string name="shortcut_press_long">长按</string>
     <string name="shortcut_press_double">双击</string>
+    <string name="save_moment_channel">保存这一刻</string>
+    <string name="save_moment_starting">正在开始…</string>
+    <string name="save_moment_waiting">等这一段录完</string>
+    <string name="save_moment_progress">%1$d%%</string>
     <string name="save_moment_none">没有可保存的录像</string>
     <string name="save_moment_done">已保护最近一段录像，不会被自动删除</string>
     <string name="save_moment_armed">已保护前后各一段。下一段切完后也会保护</string>

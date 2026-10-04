@@ -147,6 +147,10 @@
     <string name="shortcut_press_tap">Tap</string>
     <string name="shortcut_press_long">Long press</string>
     <string name="shortcut_press_double">Double</string>
+    <string name="save_moment_channel">Save this moment</string>
+    <string name="save_moment_starting">Starting…</string>
+    <string name="save_moment_waiting">Waiting for the clip to finish</string>
+    <string name="save_moment_progress">%1$d%%</string>
     <string name="save_moment_none">No recording to save</string>
     <string name="save_moment_done">Protected the latest clip. Auto-delete will skip it</string>
     <string name="save_moment_armed">Protected the clips around this moment. The next segment is protected when it finishes</string>

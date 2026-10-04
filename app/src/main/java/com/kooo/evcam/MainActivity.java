@@ -2825,8 +2825,10 @@ public class MainActivity extends AppCompatActivity {
 
     /** 录制键切到某个状态。回调可能来自相机线程，统一丢回主线程。 */
     private void setRecordState(com.kooo.evcam.ui.RecordButtonUi.State state) {
-        com.kooo.evcam.ui.MotionPolicy.setRecording(state == com.kooo.evcam.ui.RecordButtonUi.State.PREPARING
-                || state == com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
+        boolean on = state == com.kooo.evcam.ui.RecordButtonUi.State.PREPARING
+                || state == com.kooo.evcam.ui.RecordButtonUi.State.RECORDING;
+        com.kooo.evcam.ui.MotionPolicy.setRecording(on);
+        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(this, on);
         runOnUiThread(() -> {
             if (recordButtonUi == null) {
                 return;
@@ -3009,6 +3011,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
+        broadcastCurrentRecordingState();
 
         // U 盘可能在后台时插拔过：先按上一份快照画，再去后台探测一次（结果经 storageListener 回来）
         refreshRecordAvailability();
