@@ -10,7 +10,8 @@ public enum ShortcutAction {
     BOTH_MIRRORS("toggle_both_mirrors", R.string.shortcut_action_both_mirrors),
     APP("open_app", R.string.shortcut_action_app),
     DIM("toggle_dim", R.string.shortcut_action_dim),
-    SAVE("save_moment", R.string.shortcut_action_save);
+    SAVE("save_moment", R.string.shortcut_action_save),
+    LOCK_SAVE("lock_and_save", R.string.shortcut_action_lock_save);
 
     public final String key;
     public final int labelRes;

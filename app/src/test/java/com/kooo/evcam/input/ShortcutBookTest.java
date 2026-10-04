@@ -64,6 +64,13 @@ public class ShortcutBookTest {
     }
 
     @Test
+    public void lockAndSaveActionRoundTrips() {
+        Shortcut item = new Shortcut(48, 0, "qwerty2", "lock_and_save", "tap");
+        Shortcut back = ShortcutBook.parse(ShortcutBook.write(Collections.singletonList(item))).get(0);
+        assertEquals("lock_and_save", back.action);
+        assertEquals(ShortcutAction.LOCK_SAVE, ShortcutAction.fromKey(back.action));
+    }
+
     public void bothMirrorsActionRoundTrips() {
         Shortcut item = new Shortcut(96, 0, "Pad", "toggle_both_mirrors", "tap");
         Shortcut back = ShortcutBook.parse(ShortcutBook.write(Collections.singletonList(item))).get(0);

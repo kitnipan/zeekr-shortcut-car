@@ -38,6 +38,7 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
         bind(R.id.shortcut_action_app, ShortcutAction.APP);
         bind(R.id.shortcut_action_dim, ShortcutAction.DIM);
         bind(R.id.shortcut_action_save, ShortcutAction.SAVE);
+        bind(R.id.shortcut_action_lock_save, ShortcutAction.LOCK_SAVE);
         highlightPress();
     }
 

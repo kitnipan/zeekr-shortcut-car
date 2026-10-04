@@ -54,6 +54,10 @@ public final class ShortcutPerformer {
             case SAVE:
                 com.kooo.evcam.recording.SaveMoment.perform(context);
                 return;
+            case LOCK_SAVE:
+                com.kooo.evcam.storage.AutoLock.get().lockFromShortcut(context);
+                com.kooo.evcam.recording.SaveMoment.perform(context);
+                return;
             default:
                 return;
         }

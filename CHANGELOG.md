@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.1.0-beta3] - 2026-10-04
+
+### New and improved
+
+- Shortcut action: Lock and save. Locks every camera's footage from 10 seconds before the press to 10 seconds after, then saves those clips to USB the same way Save this moment does. The flash-to-pass lock switch can stay off.
+
 ## [2.1.0-beta2] - 2026-10-04
 
 ### Fixes

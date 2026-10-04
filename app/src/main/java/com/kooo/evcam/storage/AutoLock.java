@@ -186,19 +186,37 @@ public final class AutoLock implements Telemetry.Listener {
         boolean rising = Boolean.TRUE.equals(flash) && !Boolean.TRUE.equals(lastFlash);
         lastFlash = flash;
         if (rising) {
-            lockAround(app, System.currentTimeMillis());
+            lockAround(app, System.currentTimeMillis(), false);
         }
+    }
+
+    /**
+     * 快捷键：锁这一刻前后 10 秒（每一路），不看「闪远光时自动锁定」开没开。
+     * 保存到 U 盘由调用方接着做（和保存这一刻同一条路）。
+     */
+    public void lockFromShortcut(Context context) {
+        if (context == null) {
+            return;
+        }
+        Context appContext = context.getApplicationContext();
+        main.post(() -> {
+            if (app == null) {
+                app = appContext;
+            }
+            worker.post(() -> segmentMs = segmentLengths(appContext));
+            lockAround(appContext, System.currentTimeMillis(), true);
+        });
     }
 
     // ================================================================= 锁
 
     /** 这一刻前后 10 秒：现在锁一遍，窗口结束后再锁一遍。主线程。 */
-    private void lockAround(Context context, long momentMs) {
+    private void lockAround(Context context, long momentMs, boolean manual) {
         final LockWindow window = LockWindow.around(momentMs);
         // 这次录像的中转目标跟着这一下走：第二遍时可能已经停了录、又开了一次
         final File target = relayTarget;
-        worker.post(() -> pass(context, window, target, 0));
-        worker.postDelayed(() -> pass(context, window, target, 1),
+        worker.post(() -> pass(context, window, target, 0, manual));
+        worker.postDelayed(() -> pass(context, window, target, 1, manual),
                 window.endMs - momentMs + SECOND_PASS_DELAY_MS);
     }
 
@@ -208,8 +226,8 @@ public final class AutoLock implements Telemetry.Listener {
      * @param relayTarget 中转写入的目标目录（见 {@link #scan}）；不是中转写入为 null
      * @param round       0 = 当时，1 = 补锁（窗口结束后），2 起 = 等中转目标目录回来再试
      */
-    private void pass(Context context, LockWindow window, File relayTarget, int round) {
-        if (!flashEnabled(context)) {
+    private void pass(Context context, LockWindow window, File relayTarget, int round, boolean manual) {
+        if (!manual && !flashEnabled(context)) {
             BlackBox.noteImportant("闪远光自动锁定" + (round == 0 ? "（当时）" : round == 1 ? "（补锁）" : "（等盘回来）")
                     + " " + describe(window) + "：开关已关，不锁");
             return;
@@ -241,16 +259,18 @@ public final class AutoLock implements Telemetry.Listener {
                 continue;
             }
             locking.addAll(names);
-            FootageLocks.set(entry.getKey(), names, true, round == 0 ? toastWhenLocked : null);
+            FootageLocks.set(entry.getKey(), names, true,
+                    round == 0 ? (manual ? toastWhenShortcutLocked : toastWhenLocked) : null);
         }
         // 第二遍起还有锁不了的：隔一阵再试，等盘回来（第一遍不用，第二遍本来就排着）
         boolean retry = !waiting.isEmpty() && round >= 1 && round < RELAY_RETRY_LIMIT;
         if (retry) {
-            worker.postDelayed(() -> pass(context, window, relayTarget, round + 1), RELAY_RETRY_MS);
+            worker.postDelayed(() -> pass(context, window, relayTarget, round + 1, manual), RELAY_RETRY_MS);
         }
         // 等盘回来的那几遍只在锁上了、或者不再等时记一行，不然一小时能记一百多行
         if (round <= 1 || !locking.isEmpty() || !retry) {
-            BlackBox.noteImportant("闪远光自动锁定" + (round == 0 ? "（当时）" : round == 1 ? "（补锁）" : "（等盘回来）")
+            BlackBox.noteImportant((manual ? "快捷键锁定" : "闪远光自动锁定")
+                    + (round == 0 ? "（当时）" : round == 1 ? "（补锁）" : "（等盘回来）")
                     + " " + describe(window)
                     + "：" + (locking.isEmpty() ? "没有新的要锁" : "锁上 " + locking.size() + " 个 " + locking)
                     + (alreadyLocked > 0 ? "，已经锁着 " + alreadyLocked + " 个" : "")
@@ -268,19 +288,25 @@ public final class AutoLock implements Telemetry.Listener {
      */
     private final FootageLocks.Result toastWhenLocked = ok -> {
         if (ok) {
-            toastLocked();
+            toastLocked(R.string.msg_flash_locked);
+        }
+    };
+
+    private final FootageLocks.Result toastWhenShortcutLocked = ok -> {
+        if (ok) {
+            toastLocked(R.string.msg_shortcut_locked);
         }
     };
 
     /** 「已锁定前后 10 秒的录像」。离上一次弹不到 {@link #TOAST_GAP_MS} 就不再弹。主线程。 */
-    private void toastLocked() {
+    private void toastLocked(int message) {
         Context context = app;
         long now = SystemClock.uptimeMillis();
         if (context == null || (lastToastAt > 0 && now - lastToastAt < TOAST_GAP_MS)) {
             return;
         }
         lastToastAt = now;
-        Toast.makeText(context, Languages.localized(context).getString(R.string.msg_flash_locked),
+        Toast.makeText(context, Languages.localized(context).getString(message),
                 Toast.LENGTH_SHORT).show();
     }
 

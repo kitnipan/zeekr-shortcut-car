@@ -169,6 +169,7 @@
     <string name="shortcut_action_app">Buka apl</string>
     <string name="shortcut_action_dim">Gelapkan skrin</string>
     <string name="shortcut_action_save">Simpan saat ini</string>
+    <string name="shortcut_action_lock_save">Kunci dan simpan</string>
     <string name="shortcut_press_tap">Ketik</string>
     <string name="shortcut_press_long">Tekan lama</string>
     <string name="shortcut_press_double">Dwiklik</string>
@@ -424,6 +425,7 @@
     <string name="set_footage_lock_horn_title">Kunci rakaman semasa hon dibunyikan</string>
     <string name="set_footage_lock_horn_summary">Isyarat hon kereta belum dapat dibaca, jadi ini belum boleh dihidupkan buat masa ini</string>
     <string name="msg_flash_locked">Kelip lampu tinggi: rakaman 10 saat sebelum dan selepas telah dikunci</string>
+    <string name="msg_shortcut_locked">Rakaman 10 saat sebelum dan selepas dikunci, dan disalin ke USB seperti Simpan saat ini</string>
     <string name="msg_storage_locked_stopped">Rakaman yang dikunci telah memenuhi ruang, rakaman dihentikan. Buka kunci sebahagian dalam main semula</string>
     <string name="msg_storage_locked_refuse">Rakaman yang dikunci telah memenuhi ruang, rakaman tidak dapat dimulakan. Buka kunci sebahagian dalam main semula</string>
     <string name="action_lock_footage">Kunci</string>

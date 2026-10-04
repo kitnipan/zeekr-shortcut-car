@@ -168,6 +168,7 @@
     <string name="shortcut_action_app">Open app</string>
     <string name="shortcut_action_dim">Dim display</string>
     <string name="shortcut_action_save">Save this moment</string>
+    <string name="shortcut_action_lock_save">Lock and save</string>
     <string name="shortcut_press_tap">Tap</string>
     <string name="shortcut_press_long">Long press</string>
     <string name="shortcut_press_double">Double</string>
@@ -423,6 +424,7 @@
     <string name="set_footage_lock_horn_title">Lock footage on horn</string>
     <string name="set_footage_lock_horn_summary">The car\'s horn signal can\'t be read yet, so this can\'t be turned on for now</string>
     <string name="msg_flash_locked">Flash-to-pass: locked the footage 10 seconds before and after</string>
+    <string name="msg_shortcut_locked">Locked the footage 10 seconds before and after, and saved it to USB like Save this moment</string>
     <string name="msg_storage_locked_stopped">Locked footage has filled the space, so recording stopped. Unlock some in playback</string>
     <string name="msg_storage_locked_refuse">Locked footage has filled the space, so recording can\'t start. Unlock some in playback</string>
     <string name="action_lock_footage">Lock</string>
