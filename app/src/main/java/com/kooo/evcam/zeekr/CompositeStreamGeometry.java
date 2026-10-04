@@ -183,6 +183,15 @@ public final class CompositeStreamGeometry {
     }
 
     /**
+     * Force a vertical 4-split. Used by Super mirror / remote when the surround
+     * camera is known but {@link StreamLayoutTable} has not registered its id yet,
+     * or the HAL tip size would otherwise be rejected as non-composite.
+     */
+    public static Plan analyseAsVertical(int frameWidth, int frameHeight) {
+        return analyse(frameWidth, frameHeight, Stacking.VERTICAL);
+    }
+
+    /**
      * 这一帧要不要拆、怎么拆。
      *
      * <p>依据只有两个：<b>哪一路相机 + 什么分辨率</b>，规则全在

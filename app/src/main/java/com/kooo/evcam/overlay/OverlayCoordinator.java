@@ -9,7 +9,9 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
+import com.kooo.evcam.zeekr.BothMirrorsService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
+import com.kooo.evcam.zeekr.SideViewPopupService;
 
 /**
  * 两个悬浮窗（超级后视镜、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
@@ -57,6 +59,7 @@ public final class OverlayCoordinator {
     public static void restoreOnLaunch(Context context, Runnable afterPreviewWindowStarted) {
         AppConfig config = new AppConfig(context);
         boolean allowed = canShowOverlay(context);
+        com.kooo.evcam.input.AccessibilityGate.ensureForShortcuts(context);
 
         if (config.isRearViewEnabled() && allowed) {
             // 这一段以前没有：开关存着「开」，但没人在启动时把服务拉起来，
@@ -64,6 +67,26 @@ public final class OverlayCoordinator {
             main().postDelayed(() -> {
                 RearViewMirrorService.start(context);
                 AppLog.d(TAG, "超级后视镜已按设置自动开启");
+            }, REAR_VIEW_DELAY_MS);
+        }
+
+        if (config.isDimOverlayEnabled() && allowed) {
+            DimOverlayService.show(context);
+            AppLog.d(TAG, "屏幕遮罩已按设置打开");
+        }
+
+        if (config.isBothMirrorsEnabled() && allowed) {
+            main().postDelayed(() -> {
+                BothMirrorsService.start(context);
+                AppLog.d(TAG, "左右侧视已按设置自动开启");
+            }, REAR_VIEW_DELAY_MS);
+        }
+
+        if (config.isSidePopupEnabled() && allowed) {
+            // 和后视镜一样等相机开起来；它平时只听信号，弹的时候才接相机
+            main().postDelayed(() -> {
+                SideViewPopupService.start(context);
+                AppLog.d(TAG, "打转向灯弹侧视已按设置开启");
             }, REAR_VIEW_DELAY_MS);
         }
 
@@ -101,6 +124,33 @@ public final class OverlayCoordinator {
     }
 
     /**
+     * 开 / 关全屏遮罩。返回值含义同 {@link #setRecordButtonEnabled}。
+     */
+    public static boolean setDimOverlayEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        AppConfig config = new AppConfig(context);
+        config.setDimOverlayEnabled(enabled);
+        if (enabled) {
+            DimOverlayService.show(context);
+        } else {
+            DimOverlayService.hide(context);
+        }
+        // 快捷键、设置页也会开关遮罩：让月亮按钮跟着变
+        if (config.isRecordingFloatingEnabled()) {
+            Intent refresh = new Intent(context, RecordingFloatingService.class);
+            refresh.setAction(RecordingFloatingService.ACTION_UPDATE_STYLE);
+            try {
+                context.startService(refresh);
+            } catch (Exception e) {
+                AppLog.e("OverlayCoordinator", "月亮按钮刷新失败", e);
+            }
+        }
+        return true;
+    }
+
+    /**
      * 开 / 关超级后视镜。返回值含义同 {@link #setRecordButtonEnabled}。
      *
      * <p>这里的权限检查是补上的 —— 原来没有，没授权时开关会拨上去而窗口不出现。</p>
@@ -111,6 +161,9 @@ public final class OverlayCoordinator {
         }
         new AppConfig(context).setRearViewEnabled(enabled);
         if (enabled) {
+            if (new AppConfig(context).isBothMirrorsEnabled()) {
+                setBothMirrorsEnabled(context, false);
+            }
             RearViewMirrorService.start(context);
         } else {
             RearViewMirrorService.stop(context);
@@ -118,6 +171,41 @@ public final class OverlayCoordinator {
         return true;
     }
 
+    /**
+     * 开 / 关左右侧视。返回值含义同 {@link #setRecordButtonEnabled}。
+     *
+     * <p>和超级后视镜共用一路相机输出，开这边就关掉后视镜。</p>
+     */
+    public static boolean setBothMirrorsEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setBothMirrorsEnabled(enabled);
+        if (enabled) {
+            if (new AppConfig(context).isRearViewEnabled()) {
+                setRearViewEnabled(context, false);
+            }
+            BothMirrorsService.start(context);
+        } else {
+            BothMirrorsService.stop(context);
+        }
+        SideViewPopupService.refresh();
+        return true;
+    }
+
+    /** 开 / 关打转向灯弹侧视。返回值含义同 {@link #setRecordButtonEnabled}。 */
+    public static boolean setSidePopupEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setSidePopupEnabled(enabled);
+        if (enabled) {
+            SideViewPopupService.start(context);
+        } else {
+            SideViewPopupService.stop(context);
+        }
+        return true;
+    }
 
     /**
      * 主界面销毁时的清理。

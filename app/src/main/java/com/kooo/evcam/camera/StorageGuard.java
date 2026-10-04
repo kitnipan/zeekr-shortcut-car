@@ -108,12 +108,14 @@ public final class StorageGuard {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("存储检查：锁定清单读不出来，这一轮不删录像");
         }
 
-        long capBytes = new AppConfig(context).getVideoStorageLimitGb() * GB;
+        AppConfig config = new AppConfig(context);
+        long capBytes = config.getVideoStorageLimitGb() * GB;
         long free = freeBytes(videoDir);
         long segment = StoragePlan.estimateSegmentBytes(clips);
         // 读不到剩余空间时不据此下结论：当作足够，只按上限管
         StoragePlan.Decision decision = StoragePlan.decide(
-                clips, locked, capBytes, free < 0 ? Long.MAX_VALUE : free, segment);
+                clips, locked, capBytes, free < 0 ? Long.MAX_VALUE : free, segment,
+                config.getSavedClipGroups());
         lastMarginBytes = decision.marginBytes;
 
         AppLog.i(TAG, "存储检查: " + clips.size() + " 个录像 上限="

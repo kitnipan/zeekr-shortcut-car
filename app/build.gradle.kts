@@ -1,5 +1,27 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
+}
+
+// 电视端 OAuth。设备码登录必须把这对值编进安装包。
+// GitHub 推送保护不允许把 client secret 写进仓库，所以：
+//   - Action 从仓库 Secrets 注入 DRIVE_CLIENT_ID / DRIVE_CLIENT_SECRET
+//   - 本机从 gitignore 的 local.properties 读同名键
+// 两边都空时，设置页里手填的一对仍然生效。
+fun driveCredential(name: String): String {
+    val fromEnv = System.getenv(name)?.trim().orEmpty()
+    if (fromEnv.isNotEmpty()) return fromEnv
+    val propsFile = rootProject.file("local.properties")
+    if (!propsFile.isFile) return ""
+    val props = Properties()
+    propsFile.inputStream().use { props.load(it) }
+    return props.getProperty(name)?.trim().orEmpty()
+}
+
+fun gradleStringLiteral(value: String): String {
+    val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+    return "\"$escaped\""
 }
 
 android {
@@ -34,16 +56,20 @@ android {
         // 每次发布 tag 前同步更新这两个值：versionCode 决定能否覆盖安装，
         // versionName 会成为 Release 名称与 APK 文件名
         //
-        // 后缀默认就是 -alpha。只有项目拥有者明确说「这一版发 beta」时才用
-        // -beta，而且<b>不会延续到下一版</b>——上一版是 beta 不是下一版也是 beta
-        // 的理由。检查更新只推 beta 和正式版，标错等于把一个没验证过的版本
-        // 推给一台正在用的车机。
-        versionCode = 259
+        // 这一版是 fork：上游 2.1.0-beta 为底，加上 dim、远程、侧视和保存瞬间。
+        // versionCode 必须高于已经装在车上的 2.0.3-beta27（271）。
+        versionCode = 272
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "2.1.0-beta"
+        versionName = "2.1.0-beta1"
 
+        buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
+        buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -91,11 +117,16 @@ dependencies {
     // NanoHTTPD 是 BSD-3-Clause，ZXing 是 Apache-2.0。
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.google.zxing:core:3.5.1")
+    // 远程观看：车机拨出到 7xDash 的 /ws/car，有人看的时候才推 JPEG。
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // 设置界面（PreferenceScreen）
     implementation("androidx.preference:preference:1.2.1")
     // 两栏设置的左右分栏（androidx 自己的 PreferenceHeaderFragmentCompat 也用它）
     implementation("androidx.slidingpanelayout:slidingpanelayout:1.2.0")
+    // 车机没有无障碍设置页：借 Shizuku（shell 身份）给自己授 WRITE_SECURE_SETTINGS
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

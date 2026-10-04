@@ -34,7 +34,9 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
+import com.kooo.evcam.overlay.DimOverlayService;
 import com.kooo.evcam.overlay.FloatingAction;
+import com.kooo.evcam.overlay.OverlayCoordinator;
 
 /**
  * 悬浮按钮服务：整个应用只有这一个悬浮按钮。
@@ -58,8 +60,12 @@ public class RecordingFloatingService extends Service {
 
     /** 大小、字号、透明度、时长显示改了，就地重贴一遍。 */
     public static final String ACTION_UPDATE_STYLE = "com.kooo.evcam.action.UPDATE_FLOATING_STYLE";
+    /** 全屏遮罩盖上来之后，把按钮重新贴到最上面。没在显示就什么都不做。 */
+    public static final String ACTION_RAISE = "com.kooo.evcam.action.RAISE_RECORDING_FLOATING";
     /** 「重置悬浮窗布局」：大小和位置回默认，当场挪过去。 */
     public static final String ACTION_RESET_POSITION = "com.kooo.evcam.action.RESET_FLOATING_POSITION";
+    /** A saved external button asked to start or stop recording. Does not show the floating button. */
+    public static final String ACTION_TOGGLE_RECORDING = "com.kooo.evcam.action.SHORTCUT_TOGGLE_RECORDING";
 
     /**
      * 录制状态变了，告诉按钮换颜色。
@@ -100,7 +106,18 @@ public class RecordingFloatingService extends Service {
     // 视图组件
     private FrameLayout floatingContainer;
     private RecordingButtonView recordingButton;
+    private DimButtonView dimButton;
     private TextView timeTextView;
+    /** 录制键 + 间距 + 遮罩键。拖动时按这一整条夹在屏幕里。 */
+    private int clusterWidthPx;
+    private boolean downOnDim;
+    /** Finger started on the moon and has slid far enough to change the dim, not toggle it. */
+    private boolean dimAdjusting;
+    /** Opacity when the dim drag started. Right and down add to this. */
+    private int dimOrigin;
+    private int dimShown = -1;
+    private static final int DIM_LEVEL_MIN = 10;
+    private static final int DIM_LEVEL_MAX = 100;
 
     // 布局参数
     private WindowManager.LayoutParams layoutParams;
@@ -239,6 +256,17 @@ public class RecordingFloatingService extends Service {
             recordingButton.getLayoutParams().height = buttonSize;
             recordingButton.setButtonSize(buttonSize);
             recordingButton.requestLayout();
+            if (dimButton != null) {
+                LinearLayout.LayoutParams dimParams = (LinearLayout.LayoutParams) dimButton.getLayoutParams();
+                dimParams.width = buttonSize;
+                dimParams.height = buttonSize;
+                dimParams.leftMargin = Math.max(4, buttonSize / 8);
+                dimButton.setLayoutParams(dimParams);
+                clusterWidthPx = buttonSize * 2 + dimParams.leftMargin;
+            }
+        }
+        if (dimButton != null) {
+            dimButton.setDimOn(appConfig.isDimOverlayEnabled());
         }
 
         // 更新时间文字大小
@@ -306,6 +334,12 @@ public class RecordingFloatingService extends Service {
                 if (floatingContainer != null) {
                     mainHandler.post(this::applyStyle);
                 }
+            } else if (ACTION_RAISE.equals(action)) {
+                if (floatingContainer != null) {
+                    mainHandler.post(this::raiseAboveShade);
+                }
+            } else if (ACTION_TOGGLE_RECORDING.equals(action)) {
+                mainHandler.post(this::toggleRecording);
             } else if (ACTION_RESET_POSITION.equals(action)) {
                 // 同上：没显示就不管，下次显示时自然落在默认位置
                 if (floatingContainer != null) {
@@ -374,6 +408,7 @@ public class RecordingFloatingService extends Service {
             windowManager.removeView(floatingContainer);
             floatingContainer = null;
             recordingButton = null;
+            dimButton = null;
             timeTextView = null;
         }
         stopTimeUpdate();
@@ -407,7 +442,8 @@ public class RecordingFloatingService extends Service {
             return;
         }
         applyStyle();
-        placeAtSavedOrDefault(recordingButton.getLayoutParams().width);
+        placeAtSavedOrDefault(clusterWidthPx > 0
+                ? clusterWidthPx : recordingButton.getLayoutParams().width);
         windowManager.updateViewLayout(floatingContainer, layoutParams);
         AppLog.i(TAG, "悬浮按钮已回到默认位置: " + layoutParams.x + "," + layoutParams.y);
     }
@@ -433,6 +469,14 @@ public class RecordingFloatingService extends Service {
         recordingButton = new RecordingButtonView(this, buttonSize);
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(buttonSize, buttonSize);
         horizontalContainer.addView(recordingButton, buttonParams);
+
+        int gap = Math.max(4, buttonSize / 8);
+        dimButton = new DimButtonView(this);
+        dimButton.setDimOn(appConfig.isDimOverlayEnabled());
+        LinearLayout.LayoutParams dimParams = new LinearLayout.LayoutParams(buttonSize, buttonSize);
+        dimParams.leftMargin = gap;
+        horizontalContainer.addView(dimButton, dimParams);
+        clusterWidthPx = buttonSize * 2 + gap;
 
         // 创建时间显示
         timeTextView = new TextView(this);
@@ -472,7 +516,7 @@ public class RecordingFloatingService extends Service {
         layoutParams.gravity = Gravity.TOP | Gravity.START;
 
         // 恢复上次拖到的位置；没存过就用默认位置
-        placeAtSavedOrDefault(buttonSize);
+        placeAtSavedOrDefault(clusterWidthPx);
 
         // 设置触摸事件
         floatingContainer.setOnTouchListener(new View.OnTouchListener() {
@@ -486,12 +530,28 @@ public class RecordingFloatingService extends Service {
                         initialTouchY = event.getRawY();
                         isDragging = false;
                         longPressFired = false;
-                        mainHandler.postDelayed(longPressRunnable, LONG_PRESS_MS);
+                        downOnDim = hitDim(event);
+                        dimAdjusting = false;
+                        dimShown = -1;
+                        if (downOnDim) {
+                            dimOrigin = appConfig.getDimOpacity();
+                        } else {
+                            mainHandler.postDelayed(longPressRunnable, LONG_PRESS_MS);
+                        }
                         return true;
 
                     case MotionEvent.ACTION_MOVE:
                         int deltaX = (int) (event.getRawX() - initialTouchX);
                         int deltaY = (int) (event.getRawY() - initialTouchY);
+
+                        if (downOnDim) {
+                            if (Math.abs(deltaX) > CLICK_THRESHOLD || Math.abs(deltaY) > CLICK_THRESHOLD) {
+                                dimAdjusting = true;
+                                mainHandler.removeCallbacks(longPressRunnable);
+                                applyDimLevel(deltaX, deltaY);
+                            }
+                            return true;
+                        }
 
                         if (Math.abs(deltaX) > CLICK_THRESHOLD || Math.abs(deltaY) > CLICK_THRESHOLD) {
                             // 位置锁上时手指照样能滑，只是按钮不跟着走 ——
@@ -515,7 +575,8 @@ public class RecordingFloatingService extends Service {
                             // screenWidth - maxWidth 恒等于 200，等于把 X 锁死在 0..200 ——
                             // 无论屏幕多宽，按钮都只能在左边一小条里移动。这是个笔误，
                             // 本意应该是 Math.min(newX, maxWidth)。
-                            newX = Math.max(0, Math.min(newX, screenWidth - buttonSize));
+                            int span = clusterWidthPx > 0 ? clusterWidthPx : buttonSize;
+                            newX = Math.max(0, Math.min(newX, screenWidth - span));
                             newY = Math.max(0, Math.min(newY, screenHeight - buttonSize));
 
                             layoutParams.x = newX;
@@ -526,11 +587,17 @@ public class RecordingFloatingService extends Service {
 
                     case MotionEvent.ACTION_UP:
                         mainHandler.removeCallbacks(longPressRunnable);
+                        if (dimAdjusting) {
+                            dimAdjusting = false;
+                            return true;
+                        }
                         if (slidWhileLocked) {
                             slidWhileLocked = false;
                             return true;
                         }
-                        if (!isDragging && !longPressFired) {
+                        if (!isDragging && !longPressFired && downOnDim) {
+                            toggleDim();
+                        } else if (!isDragging && !longPressFired) {
                             perform(FloatingAction.fromKey(appConfig.getFloatingTapAction()));
                         } else if (!isDragging) {
                             // 长按已经在计时器里做过了，抬手不再做第二件事
@@ -549,10 +616,79 @@ public class RecordingFloatingService extends Service {
         try {
             windowManager.addView(floatingContainer, layoutParams);
             applyStyle();
+            // 按钮是后建的。广播如果在这之前到了，视图还是空的，颜色就停在待机。
+            // 以协调器此刻的状态再画一次，和主界面那个录制键对齐。
+            updateRecordingState(com.kooo.evcam.recording.RecordingCoordinator.get(this).isRecording());
             AppLog.d(TAG, "录制悬浮窗创建成功");
         } catch (Exception e) {
             AppLog.e(TAG, "添加悬浮窗失败", e);
             stopSelf();
+        }
+    }
+
+    /** 遮罩窗口后加，会盖住按钮。摘下来再贴一次，按钮回到最上面。 */
+    private void raiseAboveShade() {
+        if (floatingContainer == null || windowManager == null || layoutParams == null) {
+            return;
+        }
+        try {
+            windowManager.removeView(floatingContainer);
+            windowManager.addView(floatingContainer, layoutParams);
+        } catch (Exception e) {
+            AppLog.e(TAG, "悬浮按钮置顶失败", e);
+        }
+    }
+
+    private boolean hitDim(MotionEvent event) {
+        if (dimButton == null || dimButton.getWidth() == 0) {
+            return false;
+        }
+        int[] location = new int[2];
+        dimButton.getLocationOnScreen(location);
+        float x = event.getRawX();
+        float y = event.getRawY();
+        return x >= location[0] && x <= location[0] + dimButton.getWidth()
+                && y >= location[1] && y <= location[1] + dimButton.getHeight();
+    }
+
+    /**
+     * Drag on the moon changes how dark the veil is. Right or down increases it.
+     * Left or up decreases it. A short tap still toggles the veil on and off.
+     */
+    private void applyDimLevel(int deltaX, int deltaY) {
+        float density = getResources().getDisplayMetrics().density;
+        int step = Math.max(1, Math.round(density * 6f));
+        int level = dimOrigin + (deltaX + deltaY) / step;
+        if (level < DIM_LEVEL_MIN) {
+            level = DIM_LEVEL_MIN;
+        } else if (level > DIM_LEVEL_MAX) {
+            level = DIM_LEVEL_MAX;
+        }
+        if (level == dimShown) {
+            return;
+        }
+        dimShown = level;
+        if (!appConfig.isDimOverlayEnabled()) {
+            if (!OverlayCoordinator.setDimOverlayEnabled(this, true)) {
+                Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (dimButton != null) {
+                dimButton.setDimOn(true);
+            }
+        }
+        appConfig.setDimOpacity(level);
+        DimOverlayService.apply(this);
+    }
+
+    private void toggleDim() {
+        boolean on = !appConfig.isDimOverlayEnabled();
+        if (!OverlayCoordinator.setDimOverlayEnabled(this, on)) {
+            Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (dimButton != null) {
+            dimButton.setDimOn(on);
         }
     }
 
@@ -977,6 +1113,49 @@ public class RecordingFloatingService extends Service {
                 canvas.drawCircle(centerX, centerY, radius * 0.32f, iconPaint);
                 iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.recording));
             }
+        }
+    }
+
+    /** 录制键旁边的月亮。点一下开 / 关全屏遮罩。 */
+    private static class DimButtonView extends View {
+        private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint cutPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private boolean dimOn;
+
+        DimButtonView(Context context) {
+            super(context);
+            backgroundPaint.setStyle(Paint.Style.FILL);
+            iconPaint.setStyle(Paint.Style.FILL);
+            cutPaint.setXfermode(new android.graphics.PorterDuffXfermode(
+                    android.graphics.PorterDuff.Mode.DST_OUT));
+            setDimOn(false);
+        }
+
+        void setDimOn(boolean on) {
+            dimOn = on;
+            setContentDescription(getContext().getString(on
+                    ? R.string.dim_button_on : R.string.dim_button_off));
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            float radius = Math.min(getWidth(), getHeight()) / 2f - 6f;
+            backgroundPaint.setColor(ContextCompat.getColor(getContext(),
+                    dimOn ? R.color.text_primary : R.color.sunken));
+            canvas.drawCircle(cx, cy, radius, backgroundPaint);
+
+            iconPaint.setColor(ContextCompat.getColor(getContext(),
+                    dimOn ? R.color.bg : R.color.text_primary));
+            int layer = canvas.saveLayer(0, 0, getWidth(), getHeight(), null);
+            float moon = radius * 0.46f;
+            canvas.drawCircle(cx - moon * 0.15f, cy, moon, iconPaint);
+            canvas.drawCircle(cx + moon * 0.45f, cy - moon * 0.15f, moon * 0.82f, cutPaint);
+            canvas.restoreToCount(layer);
         }
     }
 }

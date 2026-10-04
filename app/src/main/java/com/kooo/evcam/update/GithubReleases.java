@@ -64,10 +64,11 @@ public final class GithubReleases {
 
     private static final String TAG = "GithubReleases";
 
-    private static final String OWNER = "dts88";
+    /** 更新只问这个 fork。上游 dts88 的 Release 不会被推到这台车机上。 */
+    private static final String OWNER = "kitnipan";
     private static final String REPO = "zeekr-shortcut-car";
     private static final String LIST_URL =
-            "https://api.github.com/repos/" + OWNER + "/" + REPO + "/releases?per_page=20";
+            "https://api.github.com/repos/" + OWNER + "/" + REPO + "/releases?per_page=50";
 
     /** GitHub 要求带 User-Agent，不带会直接 403。 */
     private static final String USER_AGENT = "ZeekrShortcut-UpdateCheck";
@@ -132,17 +133,17 @@ public final class GithubReleases {
      * @return 没有符合条件、且带 APK 的版本时返回 null
      * @throws IOException 网络或解析出错
      */
-    public static Release fetchLatest(boolean includeBeta, String currentVersion)
-            throws IOException {
+    /**
+     * 可安装的版本，新的在前。草稿和 alpha 不算。关了「接收 Beta 版」时 beta 也不算。
+     */
+    public static List<Release> list(boolean includeBeta) throws IOException {
         String body = getText(LIST_URL);
-        Release best = null;
-        List<Release> newer = new ArrayList<>();
+        List<Release> found = new ArrayList<>();
         try {
             JSONArray releases = new JSONArray(body);
             for (int i = 0; i < releases.length(); i++) {
                 JSONObject release = releases.optJSONObject(i);
                 if (release == null || release.optBoolean("draft", false)) {
-                    // 草稿是不该被公众看到的版本
                     continue;
                 }
                 Release candidate = toRelease(release);
@@ -153,30 +154,31 @@ public final class GithubReleases {
                         ? VersionName.isBetaOrRelease(candidate.tagName)
                         : VersionName.isRelease(candidate.tagName);
                 if (!eligible) {
-                    // alpha 永远不推：那是开发过程里随手发的，不该盖到一台在用的车机上。
-                    // 关了「接收 Beta 版」时 beta 也不推
                     continue;
                 }
-                if (best == null || VersionName.compare(candidate.tagName, best.tagName) > 0) {
-                    best = candidate;
-                }
-                if (currentVersion == null
-                        || VersionName.isNewer(candidate.tagName, currentVersion)) {
-                    newer.add(candidate);
-                }
+                found.add(candidate);
             }
         } catch (org.json.JSONException e) {
             throw new Failure("Unreadable GitHub response: " + e.getMessage(),
                     R.string.upd_err_bad_response).because(e);
         }
-        if (best == null) {
+        Collections.sort(found, (a, b) -> VersionName.compare(b.tagName, a.tagName));
+        return found;
+    }
+
+    public static Release fetchLatest(boolean includeBeta, String currentVersion)
+            throws IOException {
+        List<Release> all = list(includeBeta);
+        if (all.isEmpty()) {
             return null;
         }
-        // 新的在前：对话框里最先看到的应该是马上要装上的那一版
-        Collections.sort(newer, (a, b) -> VersionName.compare(b.tagName, a.tagName));
+        Release best = all.get(0);
         List<ReleaseNotes.Entry> entries = new ArrayList<>();
-        for (Release release : newer) {
-            entries.add(new ReleaseNotes.Entry(release.tagName, release.body));
+        for (Release release : all) {
+            if (currentVersion == null
+                    || VersionName.isNewer(release.tagName, currentVersion)) {
+                entries.add(new ReleaseNotes.Entry(release.tagName, release.body));
+            }
         }
         return best.withNotes(ReleaseNotes.combine(entries));
     }

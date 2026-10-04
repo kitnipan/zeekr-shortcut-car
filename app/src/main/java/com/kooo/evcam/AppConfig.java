@@ -46,6 +46,16 @@ public class AppConfig {
     
     // 悬浮窗配置
     private static final String KEY_FLOATING_WINDOW_ALPHA = "floating_window_alpha";  // 悬浮窗透明度
+
+    // 全屏遮罩：压暗导航地图。跟超级后视镜一样是系统悬浮窗。
+    private static final String KEY_DIM_ENABLED = "dim_overlay_enabled";
+    private static final String KEY_DIM_OPACITY = "dim_overlay_opacity";
+    private static final String KEY_DIM_BRIGHTNESS = "dim_overlay_brightness";
+    private static final String KEY_DIM_WARMTH = "dim_overlay_warmth";
+    private static final String KEY_DIM_PASS_THROUGH = "dim_overlay_pass_through";
+    public static final int DIM_OPACITY_DEFAULT = 90;
+    public static final int DIM_BRIGHTNESS_DEFAULT = 0;
+    public static final int DIM_WARMTH_DEFAULT = 0;
     
     // 存储清理配置
     private static final String KEY_VIDEO_STORAGE_LIMIT_GB = "video_storage_limit_gb";  // 视频存储限制（GB）
@@ -73,6 +83,12 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
     private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
     private static final String KEY_UPDATE_BETA = "update_include_beta";  // 检查更新是否接收 Beta 版
+    private static final String KEY_DRIVE_CLIENT_ID = "drive_client_id";
+    private static final String KEY_DRIVE_CLIENT_SECRET = "drive_client_secret";
+    private static final String KEY_DRIVE_REFRESH = "drive_refresh_token";
+    private static final String KEY_DRIVE_ACCESS = "drive_access_token";
+    private static final String KEY_DRIVE_ACCESS_EXPIRY = "drive_access_expiry";
+    private static final String KEY_DRIVE_FOLDER = "drive_folder_id";
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
@@ -88,6 +104,35 @@ public class AppConfig {
     private static final String KEY_INFO_BAR = "info_bar_enabled";  // 录像下方的行驶信息条
     private static final String KEY_VEHICLE_STATUS = "vehicle_status_panel";  // 主界面的车辆状态面板（试验性）
     private static final String KEY_INFO_BAR_ITEMS = "info_bar_items";  // 信息条上放哪几项（系统信息里勾的）
+    private static final String KEY_INFO_BAR_ALL = "info_bar_all";  // 开发者：连没验证的栏目一起启用
+    private static final String KEY_SIDE_POPUP = "side_popup_enabled";  // 打转向灯弹侧视
+    private static final String KEY_BOTH_MIRRORS = "both_mirrors_enabled";  // 快捷键同时打开左右侧视
+    private static final String KEY_SIDE_POPUP_MIN_SPEED = "side_popup_min_speed";  // 侧视弹窗的车速门槛 km/h
+    /** 默认 30 km/h：再慢原厂自己会弹侧方小窗。 */
+    public static final int SIDE_POPUP_DEFAULT_MIN_SPEED = 30;
+    public static final int SIDE_POPUP_MAX_MIN_SPEED = 80;
+    private static final String KEY_SIDE_POPUP_STRAIGHTEN = "side_popup_straighten";  // 侧视拉直鱼眼
+    private static final String KEY_SIDE_POPUP_INSTANT = "side_popup_instant";  // D 档时备着相机，打灯即出画面
+    private static final String KEY_SIDE_POPUP_CLOSE_DELAY_MS = "side_popup_close_delay_ms";  // 灯灭后再留多少毫秒
+    private static final String KEY_SIDE_POPUP_SIZE = "side_popup_size";  // 边长，屏幕高度的百分比
+    private static final String KEY_SIDE_POPUP_VERTICAL = "side_popup_vertical";  // 上下位置，0 顶 100 底
+    /** 以毫秒存：按秒只有 0–3 四档，车机那条很宽的滑块拖一小段根本不动（PR 作者 2026-10-01 实车）。 */
+    public static final int SIDE_POPUP_MAX_CLOSE_DELAY_MS = 3000;
+    public static final int SIDE_POPUP_DEFAULT_CLOSE_DELAY_MS = 1000;
+    public static final int SIDE_POPUP_MIN_SIZE_PERCENT = 25;
+    public static final int SIDE_POPUP_MAX_SIZE_PERCENT = 90;
+    public static final int SIDE_POPUP_DEFAULT_SIZE_PERCENT = 55;
+    private static final String KEY_SIDE_POPUP_FOV = "side_popup_fov";  // 虚拟相机视野（度）
+    private static final String KEY_SIDE_POPUP_YAW = "side_popup_yaw";  // 往车尾转多少度，负数往车头
+    private static final String KEY_SIDE_POPUP_PITCH = "side_popup_pitch";  // 往上（车外）转多少度，负数往下
+    private static final String KEY_SIDE_POPUP_ROLL = "side_popup_roll";  // 旧：左右共用，读时迁到左右键
+    private static final String KEY_SIDE_POPUP_ROLL_LEFT = "side_popup_roll_left";
+    private static final String KEY_SIDE_POPUP_ROLL_RIGHT = "side_popup_roll_right";
+    /** 默认值是猜的（见 SideViewProjection）：视野 90°，往车尾转 50°，稍往上 15°。滚转默认 0。 */
+    public static final int SIDE_POPUP_DEFAULT_FOV = 90;
+    public static final int SIDE_POPUP_DEFAULT_YAW = 50;
+    public static final int SIDE_POPUP_DEFAULT_PITCH = 15;
+    public static final int SIDE_POPUP_DEFAULT_ROLL = 0;
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
@@ -1002,6 +1047,76 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_UPDATE_BETA, enabled).apply();
     }
 
+    public String getDriveClientId() {
+        String saved = prefs.getString(KEY_DRIVE_CLIENT_ID, "");
+        if (saved != null && !saved.trim().isEmpty()) {
+            return saved.trim();
+        }
+        return BuildConfig.DRIVE_CLIENT_ID;
+    }
+
+    public void setDriveClientId(String value) {
+        prefs.edit().putString(KEY_DRIVE_CLIENT_ID, value == null ? "" : value.trim()).apply();
+    }
+
+    public String getDriveClientSecret() {
+        String saved = prefs.getString(KEY_DRIVE_CLIENT_SECRET, "");
+        if (saved != null && !saved.trim().isEmpty()) {
+            return saved.trim();
+        }
+        return BuildConfig.DRIVE_CLIENT_SECRET;
+    }
+
+    public void setDriveClientSecret(String value) {
+        prefs.edit().putString(KEY_DRIVE_CLIENT_SECRET, value == null ? "" : value.trim()).apply();
+    }
+
+    public boolean hasDriveClient() {
+        return !getDriveClientId().isEmpty() && !getDriveClientSecret().isEmpty();
+    }
+
+    public boolean hasDriveRefreshToken() {
+        return !getDriveRefreshToken().isEmpty();
+    }
+
+    public String getDriveRefreshToken() {
+        return prefs.getString(KEY_DRIVE_REFRESH, "");
+    }
+
+    public String getDriveAccessToken() {
+        return prefs.getString(KEY_DRIVE_ACCESS, "");
+    }
+
+    public long getDriveAccessExpiry() {
+        return prefs.getLong(KEY_DRIVE_ACCESS_EXPIRY, 0L);
+    }
+
+    public String getDriveFolderId() {
+        return prefs.getString(KEY_DRIVE_FOLDER, "");
+    }
+
+    public void setDriveFolderId(String id) {
+        prefs.edit().putString(KEY_DRIVE_FOLDER, id == null ? "" : id).apply();
+    }
+
+    public void setDriveTokens(String accessToken, String refreshToken, long expiresAtMs) {
+        prefs.edit()
+                .putString(KEY_DRIVE_ACCESS, accessToken == null ? "" : accessToken)
+                .putString(KEY_DRIVE_REFRESH, refreshToken == null ? "" : refreshToken)
+                .putLong(KEY_DRIVE_ACCESS_EXPIRY, expiresAtMs)
+                .apply();
+    }
+
+    /** 退出登录。客户端 ID 和密钥留着，下次还能登。 */
+    public void clearDriveSession() {
+        prefs.edit()
+                .remove(KEY_DRIVE_REFRESH)
+                .remove(KEY_DRIVE_ACCESS)
+                .remove(KEY_DRIVE_ACCESS_EXPIRY)
+                .remove(KEY_DRIVE_FOLDER)
+                .apply();
+    }
+
     /** 录制时减少装饰性动效。默认开：编码器在用 GPU，界面不跟它抢。 */
     public boolean isReduceMotionWhileRecording() {
         return prefs.getBoolean(KEY_REDUCE_MOTION_RECORDING, true);
@@ -1407,6 +1522,150 @@ public class AppConfig {
         AppLog.i(TAG, "信息条显示项: " + items);
     }
 
+    /** 打转向灯弹侧视，默认关。 */
+    public boolean isSidePopupEnabled() {
+        return prefs.getBoolean(KEY_SIDE_POPUP, false);
+    }
+
+    public void setSidePopupEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SIDE_POPUP, enabled).apply();
+        AppLog.i(TAG, "打转向灯弹侧视: " + (enabled ? "开" : "关"));
+    }
+
+    /** 快捷键同时打开左右侧视。和超级后视镜共用一路相机输出，所以开着时后视镜关掉。 */
+    public boolean isBothMirrorsEnabled() {
+        return prefs.getBoolean(KEY_BOTH_MIRRORS, false);
+    }
+
+    public void setBothMirrorsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_BOTH_MIRRORS, enabled).apply();
+        AppLog.i(TAG, "左右侧视: " + (enabled ? "开" : "关"));
+    }
+
+    /** 低于这个车速（km/h）不弹；0 表示不看车速。 */
+    public int getSidePopupMinSpeed() {
+        int v = prefs.getInt(KEY_SIDE_POPUP_MIN_SPEED, SIDE_POPUP_DEFAULT_MIN_SPEED);
+        return Math.max(0, Math.min(SIDE_POPUP_MAX_MIN_SPEED, v));
+    }
+
+    public void setSidePopupMinSpeed(int kmh) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_MIN_SPEED,
+                Math.max(0, Math.min(SIDE_POPUP_MAX_MIN_SPEED, kmh))).apply();
+    }
+
+    /** 侧视拉直鱼眼，默认开；视野和朝向见 getSidePopupFov / Yaw / Pitch。 */
+    public boolean isSidePopupStraighten() {
+        return prefs.getBoolean(KEY_SIDE_POPUP_STRAIGHTEN, true);
+    }
+
+    public void setSidePopupStraighten(boolean on) {
+        prefs.edit().putBoolean(KEY_SIDE_POPUP_STRAIGHTEN, on).apply();
+    }
+
+    /** D 档时把侧视窗备着（透明、相机照推），打灯即出画面；代价是开车时相机一直开着。默认开。 */
+    public boolean isSidePopupInstant() {
+        return prefs.getBoolean(KEY_SIDE_POPUP_INSTANT, true);
+    }
+
+    public void setSidePopupInstant(boolean on) {
+        prefs.edit().putBoolean(KEY_SIDE_POPUP_INSTANT, on).apply();
+    }
+
+    /** 灯灭后再留多少毫秒，0..3000，按 100 取整，默认 1000（PR 作者 2026-10-01 实车：灯灭就收太急）。 */
+    public int getSidePopupCloseDelayMs() {
+        int v = prefs.getInt(KEY_SIDE_POPUP_CLOSE_DELAY_MS, SIDE_POPUP_DEFAULT_CLOSE_DELAY_MS);
+        return Math.max(0, Math.min(SIDE_POPUP_MAX_CLOSE_DELAY_MS, v));
+    }
+
+    public void setSidePopupCloseDelayMs(int ms) {
+        int rounded = Math.round(ms / 100f) * 100;
+        prefs.edit().putInt(KEY_SIDE_POPUP_CLOSE_DELAY_MS,
+                Math.max(0, Math.min(SIDE_POPUP_MAX_CLOSE_DELAY_MS, rounded))).apply();
+    }
+
+    /** 侧视窗边长，屏幕高度的百分比。 */
+    public int getSidePopupSizePercent() {
+        int v = prefs.getInt(KEY_SIDE_POPUP_SIZE, SIDE_POPUP_DEFAULT_SIZE_PERCENT);
+        return Math.max(SIDE_POPUP_MIN_SIZE_PERCENT, Math.min(SIDE_POPUP_MAX_SIZE_PERCENT, v));
+    }
+
+    public void setSidePopupSizePercent(int percent) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_SIZE,
+                Math.max(SIDE_POPUP_MIN_SIZE_PERCENT, Math.min(SIDE_POPUP_MAX_SIZE_PERCENT, percent))).apply();
+    }
+
+    /** 侧视窗上下位置：剩余高度里的百分比，0 贴顶、100 贴底，默认 0。 */
+    public int getSidePopupVerticalPercent() {
+        int v = prefs.getInt(KEY_SIDE_POPUP_VERTICAL, 0);
+        return Math.max(0, Math.min(100, v));
+    }
+
+    public void setSidePopupVerticalPercent(int percent) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_VERTICAL, Math.max(0, Math.min(100, percent))).apply();
+    }
+
+    /** 侧视虚拟相机的视野（度）。 */
+    public int getSidePopupFov() {
+        int v = prefs.getInt(KEY_SIDE_POPUP_FOV, SIDE_POPUP_DEFAULT_FOV);
+        return Math.round(Math.max(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES,
+                Math.min(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES, v)));
+    }
+
+    public void setSidePopupFov(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_FOV, degrees).apply();
+    }
+
+    /** 侧视往车尾转多少度（负数往车头）。 */
+    public int getSidePopupYaw() {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
+        return Math.max(-max, Math.min(max, prefs.getInt(KEY_SIDE_POPUP_YAW, SIDE_POPUP_DEFAULT_YAW)));
+    }
+
+    public void setSidePopupYaw(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_YAW, degrees).apply();
+    }
+
+    /** 侧视往上（车外）转多少度（负数往下）。 */
+    public int getSidePopupPitch() {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
+        return Math.max(-max, Math.min(max, prefs.getInt(KEY_SIDE_POPUP_PITCH, SIDE_POPUP_DEFAULT_PITCH)));
+    }
+
+    public void setSidePopupPitch(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_PITCH, degrees).apply();
+    }
+
+    /** 侧视画面平面内旋转多少度（正数顺时针）。左右分开：镜子安装倾斜往往不一样。 */
+    public int getSidePopupRollLeft() {
+        return readSidePopupRoll(KEY_SIDE_POPUP_ROLL_LEFT);
+    }
+
+    public void setSidePopupRollLeft(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_ROLL_LEFT, degrees).apply();
+    }
+
+    public int getSidePopupRollRight() {
+        return readSidePopupRoll(KEY_SIDE_POPUP_ROLL_RIGHT);
+    }
+
+    public void setSidePopupRollRight(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_POPUP_ROLL_RIGHT, degrees).apply();
+    }
+
+    /** {@code lane} 为 {@link com.kooo.evcam.zeekr.LaneCycle#LEFT} / {@code RIGHT}。 */
+    public int getSidePopupRollForLane(int lane) {
+        return lane == com.kooo.evcam.zeekr.LaneCycle.RIGHT
+                ? getSidePopupRollRight()
+                : getSidePopupRollLeft();
+    }
+
+    private int readSidePopupRoll(String key) {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_ROLL_DEGREES);
+        int legacy = prefs.getInt(KEY_SIDE_POPUP_ROLL, SIDE_POPUP_DEFAULT_ROLL);
+        int v = prefs.contains(key) ? prefs.getInt(key, legacy) : legacy;
+        return Math.max(-max, Math.min(max, v));
+    }
+
     public boolean isLicensePlateEnabled() {
         return prefs.getBoolean(KEY_LICENSE_PLATE_ENABLED, false);
     }
@@ -1775,6 +2034,179 @@ public class AppConfig {
     public void setRecordingFloatingTimeTextSizeSp(int sizeSp) {
         prefs.edit().putInt(KEY_RECORDING_FLOATING_TIME_TEXT_SIZE, sizeSp).apply();
         AppLog.d(TAG, "录制悬浮按钮时间文字大小设置: " + sizeSp + "sp");
+    }
+
+    // ==================== 全屏遮罩 ====================
+
+    public boolean isDimOverlayEnabled() {
+        return prefs.getBoolean(KEY_DIM_ENABLED, false);
+    }
+
+    public void setDimOverlayEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_DIM_ENABLED, enabled).apply();
+    }
+
+    private static final String KEY_BUTTON_SHORTCUTS = "button_shortcuts";
+
+    public String getButtonShortcuts() {
+        return prefs.getString(KEY_BUTTON_SHORTCUTS, "");
+    }
+
+    public void setButtonShortcuts(String raw) {
+        prefs.edit().putString(KEY_BUTTON_SHORTCUTS, raw == null ? "" : raw).apply();
+    }
+
+    private static final String KEY_SHORTCUT_CATCH_EVERYWHERE = "shortcut_catch_everywhere";
+
+    /** 没有无障碍服务时，用按键捕捉窗让快捷键在任何界面生效（试验）。 */
+    public boolean isShortcutCatchEverywhere() {
+        return prefs.getBoolean(KEY_SHORTCUT_CATCH_EVERYWHERE, true);
+    }
+
+    public void setShortcutCatchEverywhere(boolean on) {
+        prefs.edit().putBoolean(KEY_SHORTCUT_CATCH_EVERYWHERE, on).apply();
+    }
+
+    private static final String KEY_SAVED_CLIPS = "saved_clip_groups";
+    private static final String KEY_SAVE_MOMENT_USB = "save_moment_usb";
+    private static final String KEY_SAVE_MOMENT_DRIVE = "save_moment_drive";
+
+    /** Protected segment stamps ({@code yyyyMMdd_HHmmss}). Auto-delete never removes them. */
+    public java.util.Set<String> getSavedClipGroups() {
+        return com.kooo.evcam.recording.SavedClips.parse(prefs.getString(KEY_SAVED_CLIPS, ""));
+    }
+
+    public void setSavedClipGroups(java.util.Set<String> stamps) {
+        prefs.edit().putString(KEY_SAVED_CLIPS,
+                com.kooo.evcam.recording.SavedClips.write(stamps)).apply();
+    }
+
+    /** 保存这一刻时，把已完成的文件再拷一份到 U 盘的 moments。默认开。 */
+    public boolean isSaveMomentUsb() {
+        return prefs.getBoolean(KEY_SAVE_MOMENT_USB, true);
+    }
+
+    public void setSaveMomentUsb(boolean on) {
+        prefs.edit().putBoolean(KEY_SAVE_MOMENT_USB, on).apply();
+    }
+
+    /** 保存这一刻时再上传到 Google Drive。默认关，而且要已登录。 */
+    public boolean isSaveMomentDrive() {
+        return prefs.getBoolean(KEY_SAVE_MOMENT_DRIVE, false);
+    }
+
+    public void setSaveMomentDrive(boolean on) {
+        prefs.edit().putBoolean(KEY_SAVE_MOMENT_DRIVE, on).apply();
+    }
+
+    public void addSavedClipGroups(java.util.Collection<String> stamps) {
+        if (stamps == null || stamps.isEmpty()) {
+            return;
+        }
+        java.util.Set<String> all = getSavedClipGroups();
+        boolean changed = false;
+        for (String stamp : stamps) {
+            String n = com.kooo.evcam.recording.SavedClips.normalize(stamp);
+            if (n != null && all.add(n)) {
+                changed = true;
+            }
+        }
+        if (changed) {
+            setSavedClipGroups(all);
+        }
+    }
+
+    private static final String KEY_AUTO_DIM = "auto_dim_enabled";
+    private static final String KEY_AUTO_DIM_START = "auto_dim_start_hour";
+    private static final String KEY_AUTO_DIM_END = "auto_dim_end_hour";
+
+    /** Experimental: dim on by wall-clock night window. */
+    public boolean isAutoDimEnabled() {
+        return prefs.getBoolean(KEY_AUTO_DIM, false);
+    }
+
+    public void setAutoDimEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_AUTO_DIM, on).apply();
+    }
+
+    /** Hour 0–23 when dim turns on (default 19). */
+    public int getAutoDimStartHour() {
+        return clampHour(prefs.getInt(KEY_AUTO_DIM_START, 19));
+    }
+
+    public void setAutoDimStartHour(int hour) {
+        prefs.edit().putInt(KEY_AUTO_DIM_START, clampHour(hour)).apply();
+    }
+
+    /** Hour 0–23 when dim turns off (default 7). */
+    public int getAutoDimEndHour() {
+        return clampHour(prefs.getInt(KEY_AUTO_DIM_END, 7));
+    }
+
+    public void setAutoDimEndHour(int hour) {
+        prefs.edit().putInt(KEY_AUTO_DIM_END, clampHour(hour)).apply();
+    }
+
+    private static int clampHour(int hour) {
+        if (hour < 0) {
+            return 0;
+        }
+        if (hour > 23) {
+            return 23;
+        }
+        return hour;
+    }
+
+    public int getDimOpacity() {
+        return clampPercent(prefs.getInt(KEY_DIM_OPACITY, DIM_OPACITY_DEFAULT));
+    }
+
+    public void setDimOpacity(int percent) {
+        prefs.edit().putInt(KEY_DIM_OPACITY, clampPercent(percent)).apply();
+    }
+
+    public int getDimBrightness() {
+        return clampPercent(prefs.getInt(KEY_DIM_BRIGHTNESS, DIM_BRIGHTNESS_DEFAULT));
+    }
+
+    public void setDimBrightness(int percent) {
+        prefs.edit().putInt(KEY_DIM_BRIGHTNESS, clampPercent(percent)).apply();
+    }
+
+    public int getDimWarmth() {
+        return clampPercent(prefs.getInt(KEY_DIM_WARMTH, DIM_WARMTH_DEFAULT));
+    }
+
+    public void setDimWarmth(int percent) {
+        prefs.edit().putInt(KEY_DIM_WARMTH, clampPercent(percent)).apply();
+    }
+
+    /** 开着时手指穿过遮罩，地图照常能点。 */
+    public boolean isDimPassThrough() {
+        return prefs.getBoolean(KEY_DIM_PASS_THROUGH, true);
+    }
+
+    public void setDimPassThrough(boolean passThrough) {
+        prefs.edit().putBoolean(KEY_DIM_PASS_THROUGH, passThrough).apply();
+    }
+
+    public void resetDimOverlay() {
+        prefs.edit()
+                .putInt(KEY_DIM_OPACITY, DIM_OPACITY_DEFAULT)
+                .putInt(KEY_DIM_BRIGHTNESS, DIM_BRIGHTNESS_DEFAULT)
+                .putInt(KEY_DIM_WARMTH, DIM_WARMTH_DEFAULT)
+                .putBoolean(KEY_DIM_PASS_THROUGH, true)
+                .apply();
+    }
+
+    private static int clampPercent(int value) {
+        if (value < 0) {
+            return 0;
+        }
+        if (value > 100) {
+            return 100;
+        }
+        return value;
     }
 
 }

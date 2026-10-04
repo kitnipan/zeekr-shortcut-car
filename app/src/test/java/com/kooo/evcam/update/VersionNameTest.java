@@ -118,4 +118,16 @@ public class VersionNameTest {
         assertFalse(VersionName.isRelease("nightly"));
         assertFalse(VersionName.isRelease(null));
     }
+
+    /** 这个 fork 发 2.0.0-kd。同号时它比上游正式版新，并且检查更新会推它。 */
+    @Test
+    public void kdChannelIsOfferedAndNewerThanTheSameRelease() {
+        assertTrue(VersionName.isBetaOrRelease("2.0.0-kd"));
+        assertTrue(VersionName.isBetaOrRelease("v2.0.0-kd.2"));
+        assertTrue(VersionName.isRelease("2.0.0-kd"));
+        assertTrue(VersionName.isNewer("2.0.0-kd", "2.0.0"));
+        assertTrue(VersionName.isNewer("2.0.0-kd.2", "2.0.0-kd"));
+        assertTrue(VersionName.isNewer("2.0.1-kd", "2.0.0-kd"));
+        assertFalse(VersionName.isNewer("2.0.0", "2.0.0-kd"));
+    }
 }

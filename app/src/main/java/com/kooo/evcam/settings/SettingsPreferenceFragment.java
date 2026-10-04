@@ -26,9 +26,11 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
+import com.kooo.evcam.overlay.DimOverlayService;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.service.RecordingFloatingService;
+import com.kooo.evcam.input.ControllerProbeActivity;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
 
@@ -96,12 +98,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindRecording();
         bindStorage();
         bindRearView();
+        bindSidePopup();
         bindFloating();
+        bindDim();
         bindInterface();
         bindSystem();
         bindAdvanced();
         bindDeveloper();
         bindUpdate();
+        bindDrive();
 
         // 行样式在交给列表之前套上（车机系统式：卡片行、开关在前、值在后）
         PreferenceRows.apply(getPreferenceScreen());
@@ -120,6 +125,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateStorageUsage();
         refreshRearViewSize();
+        SwitchPreferenceCompat dim = findPreference("pref_dim");
+        if (dim != null && appConfig != null) {
+            dim.setChecked(appConfig.isDimOverlayEnabled());
+        }
     }
 
     // ------------------------------------------------------------------ 录制
@@ -651,6 +660,75 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }, "storage-usage").start();
     }
 
+    // ------------------------------------------------------------------ 打转向灯弹侧视
+
+    private void bindSidePopup() {
+        bindOverlaySwitch("pref_side_popup", appConfig.isSidePopupEnabled(),
+                OverlayCoordinator::setSidePopupEnabled, on -> {
+                    if (on) {
+                        toast(getString(R.string.msg_side_popup_on));
+                    }
+                });
+        bindSlider("pref_side_popup_min_speed", 0, AppConfig.SIDE_POPUP_MAX_MIN_SPEED,
+                appConfig.getSidePopupMinSpeed(), "km/h", value -> {
+                    appConfig.setSidePopupMinSpeed(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSwitch("pref_side_popup_straighten", appConfig.isSidePopupStraighten(), value -> {
+            appConfig.setSidePopupStraighten(value);
+            com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+        });
+        bindSlider("pref_side_popup_fov",
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES),
+                appConfig.getSidePopupFov(), "°", value -> {
+                    appConfig.setSidePopupFov(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        int maxYaw = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
+        bindSlider("pref_side_popup_yaw", -maxYaw, maxYaw,
+                appConfig.getSidePopupYaw(), "°", value -> {
+                    appConfig.setSidePopupYaw(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        int maxPitch = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
+        bindSlider("pref_side_popup_pitch", -maxPitch, maxPitch,
+                appConfig.getSidePopupPitch(), "°", value -> {
+                    appConfig.setSidePopupPitch(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        int maxRoll = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_ROLL_DEGREES);
+        bindSlider("pref_side_popup_roll_left", -maxRoll, maxRoll,
+                appConfig.getSidePopupRollLeft(), "°", value -> {
+                    appConfig.setSidePopupRollLeft(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSlider("pref_side_popup_roll_right", -maxRoll, maxRoll,
+                appConfig.getSidePopupRollRight(), "°", value -> {
+                    appConfig.setSidePopupRollRight(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSwitch("pref_side_popup_instant", appConfig.isSidePopupInstant(), value -> {
+            appConfig.setSidePopupInstant(value);
+            com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+        });
+        bindSlider("pref_side_popup_close_delay_ms", 0, AppConfig.SIDE_POPUP_MAX_CLOSE_DELAY_MS,
+                appConfig.getSidePopupCloseDelayMs(), "ms", value -> {
+                    appConfig.setSidePopupCloseDelayMs(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSlider("pref_side_popup_size", AppConfig.SIDE_POPUP_MIN_SIZE_PERCENT,
+                AppConfig.SIDE_POPUP_MAX_SIZE_PERCENT, appConfig.getSidePopupSizePercent(), "%", value -> {
+                    appConfig.setSidePopupSizePercent(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSlider("pref_side_popup_vertical", 0, 100,
+                appConfig.getSidePopupVerticalPercent(), "%", value -> {
+                    appConfig.setSidePopupVerticalPercent(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+    }
+
     // ------------------------------------------------------------------ 超级后视镜
 
     private void bindRearView() {
@@ -913,6 +991,69 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         });
     }
 
+    // ------------------------------------------------------------------ 屏幕遮罩
+
+    private void bindDim() {
+        bindOverlaySwitch("pref_dim", appConfig.isDimOverlayEnabled(),
+                OverlayCoordinator::setDimOverlayEnabled, on -> pushFloatingStyle());
+
+        bindSlider("pref_dim_opacity", 10, 100, appConfig.getDimOpacity(), "%", value -> {
+            appConfig.setDimOpacity(value);
+            pushDimLook();
+        });
+        bindSlider("pref_dim_brightness", 0, 100, appConfig.getDimBrightness(), "", value -> {
+            appConfig.setDimBrightness(value);
+            pushDimLook();
+        });
+        bindSlider("pref_dim_warmth", 0, 100, appConfig.getDimWarmth(), "", value -> {
+            appConfig.setDimWarmth(value);
+            pushDimLook();
+        });
+        bindSwitch("pref_dim_passthrough", appConfig.isDimPassThrough(), value -> {
+            appConfig.setDimPassThrough(value);
+            pushDimLook();
+        });
+        onClick("pref_dim_reset", pref -> {
+            appConfig.resetDimOverlay();
+            SeekBarPreference opacity = findPreference("pref_dim_opacity");
+            if (opacity != null) {
+                opacity.setValue(appConfig.getDimOpacity());
+            }
+            SeekBarPreference brightness = findPreference("pref_dim_brightness");
+            if (brightness != null) {
+                brightness.setValue(appConfig.getDimBrightness());
+            }
+            SeekBarPreference warmth = findPreference("pref_dim_warmth");
+            if (warmth != null) {
+                warmth.setValue(appConfig.getDimWarmth());
+            }
+            SwitchPreferenceCompat pass = findPreference("pref_dim_passthrough");
+            if (pass != null) {
+                pass.setChecked(appConfig.isDimPassThrough());
+            }
+            pushDimLook();
+            toast(getString(R.string.msg_dim_reset));
+        });
+        bindSwitch("pref_auto_dim", appConfig.isAutoDimEnabled(), value -> {
+            appConfig.setAutoDimEnabled(value);
+            com.kooo.evcam.overlay.AutoDim.sync(requireContext());
+        });
+        bindSlider("pref_auto_dim_start", 0, 23, appConfig.getAutoDimStartHour(), ":00", value -> {
+            appConfig.setAutoDimStartHour(value);
+            com.kooo.evcam.overlay.AutoDim.sync(requireContext());
+        });
+        bindSlider("pref_auto_dim_end", 0, 23, appConfig.getAutoDimEndHour(), ":00", value -> {
+            appConfig.setAutoDimEndHour(value);
+            com.kooo.evcam.overlay.AutoDim.sync(requireContext());
+        });
+    }
+
+    private void pushDimLook() {
+        if (getContext() != null && appConfig.isDimOverlayEnabled()) {
+            DimOverlayService.apply(getContext());
+        }
+    }
+
     // ------------------------------------------------------------------ 系统
 
     /**
@@ -991,6 +1132,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时收，离开就把资源放掉
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
+        onClick("pref_controller", pref ->
+                startActivity(new Intent(getContext(), ControllerProbeActivity.class)));
+        onClick("pref_shortcuts", pref ->
+                startActivity(new Intent(getContext(), com.kooo.evcam.input.ShortcutListActivity.class)));
+        bindSwitch("pref_save_moment_usb", appConfig.isSaveMomentUsb(),
+                value -> appConfig.setSaveMomentUsb(value));
+        bindSwitch("pref_save_moment_drive", appConfig.isSaveMomentDrive(),
+                value -> appConfig.setSaveMomentDrive(value));
 
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));
@@ -1216,6 +1365,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if ("pref_screen_off_wake_hours".equals(key)) {
             input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         }
+        if ("pref_drive_client_id".equals(key) || "pref_drive_client_secret".equals(key)) {
+            input.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                    | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        }
     }
 
     
@@ -1239,6 +1393,61 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
         bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
                 value -> appConfig.setUpdateBetaEnabled(value));
+    }
+
+    private void bindDrive() {
+        EditTextPreference clientId = findPreference("pref_drive_client_id");
+        if (clientId != null) {
+            clientId.setPersistent(false);
+            clientId.setText(appConfig.getDriveClientId());
+            clientId.setSummary(appConfig.getDriveClientId());
+            clientId.setOnPreferenceChangeListener((preference, newValue) -> {
+                String value = String.valueOf(newValue).trim();
+                appConfig.setDriveClientId(value);
+                clientId.setText(value);
+                clientId.setSummary(value);
+                return false;
+            });
+        }
+        EditTextPreference secret = findPreference("pref_drive_client_secret");
+        if (secret != null) {
+            secret.setPersistent(false);
+            secret.setText(appConfig.getDriveClientSecret());
+            secret.setSummary(getString(appConfig.getDriveClientSecret().isEmpty()
+                    ? R.string.set_drive_secret_empty : R.string.set_drive_secret_saved));
+            secret.setOnPreferenceChangeListener((preference, newValue) -> {
+                String value = String.valueOf(newValue).trim();
+                appConfig.setDriveClientSecret(value);
+                secret.setText(value);
+                secret.setSummary(getString(value.isEmpty()
+                        ? R.string.set_drive_secret_empty : R.string.set_drive_secret_saved));
+                return false;
+            });
+        }
+        refreshDriveSignIn();
+        onClick("pref_drive_sign_in", pref -> {
+            if (getActivity() == null) {
+                return;
+            }
+            com.kooo.evcam.share.DriveExport.signIn(getActivity(), this::refreshDriveSignIn);
+        });
+        onClick("pref_drive_sign_out", pref -> {
+            appConfig.clearDriveSession();
+            refreshDriveSignIn();
+            toast(getString(R.string.drive_signed_out));
+        });
+    }
+
+    private void refreshDriveSignIn() {
+        if (!isAdded()) {
+            return;
+        }
+        androidx.preference.Preference signIn = findPreference("pref_drive_sign_in");
+        if (signIn == null || getContext() == null) {
+            return;
+        }
+        signIn.setSummary(getString(appConfig.hasDriveRefreshToken()
+                ? R.string.drive_signed_in_summary : R.string.drive_signed_out_summary));
     }
 
     // ------------------------------------------------------------------ 小工具

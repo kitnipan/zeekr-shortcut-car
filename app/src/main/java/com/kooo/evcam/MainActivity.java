@@ -96,6 +96,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private AutoFitTextureView textureFront, textureBack, textureLeft;
+    private com.kooo.evcam.remote.CarLink carLink;
+    private com.kooo.evcam.remote.CarLink.Snapshot lastLink;
+    private final android.os.Handler remoteHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final java.util.concurrent.atomic.AtomicBoolean remoteBusy =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.ExecutorService remoteCompose =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "remote-live");
+                t.setPriority(Thread.NORM_PRIORITY - 1);
+                return t;
+            });
+    private final com.kooo.evcam.remote.RemoteLive remoteLive = new com.kooo.evcam.remote.RemoteLive();
+    private final com.kooo.evcam.remote.RemoteSnap remoteSnap = new com.kooo.evcam.remote.RemoteSnap();
+    private final float[] remoteLanes = new float[16];
+    private final Runnable remotePump = new Runnable() {
+        @Override
+        public void run() {
+            if (carLink == null || !carLink.isWatching()) {
+                return;
+            }
+            pushRemoteFrame();
+            remoteHandler.postDelayed(this, 400);
+        }
+    };
     /** 极氪合成流四宫格容器；非该车型时为 null。 */
     private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
     private TextView tvCompositeInfo;
@@ -293,6 +317,7 @@ public class MainActivity extends AppCompatActivity {
 
         initViews();
         setupNavigationDrawer();
+        startRemoteLink();
 
         // 界面重建（切日夜模式、换语言）时录制管线一直在跑（见 onDestroy 的 keepPipeline），
         // 新界面只是把它现在的样子画出来（syncRecordingStateFromManager），没有「恢复录制」这回事
@@ -548,6 +573,14 @@ public class MainActivity extends AppCompatActivity {
         View btnPhotoPlayback = findViewById(R.id.btn_photo_playback);
         if (btnPhotoPlayback != null) {
             btnPhotoPlayback.setOnClickListener(v -> showPhotoPlaybackInterface());
+        }
+
+        View btnRemote = findViewById(R.id.btn_remote);
+        if (btnRemote != null) {
+            btnRemote.setOnClickListener(v -> {
+                showRemoteInterface();
+                selectNavItem(R.id.nav_remote);
+            });
         }
         
         View btnSettings = findViewById(R.id.btn_settings);
@@ -988,6 +1021,8 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_photo_playback) {
                 // 显示图片回看界面
                 showPhotoPlaybackInterface();
+            } else if (itemId == R.id.nav_remote) {
+                showRemoteInterface();
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
             } else if (itemId == R.id.nav_about) {
@@ -1301,6 +1336,152 @@ public class MainActivity extends AppCompatActivity {
      */
     private void showSettingsInterface() {
         showFragment(new com.kooo.evcam.settings.SettingsShellFragment());
+    }
+
+    /**
+     * 远程观看。预览布局留着不藏：画面从 texture_front 抓，藏掉 Surface 就断了。
+     * 这一页盖在上面，二维码给手机扫。
+     */
+    private void showRemoteInterface() {
+        getSupportFragmentManager().popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        if (recordingLayout != null) {
+            recordingLayout.setVisibility(View.VISIBLE);
+        }
+        com.kooo.evcam.remote.RemoteViewFragment fragment = new com.kooo.evcam.remote.RemoteViewFragment();
+        if (fragmentContainer != null) {
+            fragmentContainer.setVisibility(View.VISIBLE);
+        }
+        if (com.kooo.evcam.ui.MotionPolicy.decorative(this)) {
+            fragment.setEnterTransition(new com.google.android.material.transition.MaterialSharedAxis(
+                    com.google.android.material.transition.MaterialSharedAxis.Z, true));
+        }
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment, "remote")
+                .setPrimaryNavigationFragment(fragment)
+                .commit();
+        if (lastLink != null) {
+            getSupportFragmentManager().executePendingTransactions();
+            fragment.show(lastLink);
+        }
+    }
+
+    private void startRemoteLink() {
+        remoteLive.attach(this);
+        carLink = new com.kooo.evcam.remote.CarLink(this);
+        carLink.setWatchListener((watching, source) -> {
+            remoteHandler.removeCallbacks(remotePump);
+            if (!watching) {
+                return;
+            }
+            // Instant switch: push cached JPEG for the requested slot, then keep pumping.
+            byte[] cached = remoteLive.jpegFor(source);
+            if (cached != null) {
+                carLink.pushJpeg(cached);
+            }
+            remoteHandler.post(remotePump);
+        });
+        carLink.setUi(snap -> {
+            lastLink = snap;
+            com.kooo.evcam.remote.RemoteViewFragment page =
+                    (com.kooo.evcam.remote.RemoteViewFragment) getSupportFragmentManager()
+                            .findFragmentByTag("remote");
+            if (page != null) {
+                page.show(snap);
+            }
+            remoteHandler.removeCallbacks(remotePump);
+            if (snap.watching) {
+                remoteHandler.post(remotePump);
+            }
+        });
+        carLink.start();
+    }
+
+    /**
+     * Fresh remote path: grab surround (+ cabin) → defish surround → mailbox PNG on USB
+     * + JPEG in RAM → push the slot the phone asked for.
+     */
+    private void pushRemoteFrame() {
+        if (carLink == null || !carLink.isWatching()) {
+            return;
+        }
+        if (!remoteBusy.compareAndSet(false, true)) {
+            return;
+        }
+        final String source = carLink.watchSource();
+        // Already have a fresh-enough frame for this source? Still refresh captures.
+        if (textureFront == null || !textureFront.isAvailable()) {
+            byte[] cached = remoteLive.jpegFor(source);
+            if (cached != null) {
+                carLink.pushJpeg(cached);
+            }
+            remoteBusy.set(false);
+            return;
+        }
+        int vw = textureFront.getWidth();
+        int vh = textureFront.getHeight();
+        if (vw < 2 || vh < 2) {
+            remoteBusy.set(false);
+            return;
+        }
+        boolean hasLanes = compositeContainer != null
+                && compositeContainer.copyLaneWindows(remoteLanes);
+        if (!hasLanes) {
+            com.kooo.evcam.zeekr.RemoteFrame.equalVerticalLanes(remoteLanes);
+        }
+        float scale = 960f / Math.max(vw, vh);
+        int w = Math.max(2, ((int) (vw * scale)) / 2 * 2);
+        int h = Math.max(2, ((int) (vh * scale)) / 2 * 2);
+        final android.graphics.Bitmap surround = textureFront.getBitmap(w, h);
+        final android.graphics.Bitmap cabinDriver = (textureBack != null && textureBack.isAvailable())
+                ? textureBack.getBitmap(Math.min(640, textureBack.getWidth()),
+                Math.min(360, textureBack.getHeight())) : null;
+        final android.graphics.Bitmap cabinBack = (textureLeft != null && textureLeft.isAvailable())
+                ? textureLeft.getBitmap(Math.min(640, textureLeft.getWidth()),
+                Math.min(360, textureLeft.getHeight())) : null;
+        if (surround == null) {
+            if (cabinDriver != null) {
+                cabinDriver.recycle();
+            }
+            if (cabinBack != null) {
+                cabinBack.recycle();
+            }
+            remoteBusy.set(false);
+            return;
+        }
+        final float[] lanes = remoteLanes.clone();
+        final int[] order = compositeContainer != null
+                ? compositeContainer.getLaneOrder()
+                : new int[]{0, 1, 2, 3};
+        final float fov = appConfig.getFisheyeFov();
+        final String projection = appConfig.getFisheyeProjection();
+        // Surround remote stills are always defished (full strength).
+        final float strength = 1f;
+        remoteCompose.execute(() -> {
+            try {
+                remoteSnap.putSurround(remoteLive, surround, lanes, order, fov, projection, strength);
+                if (cabinDriver != null) {
+                    remoteSnap.putCabin(remoteLive, com.kooo.evcam.remote.RemoteLive.DRIVER, cabinDriver);
+                }
+                if (cabinBack != null) {
+                    remoteSnap.putCabin(remoteLive, com.kooo.evcam.remote.RemoteLive.BACKSEAT, cabinBack);
+                }
+                byte[] jpeg = remoteLive.jpegFor(carLink.watchSource());
+                if (jpeg != null) {
+                    carLink.pushJpeg(jpeg);
+                }
+            } catch (RuntimeException e) {
+                AppLog.w(TAG, "remote live failed: " + e.getMessage());
+            } finally {
+                surround.recycle();
+                if (cabinDriver != null) {
+                    cabinDriver.recycle();
+                }
+                if (cabinBack != null) {
+                    cabinBack.recycle();
+                }
+                remoteBusy.set(false);
+            }
+        });
     }
 
 
@@ -2595,7 +2776,8 @@ public class MainActivity extends AppCompatActivity {
         // 以 START_STICKY 的名义再去重启它们
         OverlayCoordinator.onActivityDestroyed(this);
         com.kooo.evcam.zeekr.RearViewMirrorService.stop(this);
-        
+        com.kooo.evcam.zeekr.SideViewPopupService.stop(this);
+        com.kooo.evcam.overlay.DimOverlayService.hide(this);
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();
 
@@ -2646,8 +2828,10 @@ public class MainActivity extends AppCompatActivity {
 
     /** 录制键切到某个状态。回调可能来自相机线程，统一丢回主线程。 */
     private void setRecordState(com.kooo.evcam.ui.RecordButtonUi.State state) {
-        com.kooo.evcam.ui.MotionPolicy.setRecording(state == com.kooo.evcam.ui.RecordButtonUi.State.PREPARING
-                || state == com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
+        boolean on = state == com.kooo.evcam.ui.RecordButtonUi.State.PREPARING
+                || state == com.kooo.evcam.ui.RecordButtonUi.State.RECORDING;
+        com.kooo.evcam.ui.MotionPolicy.setRecording(on);
+        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(this, on);
         runOnUiThread(() -> {
             if (recordButtonUi == null) {
                 return;
@@ -2830,6 +3014,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
+        broadcastCurrentRecordingState();
 
         // U 盘可能在后台时插拔过：先按上一份快照画，再去后台探测一次（结果经 storageListener 回来）
         refreshRecordAvailability();
@@ -2841,6 +3026,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        remoteHandler.removeCallbacks(remotePump);
+        remoteCompose.shutdownNow();
+        remoteLive.shutdown();
+        if (carLink != null) {
+            carLink.setUi(null);
+            carLink.stop();
+            carLink = null;
+        }
         super.onDestroy();
         com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面 onDestroy finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
@@ -2995,6 +3188,14 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> {
             android.widget.Toast.makeText(this, R.string.msg_record_error, android.widget.Toast.LENGTH_LONG).show();
         });
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (com.kooo.evcam.input.AccessibilityGate.handleInApp(this, event)) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override

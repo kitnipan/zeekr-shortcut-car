@@ -208,6 +208,92 @@
             android:dependency="pref_rearview"
             android:title="@string/set_rearview_reset_title"
             android:summary="@string/set_rearview_reset_summary" />
+
+        <!-- 打转向灯弹侧视：不依赖后视镜开关，后视镜关着也能用（开着时反而不弹） -->
+        <PreferenceCategory
+            android:key="cat_side_popup"
+            android:title="@string/set_side_popup_title">
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup"
+                android:title="@string/set_side_popup_title"
+                android:summary="@string/set_side_popup_summary" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_min_speed"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_speed_title"
+                android:summary="@string/set_side_popup_speed_summary"
+                app:showSeekBarValue="true" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup_straighten"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_straighten_title"
+                android:summary="@string/set_side_popup_straighten_summary" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_fov"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_fov_title"
+                android:summary="@string/set_side_popup_fov_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_yaw"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_yaw_title"
+                android:summary="@string/set_side_popup_yaw_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_pitch"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_pitch_title"
+                android:summary="@string/set_side_popup_pitch_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_roll_left"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_roll_left_title"
+                android:summary="@string/set_side_popup_roll_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_roll_right"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_roll_right_title"
+                android:summary="@string/set_side_popup_roll_summary"
+                app:showSeekBarValue="true" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup_instant"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_instant_title"
+                android:summary="@string/set_side_popup_instant_summary" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_close_delay_ms"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_close_delay_ms_title"
+                android:summary="@string/set_side_popup_close_delay_ms_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_size"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_size_title"
+                android:summary="@string/set_side_popup_size_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_vertical"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_vertical_title"
+                android:summary="@string/set_side_popup_vertical_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 悬浮窗 ==================== -->
@@ -264,6 +350,68 @@
             android:key="pref_reset_floating"
             android:title="@string/set_reset_floating_title"
             android:summary="@string/set_reset_floating_summary" />
+    </PreferenceScreen>
+
+    <!-- ==================== 屏幕遮罩 ==================== -->
+    <PreferenceScreen
+        android:key="screen_dim"
+        android:title="@string/set_section_dim">
+
+        <SwitchPreferenceCompat
+            android:key="pref_dim"
+            android:title="@string/set_dim_title"
+            android:summary="@string/set_dim_summary" />
+
+        <SeekBarPreference
+            android:key="pref_dim_opacity"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_opacity_title"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_dim_brightness"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_brightness_title"
+            android:summary="@string/set_dim_brightness_summary"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_dim_warmth"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_warmth_title"
+            android:summary="@string/set_dim_warmth_summary"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_dim_passthrough"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_passthrough_title"
+            android:summary="@string/set_dim_passthrough_summary" />
+
+        <Preference
+            android:key="pref_dim_reset"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_reset_title"
+            android:summary="@string/set_dim_reset_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_auto_dim"
+            android:title="@string/set_auto_dim_title"
+            android:summary="@string/set_auto_dim_summary" />
+
+        <SeekBarPreference
+            android:key="pref_auto_dim_start"
+            android:dependency="pref_auto_dim"
+            android:title="@string/set_auto_dim_start_title"
+            android:summary="@string/set_auto_dim_start_summary"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_auto_dim_end"
+            android:dependency="pref_auto_dim"
+            android:title="@string/set_auto_dim_end_title"
+            android:summary="@string/set_auto_dim_end_summary"
+            app:showSeekBarValue="true" />
     </PreferenceScreen>
 
     <!-- ==================== 界面 ==================== -->
@@ -345,6 +493,26 @@
             android:key="pref_vehicle_info"
             android:title="@string/set_vehicle_info_title"
             android:summary="@string/set_vehicle_info_summary" />
+
+        <Preference
+            android:key="pref_controller"
+            android:title="@string/set_controller_title"
+            android:summary="@string/set_controller_summary" />
+
+        <Preference
+            android:key="pref_shortcuts"
+            android:title="@string/set_shortcuts_title"
+            android:summary="@string/set_shortcuts_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_save_moment_usb"
+            android:title="@string/set_save_moment_usb_title"
+            android:summary="@string/set_save_moment_usb_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_save_moment_drive"
+            android:title="@string/set_save_moment_drive_title"
+            android:summary="@string/set_save_moment_drive_summary" />
 
     </PreferenceScreen>
 
@@ -434,6 +602,32 @@
       原来是左栏里一个点了就查的动作行；加了「接收 Beta 版」之后改成一个分区 ——
       左边选、右边改，和其他分区一个样子。
     -->
+    <PreferenceScreen
+        android:key="screen_drive"
+        android:title="@string/set_drive_title">
+
+        <Preference
+            android:key="pref_drive_help"
+            android:selectable="false"
+            android:summary="@string/set_drive_help" />
+
+        <EditTextPreference
+            android:key="pref_drive_client_id"
+            android:title="@string/set_drive_client_id" />
+
+        <EditTextPreference
+            android:key="pref_drive_client_secret"
+            android:title="@string/set_drive_client_secret" />
+
+        <Preference
+            android:key="pref_drive_sign_in"
+            android:title="@string/set_drive_sign_in" />
+
+        <Preference
+            android:key="pref_drive_sign_out"
+            android:title="@string/set_drive_sign_out" />
+    </PreferenceScreen>
+
     <PreferenceScreen
         android:key="screen_update"
         android:title="@string/set_check_update_title">

@@ -3,8 +3,7 @@
   抽屉头：平铺，不用渐变 —— 车机系统的面板都是平的，层次靠明度和留白。
   三个 id（nav_header_title / subtitle / version）MainActivity 会去填，保留。
 
-  名字下面那行小字是<b>另一种语言的应用名</b>：中文界面下写 Zeekr Shortcut，
-  其它语言下写极氪即刻 —— 两个名字都在用，两个都摆出来，谁提起哪个都能对上号。
+  标题只用当前语言的应用名。另一种语言的名字不再并排，避免一屏里中英夹杂。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -25,14 +24,6 @@
         android:textColor="@color/nav_header_text"
         android:textAppearance="@style/TextAppearance.Cam.Title"
         android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="@string/nav_header_alt_name"
-        android:textColor="@color/nav_header_text_secondary"
-        android:textAppearance="@style/TextAppearance.Cam.Micro" />
 
     <TextView
         android:id="@+id/nav_header_subtitle"

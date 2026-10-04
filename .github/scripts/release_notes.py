@@ -18,7 +18,7 @@ import re
 import sys
 
 APP_NAME = "Zeekr Shortcut (Car Version)"
-REPO = "https://github.com/dts88/zeekr-shortcut-car"
+REPO = "https://github.com/kitnipan/zeekr-shortcut-car"
 
 
 def changelog_section(version):

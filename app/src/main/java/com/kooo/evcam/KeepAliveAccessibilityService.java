@@ -1,7 +1,9 @@
 package com.kooo.evcam;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Intent;
+import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
 import java.util.concurrent.Executors;
@@ -140,6 +142,11 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
     }
 
     @Override
+    protected boolean onKeyEvent(KeyEvent event) {
+        return com.kooo.evcam.input.ShortcutKeys.dispatch(this, event);
+    }
+
+    @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         // 不处理任何无障碍事件，仅用于保活
         // 虽然配置允许获取窗口内容，但代码中不会实际读取
@@ -160,7 +167,13 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        AccessibilityServiceInfo info = getServiceInfo();
+        if (info != null) {
+            info.flags |= AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
+            setServiceInfo(info);
+        }
         AppLog.d(TAG, "无障碍服务已连接到系统");
+        com.kooo.evcam.input.KeyCatcher.sync(this);
         com.kooo.evcam.blackbox.BlackBox.noteImportant("无障碍服务已连接到系统");
         if (!new AppConfig(this).isKeepAliveEnabled()) {
             return;
@@ -186,6 +199,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         
         instance = null;
         isServiceRunning = false;
+        com.kooo.evcam.input.KeyCatcher.sync(this);
         
         super.onDestroy();
         AppLog.d(TAG, "无障碍服务已销毁");

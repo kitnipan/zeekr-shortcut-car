@@ -14,6 +14,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DRIVE_CLIENT_ID: ${{ secrets.DRIVE_CLIENT_ID }}
+      DRIVE_CLIENT_SECRET: ${{ secrets.DRIVE_CLIENT_SECRET }}
 
     steps:
       - name: Checkout
@@ -92,9 +95,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.apk.outputs.path }}
-          # 带后缀的（-alpha / -beta）是测试版；1.0.0 这种不带后缀的是正式版，显示为 Latest
-          prerelease: ${{ contains(steps.apk.outputs.version, '-') }}
-          # 2026-09-29 起所有新版本一律不公开：建成草稿，只有仓库所有者能看到和下载
-          draft: true
+          # -alpha / -beta 是测试版。-kd 是这个 fork 的正式发布通道，和 1.0.0 一样显示为 Latest。
+          prerelease: ${{ contains(steps.apk.outputs.version, '-alpha') || contains(steps.apk.outputs.version, '-beta') }}
+          # 检查更新读的是公开 Release。草稿对 api.github.com 不可见，车机永远查不到。
+          draft: false
           name: ${{ steps.apk.outputs.version }}
           body_path: RELEASE_NOTES.md

@@ -5,9 +5,16 @@ import android.opengl.EGL14;
 import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
+import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
+import android.opengl.GLUtils;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -19,7 +26,10 @@ import com.kooo.evcam.AppLog;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -94,17 +104,26 @@ public final class FisheyeGlPipe {
             "uniform float uOn;\n" +
             "uniform float uProjection;\n" +
             "uniform float uParam;\n" +
+            "uniform float uStrength;\n" +
+            "uniform float uAspect;\n" +
+            "uniform vec4 uSources[4];\n" +
+            "uniform float uPad;\n" +
+            "uniform float uOutContent;\n" +
+            "uniform float uSrcContent;\n" +
             "const float HALF_PI = 1.5707963268;\n" +
             "vec2 corrected(vec2 p) {\n" +
+            "    float ay = max(uAspect, 0.01);\n" +
+            "    float nx = p.x * 2.0 - 1.0;\n" +
+            "    float ny = (p.y * 2.0 - 1.0) / ay;\n" +
             "    if (uProjection < 0.5) {\n" +
-            "        vec2 plane = (p * 2.0 - 1.0) * uParam;\n" +
+            "        vec2 plane = vec2(nx, ny) * uParam;\n" +
             "        float r = length(plane);\n" +
             "        if (r < 0.00001) return vec2(0.5);\n" +
             "        float sr = atan(r) / HALF_PI;\n" +
             "        return clamp(0.5 + plane / r * sr * 0.5, 0.0, 1.0);\n" +
             "    } else if (uProjection < 1.5) {\n" +
-            "        float az = (p.x * 2.0 - 1.0) * uParam;\n" +
-            "        float h = (p.y * 2.0 - 1.0) * uParam;\n" +
+            "        float az = nx * uParam;\n" +
+            "        float h = ny * uParam;\n" +
             "        float s = sin(az);\n" +
             "        float cosAngle = clamp(cos(az) / sqrt(1.0 + h * h), -1.0, 1.0);\n" +
             "        float sr = acos(cosAngle) / HALF_PI;\n" +
@@ -112,7 +131,7 @@ public final class FisheyeGlPipe {
             "        vec2 dir = planar > 0.00001 ? vec2(s, h) / planar : vec2(0.0);\n" +
             "        return clamp(0.5 + dir * sr * 0.5, 0.0, 1.0);\n" +
             "    } else {\n" +
-            "        vec2 d = (p * 2.0 - 1.0) * uParam;\n" +
+            "        vec2 d = vec2(nx, ny) * uParam;\n" +
             "        float r = length(d);\n" +
             "        if (r < 0.00001) return vec2(0.5);\n" +
             "        float sr = 2.0 * atan(r) / HALF_PI;\n" +
@@ -120,18 +139,28 @@ public final class FisheyeGlPipe {
             "    }\n" +
             "}\n" +
             "void main() {\n" +
+            "    bool hit = false;\n" +
             "    vec2 src = vPos;\n" +
             "    if (uOn > 0.5) {\n" +
             "        for (int i = 0; i < 4; i++) {\n" +
             "            if (float(i) >= uLaneCount) break;\n" +
             "            vec4 lane = uLanes[i];\n" +
-            "            vec2 local = (vPos - lane.xy) / lane.zw;\n" +
+            "            vec2 local = (vPos - lane.xy) / max(lane.zw, vec2(0.00001));\n" +
             "            if (local.x >= 0.0 && local.x <= 1.0 && local.y >= 0.0 && local.y <= 1.0) {\n" +
+            "                hit = true;\n" +
             "                vec2 s = corrected(local);\n" +
-            "                src = lane.xy + s * lane.zw;\n" +
+            "                s = local + (s - local) * uStrength;\n" +
+            "                vec4 from = uSources[i];\n" +
+            "                src = from.xy + s * from.zw;\n" +
             "                break;\n" +
             "            }\n" +
             "        }\n" +
+            "    } else {\n" +
+            "        hit = true;\n" +
+            "    }\n" +
+            "    if (!hit && uPad > 0.5) {\n" +
+            "        float t = clamp((vPos.y - uOutContent) / max(1.0 - uOutContent, 0.00001), 0.0, 1.0);\n" +
+            "        src = vec2(vPos.x, mix(uSrcContent, 1.0, t));\n" +
             "    }\n" +
             // SurfaceTexture 的矩阵按左下为原点的纹理坐标算
             "    vec4 t = uTexMatrix * vec4(src.x, 1.0 - src.y, 0.0, 1.0);\n" +
@@ -140,21 +169,43 @@ public final class FisheyeGlPipe {
 
     private static final float[] QUAD = {-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f};
 
+    /** 角标字。底是透明的，不盖住下面的行驶信息条。 */
+    private static final int BAR_TEXT = 0xFFF0F1F2;
+    private static final String STAMP_VERTEX =
+            "attribute vec2 aPosition;\n" +
+            "attribute vec2 aTex;\n" +
+            "varying vec2 vTex;\n" +
+            "void main() {\n" +
+            "    gl_Position = vec4(aPosition, 0.0, 1.0);\n" +
+            "    vTex = aTex;\n" +
+            "}\n";
+    private static final String STAMP_FRAGMENT =
+            "precision mediump float;\n" +
+            "varying vec2 vTex;\n" +
+            "uniform sampler2D sStamp;\n" +
+            "void main() {\n" +
+            "    gl_FragColor = texture2D(sStamp, vTex);\n" +
+            "}\n";
+
     /** 一次设置的快照：GL 线程每帧读一次，别的线程整个换掉，不会读到一半新一半旧。 */
     private static final class Correction {
         final boolean on;
         final float projection;
         final float parameter;
+        final float strength;
 
-        Correction(boolean on, float projection, float parameter) {
+        Correction(boolean on, float projection, float parameter, float strength) {
             this.on = on;
             this.projection = projection;
             this.parameter = parameter;
+            this.strength = strength;
         }
     }
 
     private final String name;
     private final SurfaceTexture output;
+    /** 非空时画到编码器的 Surface 上，而不是屏幕。时间戳跟着这一帧走。 */
+    private final Surface encodeTarget;
     private final int inputWidth;
     private final int inputHeight;
     /** 四格的位置；只在管线线程上读写（{@link #setLanes} 也是投过去改）。 */
@@ -163,7 +214,7 @@ public final class FisheyeGlPipe {
     private final HandlerThread thread;
     private final Handler handler;
 
-    private volatile Correction correction = new Correction(false, 0f, 1f);
+    private volatile Correction correction = new Correction(false, 0f, 1f, 1f);
     private volatile boolean released;
     private volatile boolean outputBroken;
     private volatile Runnable onReleased;
@@ -180,11 +231,38 @@ public final class FisheyeGlPipe {
     private int onHandle;
     private int projectionHandle;
     private int parameterHandle;
+    private int strengthHandle;
+    private int aspectHandle;
+    private int sourcesHandle;
+    private int padHandle;
+    private int outContentHandle;
+    private int srcContentHandle;
+    private float[] sources;
+    private float cellAspect = 1f;
+    private boolean padBar;
+    private int barPx;
+    private float outContent = 1f;
+    private float srcContent = 1f;
+    private String stampLeft = "";
+    private long stampStartMs = Long.MIN_VALUE;
+    private long stampSecond = Long.MIN_VALUE;
+    private int stampProgram;
+    private int stampPosHandle;
+    private int stampTexHandle;
+    private int stampSamplerHandle;
+    private int stampTexture;
+    private Bitmap stampBitmap;
+    private FloatBuffer stampXy;
+    private FloatBuffer stampUv;
+    private final SimpleDateFormat stampClock =
+            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
     private SurfaceTexture input;
     private final float[] texMatrix = new float[16];
     private final int[] size = new int[2];
     private FloatBuffer quad;
-    private long frames;
+    private volatile long frames;
+    /** swap 成功才加。导出靠这个数等最后一帧，不能在画完之前加。 */
+    private volatile long presented;
     private long startedAtMs;
 
     private FisheyeGlPipe(String name, SurfaceTexture output, int inputWidth, int inputHeight,
@@ -196,6 +274,7 @@ public final class FisheyeGlPipe {
         int count = Math.min(MAX_LANES, lanes == null ? 0 : lanes.length / 4);
         this.laneCount = count;
         this.lanes = Arrays.copyOf(lanes == null ? new float[0] : lanes, MAX_LANES * 4);
+        this.encodeTarget = null;
         this.thread = new HandlerThread("FisheyeGl-" + name);
         this.thread.start();
         this.handler = new Handler(thread.getLooper());
@@ -246,6 +325,67 @@ public final class FisheyeGlPipe {
         return pipe;
     }
 
+    /**
+     * 和 {@link #start(String, SurfaceTexture, int, int, float[])} 同一条管线，
+     * 输出接到编码器的 Surface 上。用来把环视录像拉直后再写盘。
+     */
+    public static FisheyeGlPipe start(String name, Surface encodeTarget,
+                                      int inputWidth, int inputHeight, float[] lanes) {
+        if (encodeTarget == null || inputWidth <= 0 || inputHeight <= 0) {
+            return null;
+        }
+        FisheyeGlPipe pipe = new FisheyeGlPipe(name, encodeTarget, inputWidth, inputHeight, lanes);
+        CountDownLatch ready = new CountDownLatch(1);
+        boolean[] ok = new boolean[1];
+        pipe.handler.post(() -> {
+            try {
+                pipe.init();
+                ok[0] = true;
+            } catch (RuntimeException e) {
+                AppLog.e(TAG, name + " 起不来: " + e);
+                pipe.teardown();
+            } finally {
+                ready.countDown();
+            }
+        });
+        try {
+            if (!ready.await(START_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                AppLog.e(TAG, name + " " + START_TIMEOUT_MS + "ms 内没准备好");
+                pipe.release();
+                return null;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            pipe.release();
+            return null;
+        }
+        if (!ok[0]) {
+            pipe.thread.quitSafely();
+            return null;
+        }
+        return pipe;
+    }
+
+    private FisheyeGlPipe(String name, Surface encodeTarget, int inputWidth, int inputHeight,
+                          float[] lanes) {
+        this.name = name;
+        this.output = null;
+        this.encodeTarget = encodeTarget;
+        this.inputWidth = inputWidth;
+        this.inputHeight = inputHeight;
+        int count = Math.min(MAX_LANES, lanes == null ? 0 : lanes.length / 4);
+        this.laneCount = count;
+        this.lanes = Arrays.copyOf(lanes == null ? new float[0] : lanes, MAX_LANES * 4);
+        this.thread = new HandlerThread("FisheyeGl-" + name);
+        this.thread.start();
+        this.handler = new Handler(thread.getLooper());
+    }
+
+    /** 已经画进编码器（或屏幕）的帧数。swap 返回之后才算，导出用它等最后一帧。 */
+    public long drawn() {
+        return presented;
+    }
+
     /** 给生产者的 Surface。每次给一个新的，用完由生产者那边 release —— 和直连时一样。 */
     public Surface newInputSurface() {
         SurfaceTexture in = input;
@@ -290,6 +430,44 @@ public final class FisheyeGlPipe {
         };
     }
 
+    /**
+     * 导出才用。四格改成宽银幕，下面留一条信息条。
+     *
+     * <p>{@code outputLanes} 是画在输出上的位置，{@code sourceLanes} 是从原片取哪一块。
+     * {@code cellAspect} 是一格的宽/高（1 = 正方形）。{@code barPx} 是原片底部行驶信息条的高，
+     * 导出时原样贴到画面下面。{@code stampLeft} 和 {@code startMs} 写在画面上沿，
+     * 跟录像的角标一样，不盖那条行驶信息。</p>
+     */
+    public void setExport(float cellAspect, float[] outputLanes, float[] sourceLanes,
+                          int barPx, float srcContent, float outContent,
+                          String stampLeft, long startMs) {
+        float[] out = Arrays.copyOf(outputLanes == null ? GRID_2X2 : outputLanes, MAX_LANES * 4);
+        float[] src = Arrays.copyOf(sourceLanes == null ? out : sourceLanes, MAX_LANES * 4);
+        int count = Math.min(MAX_LANES, (outputLanes == null ? GRID_2X2.length : outputLanes.length) / 4);
+        CountDownLatch done = new CountDownLatch(1);
+        handler.post(() -> {
+            lanes = out;
+            laneCount = count;
+            sources = src;
+            this.cellAspect = cellAspect <= 0f ? 1f : cellAspect;
+            this.barPx = Math.max(0, barPx);
+            this.padBar = this.barPx > 0;
+            this.srcContent = srcContent <= 0f ? 1f : srcContent;
+            this.outContent = outContent <= 0f ? 1f : outContent;
+            this.stampLeft = stampLeft == null ? "" : stampLeft;
+            this.stampStartMs = startMs;
+            stampSecond = Long.MIN_VALUE;
+            done.countDown();
+        });
+        try {
+            if (!done.await(START_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                AppLog.w(TAG, name + " 导出画面没排上");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     public SurfaceTexture output() {
         return output;
     }
@@ -304,9 +482,14 @@ public final class FisheyeGlPipe {
      * 关着就原样拷过去 —— 生产者始终接在这条管线上，拨开关不用重建。
      */
     public void setCorrection(boolean on, float fovDegrees, String projection) {
+        setCorrection(on, fovDegrees, projection, 1f);
+    }
+
+    public void setCorrection(boolean on, float fovDegrees, String projection, float strength) {
         correction = new Correction(on,
                 FisheyeProjection.shaderProjectionCode(projection),
-                FisheyeProjection.shaderParameter(fovDegrees, projection));
+                FisheyeProjection.shaderParameter(fovDegrees, projection),
+                strength);
         if (!released) {
             handler.post(this::drawLatest);
         }
@@ -314,11 +497,11 @@ public final class FisheyeGlPipe {
 
     /** 输出多大（像素）。视频知道自己的尺寸之后按它来，放大一格时才不糊。 */
     public void setOutputSize(int width, int height) {
-        if (width <= 0 || height <= 0 || released) {
+        if (width <= 0 || height <= 0 || released || output == null) {
             return;
         }
         handler.post(() -> {
-            if (!released && !output.isReleased()) {
+            if (!released && output != null && !output.isReleased()) {
                 output.setDefaultBufferSize(width, height);
             }
         });
@@ -380,7 +563,8 @@ public final class FisheyeGlPipe {
                     + Integer.toHexString(EGL14.eglGetError()));
         }
         // 屏幕上那一块已经被别的生产者接着的话，这一步会失败 —— 那就照旧直连
-        surface = EGL14.eglCreateWindowSurface(display, configs[0], output,
+        surface = EGL14.eglCreateWindowSurface(display, configs[0],
+                encodeTarget != null ? encodeTarget : output,
                 new int[]{EGL14.EGL_NONE}, 0);
         if (surface == EGL14.EGL_NO_SURFACE) {
             throw new IllegalStateException("eglCreateWindowSurface failed 0x"
@@ -398,9 +582,16 @@ public final class FisheyeGlPipe {
         onHandle = GLES20.glGetUniformLocation(program, "uOn");
         projectionHandle = GLES20.glGetUniformLocation(program, "uProjection");
         parameterHandle = GLES20.glGetUniformLocation(program, "uParam");
+        strengthHandle = GLES20.glGetUniformLocation(program, "uStrength");
+        aspectHandle = GLES20.glGetUniformLocation(program, "uAspect");
+        sourcesHandle = GLES20.glGetUniformLocation(program, "uSources");
+        padHandle = GLES20.glGetUniformLocation(program, "uPad");
+        outContentHandle = GLES20.glGetUniformLocation(program, "uOutContent");
+        srcContentHandle = GLES20.glGetUniformLocation(program, "uSrcContent");
         quad = ByteBuffer.allocateDirect(QUAD.length * 4).order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
         quad.put(QUAD).position(0);
+        initStamp();
 
         int[] names = new int[1];
         GLES20.glGenTextures(1, names, 0);
@@ -420,7 +611,9 @@ public final class FisheyeGlPipe {
         input.setDefaultBufferSize(inputWidth, inputHeight);
         input.setOnFrameAvailableListener(st -> drawFrame(), handler);
         startedAtMs = SystemClock.elapsedRealtime();
-        handler.postDelayed(this::watchOutput, WATCH_INTERVAL_MS);
+        if (encodeTarget == null) {
+            handler.postDelayed(this::watchOutput, WATCH_INTERVAL_MS);
+        }
         AppLog.i(TAG, name + " 准备好：输入 " + inputWidth + "x" + inputHeight
                 + "，" + laneCount + " 路，GL " + version[0] + "." + version[1]);
     }
@@ -442,18 +635,24 @@ public final class FisheyeGlPipe {
             AppLog.i(TAG, name + " 第一帧，距准备好 "
                     + (SystemClock.elapsedRealtime() - startedAtMs) + "ms");
         }
-        drawLatest();
+        if (drawLatest()) {
+            presented++;
+        }
     }
 
-    /** 把最近取到的那一帧画出去。设置变了（比如暂停中拨了开关）也叫它，不用等下一帧。 */
-    private void drawLatest() {
+    /**
+     * 把最近取到的那一帧画出去。设置变了（比如暂停中拨了开关）也叫它，不用等下一帧。
+     *
+     * @return swap 成功。失败或没东西可画时是 false，调用方不要把它算成新的一帧。
+     */
+    private boolean drawLatest() {
         if (released || outputBroken || frames == 0 || surface == EGL14.EGL_NO_SURFACE) {
-            return;
+            return false;
         }
-        if (output.isReleased()) {
+        if (output != null && output.isReleased()) {
             outputBroken = true;
             AppLog.i(TAG, name + " 屏幕上那一块已经释放，只取帧不画");
-            return;
+            return false;
         }
         EGL14.eglQuerySurface(display, surface, EGL14.EGL_WIDTH, size, 0);
         EGL14.eglQuerySurface(display, surface, EGL14.EGL_HEIGHT, size, 1);
@@ -469,16 +668,122 @@ public final class FisheyeGlPipe {
         GLES20.glUniform1f(onHandle, c.on ? 1f : 0f);
         GLES20.glUniform1f(projectionHandle, c.projection);
         GLES20.glUniform1f(parameterHandle, c.parameter);
+        GLES20.glUniform1f(strengthHandle, c.strength);
+        GLES20.glUniform1f(aspectHandle, cellAspect <= 0f ? 1f : cellAspect);
+        GLES20.glUniform4fv(sourcesHandle, MAX_LANES, sources != null ? sources : lanes, 0);
+        GLES20.glUniform1f(padHandle, padBar ? 1f : 0f);
+        GLES20.glUniform1f(outContentHandle, outContent);
+        GLES20.glUniform1f(srcContentHandle, srcContent);
         GLES20.glEnableVertexAttribArray(positionHandle);
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quad);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         GLES20.glDisableVertexAttribArray(positionHandle);
+        drawStamp();
 
+        if (encodeTarget != null && input != null) {
+            EGLExt.eglPresentationTimeANDROID(display, surface, input.getTimestamp());
+        }
         if (!EGL14.eglSwapBuffers(display, surface)) {
             outputBroken = true;
             AppLog.w(TAG, name + " 画不上屏幕了 0x" + Integer.toHexString(EGL14.eglGetError())
                     + "，之后只取帧不画");
+            return false;
         }
+        return true;
+    }
+
+    private void initStamp() {
+        stampProgram = link(STAMP_VERTEX, STAMP_FRAGMENT);
+        stampPosHandle = GLES20.glGetAttribLocation(stampProgram, "aPosition");
+        stampTexHandle = GLES20.glGetAttribLocation(stampProgram, "aTex");
+        stampSamplerHandle = GLES20.glGetUniformLocation(stampProgram, "sStamp");
+        stampXy = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        stampUv = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        stampUv.put(new float[]{0f, 1f, 1f, 1f, 0f, 0f, 1f, 0f}).position(0);
+        int[] names = new int[1];
+        GLES20.glGenTextures(1, names, 0);
+        stampTexture = names[0];
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+    }
+
+    /** 左上应用名、版本、车牌，右上这一帧的日期时间。透明底，不盖行驶信息条。 */
+    private void drawStamp() {
+        if (stampProgram == 0 || size[0] <= 0 || size[1] <= 0) {
+            return;
+        }
+        if ((stampLeft == null || stampLeft.isEmpty()) && stampStartMs < 0) {
+            return;
+        }
+        long shownMs = stampStartMs;
+        if (shownMs >= 0 && input != null) {
+            long ts = input.getTimestamp();
+            if (ts > 0 && ts < 1_000_000_000_000_000L) {
+                shownMs += ts / 1_000_000L;
+            }
+        }
+        long second = shownMs >= 0 ? shownMs / 1000L : Long.MIN_VALUE;
+        int strip = Math.max(48, Math.min(72, size[0] / 36));
+        if (stampBitmap == null || stampBitmap.getWidth() != size[0]
+                || stampBitmap.getHeight() != strip || second != stampSecond) {
+            rebuildStamp(size[0], strip, shownMs);
+            stampSecond = second;
+        }
+        if (stampBitmap == null) {
+            return;
+        }
+        float bottom = 1f - 2f * strip / size[1];
+        stampXy.position(0);
+        stampXy.put(new float[]{-1f, bottom, 1f, bottom, -1f, 1f, 1f, 1f}).position(0);
+
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+        GLES20.glUseProgram(stampProgram);
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);
+        GLES20.glUniform1i(stampSamplerHandle, 0);
+        GLES20.glEnableVertexAttribArray(stampPosHandle);
+        GLES20.glVertexAttribPointer(stampPosHandle, 2, GLES20.GL_FLOAT, false, 0, stampXy);
+        GLES20.glEnableVertexAttribArray(stampTexHandle);
+        GLES20.glVertexAttribPointer(stampTexHandle, 2, GLES20.GL_FLOAT, false, 0, stampUv);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+        GLES20.glDisableVertexAttribArray(stampPosHandle);
+        GLES20.glDisableVertexAttribArray(stampTexHandle);
+        GLES20.glDisable(GLES20.GL_BLEND);
+    }
+
+    private void rebuildStamp(int width, int height, long shownMs) {
+        if (stampBitmap != null) {
+            stampBitmap.recycle();
+        }
+        stampBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(stampBitmap);
+        float textSize = Math.max(22f, Math.min(48f, width * 0.028f));
+        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        shadow.setColor(Color.BLACK);
+        shadow.setTextSize(textSize);
+        shadow.setTypeface(Typeface.MONOSPACE);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(BAR_TEXT);
+        paint.setTextSize(textSize);
+        paint.setTypeface(Typeface.MONOSPACE);
+        Paint.FontMetrics fm = paint.getFontMetrics();
+        float baseline = (height - fm.ascent - fm.descent) / 2f;
+        float pad = textSize * 0.5f;
+        String right = shownMs >= 0 ? stampClock.format(new Date(shownMs)) : "";
+        float rightW = right.isEmpty() ? 0f : paint.measureText(right);
+        String left = stampLeft == null ? "" : stampLeft;
+        canvas.drawText(left, pad + 2f, baseline + 2f, shadow);
+        canvas.drawText(left, pad, baseline, paint);
+        if (!right.isEmpty()) {
+            canvas.drawText(right, width - pad - rightW + 2f, baseline + 2f, shadow);
+            canvas.drawText(right, width - pad - rightW, baseline, paint);
+        }
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, stampTexture);
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, stampBitmap, 0);
     }
 
     /** 屏幕上那一块释放了就收掉自己：没有人会再来要这条管线。 */
@@ -486,7 +791,7 @@ public final class FisheyeGlPipe {
         if (released) {
             return;
         }
-        if (output.isReleased()) {
+        if (output != null && output.isReleased()) {
             AppLog.i(TAG, name + " 屏幕上那一块没了，收掉（共 " + frames + " 帧）");
             Runnable action = onReleased;
             release();
@@ -513,9 +818,21 @@ public final class FisheyeGlPipe {
                     GLES20.glDeleteProgram(program);
                     program = 0;
                 }
+                if (stampProgram != 0) {
+                    GLES20.glDeleteProgram(stampProgram);
+                    stampProgram = 0;
+                }
                 if (texture != 0) {
                     GLES20.glDeleteTextures(1, new int[]{texture}, 0);
                     texture = 0;
+                }
+                if (stampTexture != 0) {
+                    GLES20.glDeleteTextures(1, new int[]{stampTexture}, 0);
+                    stampTexture = 0;
+                }
+                if (stampBitmap != null) {
+                    stampBitmap.recycle();
+                    stampBitmap = null;
                 }
                 EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE,
                         EGL14.EGL_NO_CONTEXT);

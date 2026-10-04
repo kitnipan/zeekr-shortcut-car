@@ -11,6 +11,210 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.1.0-beta1] - 2026-10-04
+
+This build is the fork on top of upstream 2.1.0-beta: dim, remote watch, side views, shortcuts, and save-this-moment stay, and upstream's info bar and footage lock are included.
+
+### Fixes
+
+- The floating record button follows the in-app record button. It was staying idle when the window appeared after recording had already started.
+
+### New and improved
+
+- Save this moment shows a notification as soon as it starts, then a percent while the clips are copied or uploaded.
+
+## [2.0.3-beta27] - 2026-10-04
+
+### New and improved
+
+- Save this moment copies finished clips to the USB moments folder by default. Upload to Google Drive is a separate switch, off until you turn it on. Settings, System.
+
+## [2.0.3-beta26] - 2026-10-04
+
+### New and improved
+
+- Save this moment can also copy finished clips into the moments folder on the USB stick. Settings, System, Save moment to USB. Off until you turn it on.
+
+## [2.0.3-beta25] - 2026-10-04
+
+### New and improved
+
+- Shortcut action: Open/Close both side mirrors. Left and right cameras show together, using the turn-signal side view size and straighten settings. Super mirror turns off while this is on, because they share one camera output.
+
+## [2.0.3-beta24] - 2026-10-03
+
+### Fixes
+
+- Remote watch rebuilt: each surround lane is always defished, PNGs land on the USB stick under 7xDash/live/, and the phone gets the JPEG for the exact source it asked for (drive / ch1–ch4 / driver / backseat).
+- Camera switch on remote watch: car pushes the requested slot immediately from the mailbox; web client clears the previous frame so it does not stick on the old camera.
+
+## [2.0.3-beta23] - 2026-10-03
+
+### Fixes
+
+- Revert Super mirror framing changes from beta22. Super mirror was not broken; remote-watch-only fix remains.
+
+## [2.0.3-beta22] - 2026-10-03
+
+### Fixes
+
+- Remote watch: rebuild the phone grid from scratch. Always splits the surround strip into a 2×2 (or one channel). Never sends the jammed raw strip. Straighten only when fisheye correction is on.
+- Super mirror: never shows the raw surround strip. Geometry falls back to a vertical 4-split when the composite camera id is late or the size is a known surround shape; uses the real buffer size for framing.
+
+## [2.0.3-beta21] - 2026-10-03
+
+### New and improved
+
+- Turn-signal side view: separate Rotate left / Rotate right sliders.
+
+### Fixes
+
+- Toasts and UI fall back to English on head units whose system language is not Chinese, English, or Malay (for example Thai), instead of Chinese.
+
+## [2.0.3-beta20] - 2026-10-03
+
+### New and improved
+
+- Turn-signal side view: Rotate slider (±45°) to level a tilted horizon.
+
+## [2.0.3-beta19] - 2026-10-03
+
+### New and improved
+
+- Shortcut action: Save this moment. Protects the previous and current recording segments (and the next one when it finishes) so auto-delete skips them. If Drive is signed in, finished files upload in the background; Straighten runs when that setting is on.
+- Shortcuts support tap, long press, and double press on the same button.
+- Auto dim by time (experimental) under Settings, Dim display. Turns dim on and off by the clock, and logs whether the head unit exposes system brightness.
+
+## [2.0.3-beta18] - 2026-10-03
+
+### New and improved
+
+- Shortcuts work on every screen without accessibility or Shizuku. Settings, System, Shortcuts, Work on every screen (experimental), on by default. A button pressed within 3 seconds of touching the screen is skipped, and the hardware Back key may need a second press.
+
+## [2.0.3-beta17] - 2026-10-03
+
+### New and improved
+
+- Grant with Shizuku: with Shizuku running on the car, one tap makes shortcuts work on every screen. No computer needed. The button is on the Shortcuts screen and in the dialog after saving a shortcut.
+
+## [2.0.3-beta16] - 2026-10-03
+
+### Fixed
+
+- Shortcuts work while Zeekr Shortcut is in front, with no extra setup.
+- The head unit has no accessibility settings screen. To make shortcuts work on every screen, run the command shown after saving a shortcut once from a computer. The app then turns on its accessibility service by itself.
+
+## [2.0.3-beta15] - 2026-10-02
+
+### Fixed
+
+- The moon button lights up and goes dark when a shortcut turns dim on or off.
+- A shortcut button no longer also types into the app in front.
+
+## [2.0.3-beta14] - 2026-10-02
+
+### New and improved
+
+- Settings, System, Shortcuts: press a button, then pick start/stop recording, open/close Super mirror, open the app, or dim the display.
+- Dim display can go fully black. Drag the moon button to change how dark it is.
+- The turn-signal side view shows on top of the dimmed display.
+
+## [2.0.3-beta13] - 2026-10-02
+
+### Fixed
+
+- The turn-signal side view is flipped left to right, so it matches the side mirror.
+
+## [2.0.3-beta12] - 2026-10-01
+
+### New and improved
+
+- Signalling pops up that side's camera. Settings, Super mirror, Turn-signal side view. Off until you turn it on.
+
+## [2.0.3-beta11] - 2026-10-01
+
+### Fixed
+
+- Straightened surround on upload plays as smoothly as the fisheye recording.
+
+## [2.0.3-beta10] - 2026-10-01
+
+### New and improved
+
+- Settings, System, Controller shows the keys and sticks a Bluetooth controller or button sends.
+
+## [2.0.3-beta9] - 2026-10-01
+
+### New and improved
+
+- Settings, System, Controller shows the keys and sticks a Bluetooth controller or button sends.
+
+## [2.0.3-beta8] - 2026-10-01
+
+### New and improved
+
+- Check for updates lists versions. Pick the one to install.
+
+## [2.0.3-beta7] - 2026-10-01
+
+### Fixed
+
+- The steering wheel on the driving bar turns the same way as the wheel in the car. Left is yellow.
+- Turn signals and the hazard light blink while they are on.
+
+## [2.0.3-beta6] - 2026-10-01
+
+### New and improved
+
+- Remote watch shows the four surround cameras as a widescreen grid, each one straightened.
+- CH1, CH2, CH3, or CH4 on the phone shows that one camera on its own.
+
+## [2.0.3-beta5] - 2026-10-01
+
+### Fixed
+
+- Straightening a surround clip keeps the driving bar at the bottom. Version, plate, and time sit along the top.
+
+## [2.0.3-beta4] - 2026-10-01
+
+### New and improved
+
+- A straightened surround clip is widescreen, so each camera is 16:9.
+- A bar under the picture shows the app version, the plate, and that clip's date and time.
+
+## [2.0.3-beta3] - 2026-09-30
+
+### Fixed
+
+- Straightening a surround clip for USB or Drive finishes. The progress bar no longer stops near the end.
+
+## [2.0.3-beta2] - 2026-09-30
+
+### New and improved
+
+- Straightening a surround clip for USB or Drive shows a progress bar that counts to 100%.
+- Cancel, and the message when a save or upload finishes, follow the language you picked.
+- The app name is Zeekr Shortcut.
+
+## [2.0.3-beta1] - 2026-09-30
+
+### New and improved
+
+- Upload to Drive can be cancelled. While a surround clip is being straightened, the dialog says so.
+- Surround clips are straightened on export only when Straighten is on. With it off, the copy is the recorded file.
+- Save to USB and upload to Drive ask which camera views to include when more than one was recorded at that moment.
+- The menu header uses only the name for the language you picked.
+
+## [2.0.2] - 2026-09-30
+
+Changes since 2.0.0.
+
+### New and improved
+
+- Save clips to a USB drive from video playback, photo playback, and diagnostics. Files go into the stick's exports folder and keep their recorded names. Surround video is straightened for that copy; the recording on the car stays as it was. Cabin and the other cameras are copied unchanged. Clips that are still being written are skipped.
+- Upload the same files to Google Drive. Sign in once from Settings → Google Drive with the code shown on screen. A progress bar shows the upload. Surround video is straightened for the upload too. Files land in a Drive folder named Zeekr Shortcut.
+- Check for updates uses this app's own releases.
+
 ## [2.1.0-beta] - 2026-10-04
 
 Upgrade from 2.0.0.

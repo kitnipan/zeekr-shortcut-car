@@ -66,6 +66,11 @@ public final class FisheyeMesh {
         this.fovDegrees = FisheyeProjection.clampFov(fovDegrees, this.projection);
     }
 
+    /** 强度滑块已撤，校正始终满强度。多出来的参数是旧调用留下的。 */
+    public void setCorrection(float fovDegrees, String projection, float strength) {
+        setCorrection(fovDegrees, projection);
+    }
+
     public float fovDegrees() {
         return fovDegrees;
     }
@@ -102,6 +107,34 @@ public final class FisheyeMesh {
                 float u = windowLeft + windowWidth * column / this.divisions;
                 // 校正后画面里的一点 → 原始鱼眼画面里的采样点（这一路内，夹在 0..1）
                 FisheyeProjection.sourcePoint(u, v, fovDegrees, projection, point, 0);
+                grid[index++] = laneLeft + point[0] * laneWidth;
+                grid[index++] = laneTop + point[1] * laneHeight;
+            }
+        }
+    }
+
+    /** 输出画面里的一点 (u, v) → 这一路原始画面里的采样点，两边都是 0..1。 */
+    public interface SourceMap {
+        void map(float u, float v, float[] out);
+    }
+
+    /**
+     * 算网格，但每个角点怎么反投影由调用方给（侧视弹窗用：虚拟相机转了个角度，见 {@link SideViewProjection}）。
+     * 画法和 {@link #prepare(int, float, float, float, float, float, float, float, float)} 完全一样。
+     */
+    public void prepare(int divisions, float laneLeft, float laneTop, float laneWidth, float laneHeight,
+                        SourceMap map) {
+        this.divisions = Math.max(1, divisions);
+        int side = this.divisions + 1;
+        if (grid.length != side * side * 2) {
+            grid = new float[side * side * 2];
+        }
+        int index = 0;
+        for (int row = 0; row < side; row++) {
+            float v = (float) row / this.divisions;
+            for (int column = 0; column < side; column++) {
+                float u = (float) column / this.divisions;
+                map.map(u, v, point);
                 grid[index++] = laneLeft + point[0] * laneWidth;
                 grid[index++] = laneTop + point[1] * laneHeight;
             }

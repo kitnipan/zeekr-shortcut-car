@@ -1,11 +1,7 @@
 <resources>
-    <!--
-      应用名：装在车机上的这一份，本身就是车机版，桌面图标、抽屉标题、通知里不用再重复一遍。
-      app_name_full 才带「（车机版）」—— 关于页、诊断报告这种要跟以后的 iOS 版区分开的地方用它。
-    -->
-    <string name="app_name">极氪即刻</string>
-    <string name="app_name_full">极氪即刻（车机版）</string>
-    <string name="accessibility_service_description">保活服务：只用来提高应用在后台的存活率。\n\n本服务不会读取或操作任何界面内容，不收集任何信息。</string>
+    <!-- Default (and English) strings. Chinese lives in values-zh/. -->
+    <string name="app_name">Zeekr Shortcut</string>
+    <string name="app_name_full">Zeekr Shortcut</string>
 
     <!-- 极氪合成流模式 -->
     <string name="zeekr_lane_front">前</string>
@@ -16,8 +12,6 @@
     <string name="zeekr_composite_not_found">未检测到四联合成流，本机可能不支持极氪合成模式</string>
 
     <!-- 关于页面 -->
-    <string name="about_title">关于与致谢</string>
-
     <!-- 设置界面 -->
     <string name="set_back_to_recording">返回录制界面</string>
     <string name="set_check_update_title">检查更新</string>
@@ -242,72 +236,171 @@
     <string name="vi_v_day">白天</string>
     <string name="vi_v_night">夜晚</string>
     <string name="vi_v_armed">布防</string>
+    <!-- Settings screen -->
+    <string name="set_section_dim">Dim overlay</string>
+    <string name="set_dim_title">Dim overlay</string>
+    <string name="set_dim_summary">Covers the whole screen so maps is less bright. Default opacity 90%. Touches still reach the app underneath</string>
+    <string name="set_dim_opacity_title">Opacity</string>
+    <string name="set_dim_brightness_title">Brightness</string>
+    <string name="set_dim_brightness_summary">0 is pure black. Higher is a lighter veil</string>
+    <string name="set_dim_warmth_title">Warmth</string>
+    <string name="set_dim_warmth_summary">Higher shifts the veil toward amber</string>
+    <string name="set_dim_passthrough_title">Pass touches through</string>
+    <string name="set_dim_passthrough_summary">On: maps still receives taps. Off: the veil blocks them</string>
+    <string name="set_dim_reset_title">Reset</string>
+    <string name="set_dim_reset_summary">Opacity 90%, brightness 0, warmth 0, touches pass through</string>
+    <string name="set_auto_dim_title">Auto dim by time (experimental)</string>
+    <string name="set_auto_dim_summary">Turns dim on and off by the clock. Probes system brightness once into diagnostics; most head units cannot read it</string>
+    <string name="set_auto_dim_start_title">Dim from</string>
+    <string name="set_auto_dim_start_summary">Hour when dim turns on</string>
+    <string name="set_auto_dim_end_title">Dim until</string>
+    <string name="set_auto_dim_end_summary">Hour when dim turns off</string>
+    <string name="msg_dim_reset">Dim overlay reset</string>
+    <string name="dim_button_on">Turn dim overlay off</string>
+    <string name="dim_button_off">Turn dim overlay on</string>
+    <string name="set_info_bar_all_title">Activate all items</string>
+    <string name="set_info_bar_all_summary">Also activates items not yet verified on the car, to check that each one is real and usable</string>
+    <string name="set_info_bar_all_dev_only">Unverified items stay crossed out; activating all is for developer mode only</string>
+    <!-- Vehicle info (experimental): groups, signal names, values -->
+    <string name="set_controller_title">Controller (experimental)</string>
+    <string name="set_controller_summary">Logs keys and sticks from a Bluetooth controller or button, for shortcuts later</string>
+    <string name="set_shortcuts_title">Shortcuts</string>
+    <string name="set_shortcuts_summary">Press a button, then pick what it does</string>
+    <string name="shortcut_add">Add shortcut</string>
+    <string name="shortcut_empty">No shortcuts yet. Add one, press the button, then pick an action.</string>
+    <string name="shortcut_press">Press the external button</string>
+    <string name="shortcut_picked">Pressed %1$s. Pick an action.</string>
+    <string name="shortcut_row">%1$s  ·  %2$s</string>
+    <string name="shortcut_scan">scan %1$d</string>
+    <string name="shortcut_action_record">Start/Stop recording</string>
+    <string name="shortcut_action_mirror">Open/Close Super mirror</string>
+    <string name="shortcut_action_both_mirrors">Open/Close both side mirrors</string>
+    <string name="shortcut_action_app">Open app</string>
+    <string name="shortcut_action_dim">Dim display</string>
+    <string name="shortcut_action_save">Save this moment</string>
+    <string name="shortcut_press_tap">Tap</string>
+    <string name="shortcut_press_long">Long press</string>
+    <string name="shortcut_press_double">Double</string>
+    <string name="save_moment_channel">Save this moment</string>
+    <string name="save_moment_starting">Starting…</string>
+    <string name="save_moment_waiting">Waiting for the clip to finish</string>
+    <string name="save_moment_progress">%1$d%%</string>
+    <string name="save_moment_none">No recording to save</string>
+    <string name="save_moment_done">Protected the latest clip. Auto-delete will skip it</string>
+    <string name="save_moment_armed">Protected the clips around this moment. The next segment is protected when it finishes</string>
+    <string name="save_moment_uploaded">Uploaded %1$d saved file(s) to Drive</string>
+    <string name="save_moment_usb">Copied %1$d file(s) to the moments folder on USB</string>
+    <string name="save_moment_no_usb">No USB stick. The moment stays on the car</string>
+    <string name="set_save_moment_usb_title">Save moment to USB</string>
+    <string name="set_save_moment_usb_summary">On by default. Copies finished clips into the moments folder on the USB stick</string>
+    <string name="set_save_moment_drive_title">Upload moment to Google Drive</string>
+    <string name="set_save_moment_drive_summary">Also upload those clips when Drive is signed in. Off until you turn it on</string>
+    <string name="shortcut_access_title">Turn on accessibility</string>
+    <string name="shortcut_access_msg">For now the button works while this app is in front. To make it work on every screen, the app needs its accessibility service. The head unit has no screen for that, so the app turns it on itself.\n\nStart Shizuku, then tap Grant with Shizuku. Or run this once from a computer:\n\n%1$s\n\nThen reopen this app.</string>
+    <string name="shortcut_shizuku">Grant with Shizuku</string>
+    <string name="shortcut_banner">Shortcuts work only while this app is in front.</string>
+    <string name="shortcut_banner_catcher">Accessibility is off, so the key catcher handles other screens. A button pressed within 3 seconds of touching the screen is skipped.</string>
+    <string name="shortcut_catch">Work on every screen (experimental)</string>
+    <string name="shizuku_not_running">Shizuku isn\'t running. Open Shizuku, start it, then try again.</string>
+    <string name="shizuku_too_old">Shizuku is too old. Update it.</string>
+    <string name="shizuku_denied">Shizuku did not allow this app.</string>
+    <string name="shizuku_failed">Grant failed. %1$s</string>
+    <string name="shizuku_done">Done. Shortcuts work on every screen.</string>
+    <string name="shortcut_access_open">System settings</string>
+    <string name="shortcut_access_ok">Got it</string>
+    <string name="ctrl_subtitle">Pair it in the car Bluetooth settings, come back, then press a button</string>
+    <string name="ctrl_devices_none">No input device yet. Pair it, then press a button so it shows up.</string>
+    <string name="ctrl_waiting">Waiting for a button…</string>
+    <string name="ctrl_clear">Clear</string>
+    <string name="ctrl_pressed">down</string>
+    <string name="ctrl_released">up</string>
+    <string name="ctrl_key">%1$s  %2$s  %3$s (%4$d)  scan %5$d  · %6$s</string>
+    <string name="ctrl_axis">%1$s  %2$s  · %3$s</string>
+    <string name="ctrl_paired">Paired peripherals</string>
+    
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
-    <string name="vi_v_ign_driving">行驶</string>
-    <string name="set_language_title">语言 / Language</string>
-    <string name="lang_auto">跟随系统</string>
+    <string name="vi_v_ign_driving">Driving</string>
+    <string name="set_language_title">Language</string>
+    <string name="lang_auto">Follow system</string>
     <string name="lang_zh">中文</string>
     <string name="lang_en">English</string>
     <string name="lang_ms">Bahasa Melayu</string>
 
-    <!-- 设置里的枚举选项 -->
-    <string name="opt_mode_auto">自动（推荐）</string>
-    <string name="opt_model_zeekr">极氪7X（环视合成流）</string>
-    <string name="opt_model_zeekr_multi">极氪7X（环视 + 前后座舱）</string>
+    <!-- Enumerated setting options -->
+    <string name="opt_mode_auto">Automatic (recommended)</string>
+    <string name="opt_model_zeekr">Zeekr 7X (surround composite)</string>
+    <string name="opt_model_zeekr_multi">Zeekr 7X (surround + front and rear cabin)</string>
 
-    <!-- 设置界面里的提示与对话框 -->
-    <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
-    <string name="info_none_selected">未选择</string>
-    <string name="msg_relay_dev_only">会先写内置存储再搬到 U 盘，因此仅限开发者模式</string>
-    <string name="dlg_internal_title">确定使用内置存储？</string>
-    <string name="dlg_internal_msg">行车记录会持续不断地写入数据 —— 只要在录，就一直在写。\n\n闪存的写入寿命有限，长期把车机内置存储作为记录仪的写入位置会实打实地消耗它的寿命，而车机存储通常不可更换。\n\n建议改用 U 盘：损坏后可随时更换，也便于直接取下拷贝。</string>
-    <string name="dlg_internal_ok">仍然使用内置存储</string>
-    <string name="action_cancel">取消</string>
-    <!-- 确定键用自己的字，不用系统的 android.R.string.ok：那一份由车机系统提供，英文版的 OK 在按钮里偏右，自己的「取消」一直是正的 -->
-    <string name="action_ok">确定</string>
-    <string name="action_got_it">知道了</string>
-    <string name="info_checking_storage">正在检测存储…</string>
-    <string name="opt_internal_storage">内置存储</string>
-    <string name="opt_internal_storage_locked">内置存储（仅限开发者模式）</string>
-    <string name="dlg_internal_locked_title">内置存储需要开发者选项</string>
-    <string name="dlg_internal_locked_msg">行车记录会持续不断地写入数据，而车机内置闪存的写入寿命有限，损坏后通常无法更换。因此正常模式下只录到 U 盘。\n\n确有需要时，在「关于 → 安全须知」里打开开发者选项后再选。</string>
-    <string name="msg_storage_changed">存储位置已切换为「%1$s」</string>
-    <string name="msg_enter_number">请输入数字</string>
-    <string name="info_unlimited">不限制</string>
-    <string name="info_reading">正在读取…</string>
-    <string name="info_read_failed">读取失败</string>
-    <string name="msg_rearview_on">超级后视镜已开启：中间三分之一上下划调取景、左右划换一路，两侧拖动窗口</string>
-    <string name="msg_rearview_reset">超级后视镜取景与位置已重置</string>
-    <string name="msg_floating_reset">悬浮按钮已重置</string>
-    <string name="msg_adjust_opened">调节窗口已打开</string>
-    <string name="msg_adjust_reset">亮度 / 降噪参数已恢复默认</string>
-    <string name="info_mapping_manual">已手动指定相机映射</string>
-    <string name="info_mapping_auto">自动分配。多路配置下若某一路没有画面，可在这里手动指定</string>
-    <string name="msg_need_overlay">请先授权悬浮窗权限</string>
-    <string name="dlg_language_title">选择界面语言</string>
+    <!-- Settings prompts and dialogs -->
+    <string name="msg_stream_changed">Stream profile set to “%1$s”. Restart the app to apply</string>
+    <string name="info_none_selected">None selected</string>
+    <string name="msg_relay_dev_only">Relay write uses internal storage, so it needs developer options</string>
+    <string name="dlg_internal_title">Use internal storage?</string>
+    <string name="dlg_internal_msg">A dashcam writes continuously. Internal flash wears out and usually cannot be replaced.\n\nA USB drive is recommended: it can be replaced, and removed to copy files.</string>
+    <string name="dlg_internal_ok">Use internal storage anyway</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_ok">OK</string>
+    <string name="action_got_it">Got it</string>
+    <string name="info_checking_storage">Checking storage…</string>
+    <string name="opt_internal_storage">Internal storage</string>
+    <string name="opt_internal_storage_locked">Internal storage (developer options only)</string>
+    <string name="dlg_internal_locked_title">Internal storage requires developer options</string>
+    <string name="dlg_internal_locked_msg">Continuous recording wears out internal flash, which usually cannot be replaced, so recordings go to the USB drive only.\n\nTo choose it anyway, turn on developer options first, under About → Safety notice.</string>
+    <string name="msg_storage_changed">Storage location set to “%1$s”</string>
+    <string name="msg_enter_number">Enter a number</string>
+    <string name="info_unlimited">No limit</string>
+    <string name="info_reading">Reading…</string>
+    <string name="info_read_failed">Could not read</string>
+    <string name="msg_rearview_on">Super mirror on. Middle: swipe up or down to reframe, left or right to change camera. Sides: drag to move</string>
+    <string name="set_side_popup_title">Turn-signal side view</string>
+    <string name="set_side_popup_summary">While you signal, a pop-up shows the camera on that side: left signal, left camera. It closes when the signal goes off. The car\'s own views come first: no pop-up in reverse or while the stock 360 or side view is showing. Not shown while the Super mirror is on</string>
+    <string name="set_side_popup_speed_title">Show from speed (km/h)</string>
+    <string name="set_side_popup_speed_summary">Below this speed the car shows its own side view. 0 shows it at any speed</string>
+    <string name="msg_side_popup_on">Turn-signal side view on. Signal left or right to see that side</string>
+    <string name="set_side_popup_straighten_title">Straighten picture</string>
+    <string name="set_side_popup_straighten_summary">Corrects the fisheye curve before showing it; the three settings below set how wide it looks and where it points. Only changes the pop-up; recordings are not affected</string>
+    <string name="set_side_popup_fov_title">View width (°)</string>
+    <string name="set_side_popup_fov_summary">Smaller zooms in. Only applies with Straighten picture on</string>
+    <string name="set_side_popup_yaw_title">Aim back (°)</string>
+    <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_pitch_title">Aim up (°)</string>
+    <string name="set_side_popup_pitch_summary">Positive turns the view out towards the road further away, negative down at the car and the ground. The direction is a guess: if it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_roll_left_title">Rotate left (°)</string>
+    <string name="set_side_popup_roll_right_title">Rotate right (°)</string>
+    <string name="set_side_popup_roll_summary">Positive turns the picture clockwise to level a tilted horizon. Left and right are separate. If it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_close_delay_ms_title">Stay open after the signal (ms)</string>
+    <string name="set_side_popup_close_delay_ms_summary">1000 ms = 1 second. 0 closes it as soon as the signal goes off. A stock view still closes it straight away</string>
+    <string name="set_side_popup_instant_title">Instant pop-up</string>
+    <string name="set_side_popup_instant_summary">In D, keeps the side view ready in the background so the picture is there as soon as you signal. The camera stays on while driving, which uses a little more power</string>
+    <string name="set_side_popup_size_title">Pop-up size (% of screen height)</string>
+    <string name="set_side_popup_size_summary">Up to half the screen width: the left and right pop-ups meet at the middle</string>
+    <string name="set_side_popup_vertical_title">Height on screen (%)</string>
+    <string name="set_side_popup_vertical_summary">0 is the top, 100 the bottom</string>
+    <string name="msg_rearview_reset">Super mirror framing and position reset</string>
+    <string name="msg_floating_reset">Floating button reset</string>
+    <string name="msg_adjust_opened">Adjustment window opened</string>
+    <string name="msg_adjust_reset">Brightness / noise reduction restored to defaults</string>
+    <string name="info_mapping_manual">Camera mapping set manually</string>
+    <string name="info_mapping_auto">Automatic. If a camera shows nothing, assign it here</string>
+    <string name="msg_need_overlay">Grant the overlay permission first</string>
+    <string name="dlg_language_title">Choose a language</string>
 
-    <!-- 相机映射与语言提示 -->
-    <string name="msg_camera_list_failed">读取不到相机列表</string>
-    <string name="opt_camera_auto">自动</string>
-    <string name="opt_camera_id">相机 %1$s</string>
-    <string name="slot_surround">环视（合成流）</string>
-    <string name="slot_cabin_front">前座舱</string>
-    <string name="slot_cabin_rear">后座舱</string>
-    <string name="action_save">保存</string>
-    <string name="action_all_auto">全部自动</string>
-    <string name="msg_mapping_saved">相机映射已保存，重启应用后生效</string>
-    <string name="msg_mapping_cleared">已恢复自动分配，重启应用后生效</string>
-    <string name="msg_language_hint">以后可以在「设置 → 界面 → 语言」里更改</string>
+    <!-- Camera mapping and language hint -->
+    <string name="msg_camera_list_failed">Camera list unavailable</string>
+    <string name="opt_camera_auto">Automatic</string>
+    <string name="opt_camera_id">Camera %1$s</string>
+    <string name="slot_surround">Surround (composite)</string>
+    <string name="slot_cabin_front">Front cabin</string>
+    <string name="slot_cabin_rear">Rear cabin</string>
+    <string name="action_save">Save</string>
+    <string name="action_all_auto">All automatic</string>
+    <string name="msg_mapping_saved">Camera mapping saved. Restart the app to apply</string>
+    <string name="msg_mapping_cleared">Back to automatic assignment. Restart the app to apply</string>
+    <string name="msg_language_hint">You can change this later in Settings → Interface → Language</string>
 
-    <!-- 首次启动引导 -->
-    <string name="guide_title">开始之前</string>
-    <string name="guide_1">实验性的非官方软件，未经任何车辆功能安全认证。它不替代原厂行车记录仪、倒车影像或盲区监测，行驶中请不要操作它，也不要靠它的画面判断路况。</string>
-    <string name="guide_2">录制只写 U 盘。没插 U 盘不会开始录制 —— 行车记录是持续写入，而车机内置闪存写坏了换不了。U 盘上的录像不加密，盘拔下来在别的设备上就能读。</string>
-    <string name="guide_3">菜单键永远在左上角。操作按钮可以整列放到左边或右边（设置 → 界面 → 操作按钮位置），按驾驶座在哪一侧选。超级后视镜默认关着，在设置 → 超级后视镜里开；开了之后可以拖动、缩放，上下划换取景、左右划换一路。</string>
-    <string name="guide_4">出了问题先重启一次应用。还不正常的话，从 设置 → 系统 → 诊断信息 导出报告 —— 带着它提 issue 最省事。</string>
-    <string name="action_got_it_guide">我知道了</string>
-
+    <!-- Main interface -->
+    <string name="accessibility_service_description">Keeps the app alive in the background.\n\nIt does not read or control the screen and collects no data.</string>
     <!-- 主界面 / 通知 / 回放 -->
     <string name="msg_camera_not_ready">相机未准备好，请重试</string>
     <string name="msg_need_camera_storage">需要相机和存储权限</string>
@@ -416,110 +509,170 @@
     <string name="msg_share_photo_subject">来自极氪即刻的图片</string>
     <string name="msg_no_share_target">没有找到可以分享的应用</string>
     <string name="msg_file_unreadable">文件不存在或无法读取</string>
+    <!-- First-launch guide -->
+    <string name="guide_title">Before you start</string>
+    <string name="guide_1">Experimental, unofficial software with no vehicle safety certification. It does not replace the factory dashcam, reversing camera or blind-spot monitor. Do not use it while driving, and do not rely on its picture to judge the road.</string>
+    <string name="guide_2">Recordings go to the USB drive only; without a drive, recording does not start. Recordings are not encrypted: anyone with the drive can read them.</string>
+    <string name="guide_3">The menu is at the top left. Put the action buttons on the driver\'s side in Settings → Interface → Button side. The super mirror is off by default; turn it on in Settings → Super mirror.</string>
+    <string name="guide_4">If something goes wrong, restart the app. If it continues, export a report from Settings → System → Diagnostics and attach it to an issue.</string>
+    <string name="action_got_it_guide">Got it</string>
 
-    <!-- 侧边栏与播放器 -->
-    <string name="nav_recording">录制界面</string>
-    <string name="nav_video_playback">视频回看</string>
-    <string name="nav_photo_playback">图片回看</string>
-    <string name="nav_group_system">系统</string>
-    <string name="nav_settings">设置</string>
-    <string name="nav_header_subtitle">车机版环视记录仪</string>
-    <string name="nav_header_alt_name">Zeekr Shortcut</string>
-    <string name="lane_surround">环视</string>
-    <string name="player_title">连续回放</string>
-    <string name="player_prev">上一段</string>
-    <string name="player_next">下一段</string>
-    <string name="action_close">关闭</string>
-    <string name="nav_header_version">版本 %1$s</string>
-
-    <!-- 检查更新 -->
-    <string name="upd_checking">正在检查更新…</string>
-    <string name="upd_check_failed">检查更新失败：%1$s</string>
-    <string name="upd_none">没有找到可安装的版本</string>
-    <string name="upd_up_to_date">已是最新版本（%1$s）</string>
-    <string name="upd_found_title">发现新版本</string>
-    <string name="upd_size_suffix">，约 %1$s MB</string>
-    <string name="upd_found_msg">%1$s%2$s\n\n当前版本 %3$s\n\n下载完成后会直接进入系统的安装界面。安装包存放在应用缓存中，下次检查更新时自动清除。</string>
-    <string name="upd_found_msg_notes">%1$s%2$s\n\n当前版本 %3$s\n\n更新内容（来自 GitHub 发布页）：\n\n%4$s\n\n下载完成后会直接进入系统的安装界面。</string>
-    <string name="upd_download">下载并安装</string>
-    <string name="upd_later">稍后</string>
-    <string name="upd_guide_start">知道了，开始下载</string>
-    <string name="upd_guide_image">安装提醒：下载完成后会跳到车机的安装界面。装好后点左上角「返回」，不要点中间的「打开」</string>
-    <string name="upd_downloading">正在下载…</string>
-    <string name="upd_downloading_pct">正在下载… %1$d%%（%2$s / %3$s MB）</string>
-    <string name="upd_download_title">下载 %1$s</string>
-    <string name="upd_download_failed">下载失败：%1$s</string>
-    <string name="upd_apk_missing">安装包不见了，请重试</string>
-    <string name="upd_err_bad_response">看不懂 GitHub 的响应</string>
-    <string name="upd_err_http">服务器返回 HTTP %1$d</string>
-    <string name="upd_err_too_large">文件过大（%1$d MB），已中止</string>
-    <string name="upd_err_no_dir">建不了下载目录</string>
-    <string name="upd_err_over_limit">内容超出上限，已中止</string>
-    <string name="upd_err_truncated">只收到 %1$d / %2$d 字节</string>
-    <string name="upd_need_install_title">需要允许安装应用</string>
-    <string name="upd_need_install_msg">系统要求先允许本应用安装其他应用，才能进入安装界面。\n\n授权后回到这里再点一次「检查更新」。</string>
-    <string name="upd_go_settings">去设置</string>
-    <string name="upd_cannot_open_apk">无法打开安装包：%1$s</string>
-    <string name="upd_no_installer">这台车机上打不开安装界面：%1$s</string>
-    <string name="upd_no_settings_page">这台车机上打不开该设置页</string>
-    <string name="msg_keep_one_camera_refuse">请至少开启一路相机</string>
-    <string name="msg_refuse_no_external">未检测到 U 盘，不会开始录制。为避免持续写入损耗车机内置闪存，正常模式下只录到 U 盘。</string>
+    <!-- Main screen, notifications, playback -->
+    <!-- Navigation drawer and player -->
+    <string name="nav_recording">Recording</string>
+    <string name="nav_video_playback">Videos</string>
+    <string name="nav_photo_playback">Photos</string>
+    <string name="nav_remote">Remote view</string>
+    <string name="remote_title">Remote view</string>
+    <string name="remote_hint">Open this QR on the phone. Video starts only after someone is watching.</string>
+    <string name="remote_watching">Sending · %1$s</string>
+    <string name="remote_idle">Linked. Waiting for a watch.</string>
+    <string name="remote_email">Account %1$s</string>
+    <string name="remote_offline">Server offline</string>
+    <string name="nav_group_system">System</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_header_subtitle">Surround-view dashcam</string>
+    <string name="lane_surround">Surround</string>
+    <string name="player_title">Continuous playback</string>
+    <string name="player_prev">Previous</string>
+    <string name="player_next">Next</string>
+    <string name="action_close">Close</string>
+    <string name="nav_header_version">Version %1$s</string>
 
     <!-- 关于页 -->
     <string name="date_group_count">%1$d 组</string>
+    <!-- Update check -->
+    <string name="upd_checking">Checking for updates…</string>
+    <string name="upd_check_failed">Update check failed: %1$s</string>
+    <string name="upd_none">No installable release found</string>
+    <string name="upd_up_to_date">Already up to date (%1$s)</string>
+    <string name="upd_pick_title">Choose a version to install</string>
+    <string name="upd_pick_current">%1$s · installed</string>
+    <string name="upd_already">%1$s is already installed</string>
+    <string name="upd_older_title">Install an older version</string>
+    <string name="upd_older_msg">%1$s%2$s\n\nCurrent version %3$s\n\nThis build is older than the one on the car. The system usually will not replace a newer app with an older one. Uninstall this app first if you still want it.</string>
+    <string name="upd_older_msg_notes">%1$s%2$s\n\nCurrent version %3$s\n\nThis build is older than the one on the car. The system usually will not replace a newer app with an older one. Uninstall this app first if you still want it.\n\n%4$s</string>
+    <string name="upd_found_title">Update available</string>
+    <string name="upd_size_suffix">, about %1$s MB</string>
+    <string name="upd_found_msg">%1$s%2$s\n\nCurrent version %3$s\n\nThe installer opens when the download finishes.</string>
+    <string name="upd_found_msg_notes">%1$s%2$s\n\nCurrent version %3$s\n\nWhat\'s new (from the GitHub release page):\n\n%4$s\n\nThe installer opens when the download finishes.</string>
+    <string name="upd_download">Download and install</string>
+    <string name="upd_later">Later</string>
+    <string name="upd_guide_start">Got it, download</string>
+    <string name="upd_guide_image">Before you install: when the download finishes the head unit\'s installer opens. Once installed, tap Back at the top left, not Open in the middle</string>
+    <string name="upd_downloading">Downloading…</string>
+    <string name="upd_downloading_pct">Downloading… %1$d%% (%2$s / %3$s MB)</string>
+    <string name="upd_download_title">Downloading %1$s</string>
+    <string name="upd_download_failed">Download failed: %1$s</string>
+    <string name="upd_apk_missing">Installer file missing. Try again</string>
+    <string name="upd_err_bad_response">Unreadable response from GitHub</string>
+    <string name="upd_err_http">Server returned HTTP %1$d</string>
+    <string name="upd_err_too_large">File too large (%1$d MB), aborted</string>
+    <string name="upd_err_no_dir">Cannot create the download folder</string>
+    <string name="upd_err_over_limit">Too much data, aborted</string>
+    <string name="upd_err_truncated">Only received %1$d of %2$d bytes</string>
+    <string name="upd_need_install_title">Permission to install apps is required</string>
+    <string name="upd_need_install_msg">Allow this app to install apps, then come back and tap Check for updates again.</string>
+    <string name="upd_go_settings">Open settings</string>
+    <string name="upd_cannot_open_apk">Cannot open the installer: %1$s</string>
+    <string name="upd_no_installer">This head unit cannot open the installer: %1$s</string>
+    <string name="upd_no_settings_page">This head unit cannot open that settings page</string>
+    <string name="msg_keep_one_camera_refuse">Select at least one camera to record</string>
+    <string name="msg_refuse_no_external">No USB drive detected. Recordings go to a USB drive only.</string>
 
-    <!-- 图片回看 -->
-    <string name="photo_mode_multi">多路</string>
+    <!-- About screen -->
+    <!-- Photo playback -->
+    <string name="photo_mode_multi">All cameras</string>
     <string name="photo_mode_single">%1$s</string>
-    <string name="photo_share_count">已选择 %1$d 组图片，共 %2$d 个文件</string>
-    <string name="photo_share_total">共 %1$d 个图片文件</string>
-    <string name="msg_share_failed">分享失败：%1$s</string>
-    <string name="msg_share_path_unsupported">分享失败：文件路径不受支持</string>
+    <string name="photo_share_count">%1$d group(s) selected, %2$d file(s)</string>
+    <string name="photo_share_total">%1$d photo file(s)</string>
+    <string name="msg_share_failed">Sharing failed: %1$s</string>
+    <string name="msg_share_path_unsupported">Sharing failed: this file path is not supported</string>
 
-    <!-- 图片回看界面 -->
-    <string name="action_refresh">刷新</string>
-    <string name="action_multi_select">多选</string>
-    <string name="action_select_all">全选</string>
-    <string name="msg_selected_none">已选择 0 项</string>
-    <string name="action_share">分享</string>
-    <string name="photo_empty">暂无照片文件</string>
-    <string name="photo_no_image">无图片</string>
-    <string name="photo_pick_hint">请从左侧列表选择照片</string>
-    <string name="photo_tap_hint">点画面放大那一路</string>
-    <string name="photo_fisheye">鱼眼校正</string>
+    <!-- Photo playback screen -->
+    <string name="action_refresh">Refresh</string>
+    <string name="action_multi_select">Select</string>
+    <string name="action_select_all">Select all</string>
+    <string name="msg_selected_none">0 selected</string>
+    <string name="action_share">Share</string>
+    <string name="photo_empty">No photos yet</string>
+    <string name="photo_no_image">No photo</string>
+    <string name="photo_pick_hint">Pick a photo from the list</string>
+    <string name="photo_tap_hint">Tap a view to enlarge it</string>
+    <string name="photo_fisheye">Straighten</string>
 
-    <!-- 发送到手机 -->
-    <string name="action_send_to_phone">发送到手机</string>
-    <string name="share_phone_title">发送到手机</string>
-    <string name="share_phone_steps">用手机扫描二维码 → 浏览器会打开这个文件 → 长按图片或视频，选择「保存」</string>
-    <string name="share_phone_steps_file">用手机扫描二维码 → 浏览器打开下载页 → 点「下载」，文件就存到手机里了</string>
+    <!-- Send to phone -->
+    <string name="action_send_to_phone">Send to phone</string>
+    <string name="action_save_to_usb">Save to USB</string>
+    <string name="export_pick_views">Which views to export</string>
+    <string name="usb_export_no_stick_title">No USB stick found</string>
+    <string name="usb_export_no_stick_msg">Plug in a USB stick and try again. The file is copied into the exports folder on the stick, under the same name.</string>
+    <string name="usb_export_copying">Copying to USB…</string>
+    <string name="usb_export_saved">Saved to %1$s</string>
+    <string name="usb_export_failed">Could not save: %1$s</string>
+    <string name="usb_export_busy">Still copying the previous file</string>
+    <string name="usb_export_defish">Saving to USB. Surround is straightened first. Cabin and the other cameras are copied as recorded</string>
+    <string name="usb_export_cancelled">Save cancelled</string>
+    <string name="usb_export_saved_count">Saved %1$d files to\n%2$s</string>
+    <string name="usb_export_unfinished">%1$d files were not finished yet, so they were left out</string>
+    <string name="action_upload_drive">Upload to Drive</string>
+    <string name="set_drive_title">Google Drive</string>
+    <string name="set_drive_help">In Google Cloud, create an OAuth client of type TVs and Limited Input devices and enable the Drive API. Paste the client ID and secret below. Sign-in happens on the phone. Files land in a Drive folder named Zeekr Shortcut.</string>
+    <string name="set_drive_client_id">Client ID</string>
+    <string name="set_drive_client_secret">Client secret</string>
+    <string name="set_drive_secret_saved">Saved</string>
+    <string name="set_drive_secret_empty">Not set</string>
+    <string name="set_drive_sign_in">Sign in to Google Drive</string>
+    <string name="set_drive_sign_out">Sign out</string>
+    <string name="drive_signed_in_summary">Signed in. Tap to switch accounts</string>
+    <string name="drive_signed_out_summary">Not signed in</string>
+    <string name="drive_signed_in">Signed in to Google Drive</string>
+    <string name="drive_signed_out">Signed out of Google Drive</string>
+    <string name="drive_need_client_title">Client needed</string>
+    <string name="drive_need_client_msg">Open Settings → Google Drive, paste the OAuth client ID and secret, then sign in.</string>
+    <string name="drive_sign_in_title">Sign in on your phone</string>
+    <string name="drive_sign_in_msg">On your phone open %2$s and enter %1$s. This window closes after you approve.</string>
+    <string name="drive_sign_in_failed">Sign-in failed: %1$s</string>
+    <string name="drive_uploading">Uploading to Google Drive…</string>
+    <string name="drive_progress_title">Upload to Drive</string>
+    <string name="drive_progress_prepare">Straightening %1$s · %2$d%%</string>
+    <string name="drive_progress_file">%1$d/%2$d %3$s\n%4$d%% · %5$s / %6$s MB</string>
+    <string name="drive_uploading_defish">Uploading. Surround is straightened first. Cabin and the other cameras are sent as recorded</string>
+    <string name="drive_uploaded_count">Uploaded %1$d files to Zeekr Shortcut on Google Drive</string>
+    <string name="drive_upload_failed">Upload failed: %1$s</string>
+    <string name="drive_upload_cancelled">Upload cancelled</string>
+    <string name="drive_busy">The previous upload is still running</string>
+    <string name="drive_unfinished">%1$d files were not finished yet, so they were not uploaded</string>
+    <string name="share_phone_title">Send to phone</string>
+    <string name="share_phone_steps">Scan with your phone → the file opens in the browser → long-press it and choose Save</string>
+    <string name="share_phone_steps_file">Scan the QR code with your phone → the download page opens → tap Download to save the file</string>
     <string name="share_phone_address">%1$s\n%2$s · %3$s</string>
-    <string name="share_phone_keep_open">保存完成前请不要关闭本窗口 —— 关掉就断开了</string>
-    <string name="share_phone_switch_address">换一个地址</string>
-    <string name="share_phone_no_file">没有可发送的文件</string>
-    <string name="share_phone_failed">启动失败：%1$s</string>
-    <string name="share_phone_need_hotspot_title">需要先把两台设备连起来</string>
-    <string name="share_phone_need_hotspot_msg">手机和车机要在同一个局域网里：用手机开热点让车机连上，或者用车机开热点让手机连上。\n\n连好之后再试一次。</string>
+    <string name="share_phone_keep_open">Keep this open until the file is saved</string>
+    <string name="share_phone_switch_address">Try another address</string>
+    <string name="share_phone_no_file">Nothing to send</string>
+    <string name="share_phone_failed">Could not start: %1$s</string>
+    <string name="share_phone_need_hotspot_title">Connect the two devices first</string>
+    <string name="share_phone_need_hotspot_msg">The phone and the head unit must be on the same network: connect one to the other\'s hotspot.\n\nThen try again.</string>
 
-    <!-- 分享提示 -->
-    <string name="share_phone_network_hint">需要手机和车机在同一个网络里。最省事的做法：**用手机开热点，让车机连上这个 Wi-Fi**。</string>
-    <string name="share_video_segment_note">录像按每 %1$s 存一段。连续回放是把多段接起来放的，而这里只发**当前这一段**。要发别的时间段，把进度拖到那一段再点一次。</string>
-    <string name="share_minutes">%1$d 分钟</string>
-    <string name="action_back">返回</string>
-    <string name="set_watermark_brand_title">应用角标</string>
-    <string name="set_watermark_brand_summary">显示本应用的名称和版本号</string>
-    <string name="opt_fps_auto_unknown">原始帧率</string>
-    <string name="upd_connecting">正在连接…</string>
-    <string name="upd_downloading_size">正在下载… %1$s MB</string>
-    <string name="upd_download_failed_title">下载失败</string>
-    <string name="share_phone_qr_failed">二维码没能生成，请直接在手机浏览器里输入下面这个地址</string>
-    <string name="set_plate_switch_title">在画面中标注车牌号</string>
-    <string name="set_plate_switch_summary">录像和照片的左上角会跟着应用名一起标出车牌号</string>
-    <string name="set_plate_title">车牌号</string>
-    <string name="set_plate_hint">最长十位，只能是大写字母和数字</string>
-    <string name="set_plate_empty">未填写</string>
-    <string name="msg_plate_cleaned">已按规则整理为 %1$s</string>
-    <string name="msg_restart_required">重启应用后生效</string>
+    <!-- Share hints -->
+    <string name="share_phone_network_hint">The phone and the head unit must be on the same network. Easiest: **turn on the phone\'s hotspot and connect the car to it**.</string>
+    <string name="share_video_segment_note">Recordings are saved in %1$s clips. This sends **only the current clip**; to send another, seek to it and tap again.</string>
+    <string name="share_minutes">%1$d min</string>
+    <string name="action_back">Back</string>
+    <string name="set_watermark_brand_title">App badge</string>
+    <string name="set_watermark_brand_summary">Shows this app\'s name and version</string>
+    <string name="opt_fps_auto_unknown">Native</string>
+    <string name="upd_connecting">Connecting…</string>
+    <string name="upd_downloading_size">Downloading… %1$s MB</string>
+    <string name="upd_download_failed_title">Download failed</string>
+    <string name="share_phone_qr_failed">Could not create the QR code. Enter this address in the phone\'s browser instead</string>
+    <string name="set_plate_switch_title">Stamp the plate number</string>
+    <string name="set_plate_switch_summary">Adds the plate number next to the app name on recordings and photos</string>
+    <string name="set_plate_title">Plate number</string>
+    <string name="set_plate_hint">Up to 10 characters, uppercase letters and digits only</string>
+    <string name="set_plate_empty">Not set</string>
+    <string name="msg_plate_cleaned">Saved as %1$s</string>
+    <string name="msg_restart_required">Takes effect after restarting the app</string>
 
     <!-- 主界面（统一骨架） -->
     <string name="main_title">极氪即刻</string>
@@ -564,238 +717,245 @@
     <string name="record_unavailable_detail">未检测到 U 盘</string>
     <string name="status_profile_composite">极氪7X（环视合成流）</string>
     <string name="status_profile_composite_multi">环视 + 两路座舱</string>
+    <!-- Main screen (shared skeleton) -->
+    <!-- Interface section · first-launch side question · record unavailable · status bar -->
+    <string name="set_fisheye_strength_title">Correction strength</string>
+    <string name="set_fisheye_strength_summary">100 is the full effect of the chosen projection; lower leans back towards the original picture</string>
+    
     <string name="status_fps">≤%1$s fps</string>
-    <string name="status_bitrate_very_low">极低码率</string>
-    <string name="status_bitrate_low">低码率</string>
-    <string name="status_bitrate_medium">中码率</string>
-    <string name="status_bitrate_high">高码率</string>
-    <string name="status_storage_free">U 盘 %1$s 可用</string>
-    <string name="status_storage_none">未检测到 U 盘</string>
-    <string name="status_recording_fallback">录像已改写到 %1$s（%2$s 不可用）</string>
-    <string name="status_camera_taken">环视被车机占用，放开后自动继续录像</string>
-    <string name="status_internal_storage">内置存储</string>
-    <string name="nav_group_switches">开关</string>
+    <string name="status_bitrate_very_low">Very low bitrate</string>
+    <string name="status_bitrate_low">Low bitrate</string>
+    <string name="status_bitrate_medium">Medium bitrate</string>
+    <string name="status_bitrate_high">High bitrate</string>
+    <string name="status_storage_free">USB %1$s free</string>
+    <string name="status_storage_none">No USB drive</string>
+    <string name="status_recording_fallback">Recording to %1$s (%2$s unavailable)</string>
+    <string name="status_camera_taken">Surround camera in use by the car; recording resumes when released</string>
+    <string name="status_internal_storage">internal storage</string>
+    <string name="nav_group_switches">Switches</string>
 
-    <!-- 视频流配置编辑 -->
-    <string name="editor_reset">重置</string>
-    <string name="editor_record_codec">录制 · 编码</string>
-    <string name="editor_resolution">分辨率</string>
-    <string name="editor_reset_msg">把这份配置改回新建时的样子，你在这里改的会丢掉。</string>
-    <string name="editor_reset_ok">恢复</string>
-    <string name="editor_reset_done">已重置</string>
-    <string name="editor_whole_frame">整幅画面</string>
+    <!-- Stream profile editor -->
+    <string name="editor_reset">Reset</string>
+    <string name="editor_record_codec">Recording · codec</string>
+    <string name="editor_resolution">Resolution</string>
+    <string name="editor_reset_msg">Restore this profile to its defaults? Changes made here will be lost.</string>
+    <string name="editor_reset_ok">Reset</string>
+    <string name="editor_reset_done">Profile reset</string>
+    <string name="editor_whole_frame">Whole frame</string>
     <string name="editor_lane_group">%1$s · %2$s</string>
-    <string name="editor_pick_lane">点一格来改它</string>
-    <string name="editor_stage">拖格子换位置，拖四个角改大小</string>
-    <string name="editor_lanes_lost">打不开。请退回去重新进一次视频流配置编辑</string>
-    <string name="editor_no_camera">这份配置里还没有相机</string>
-    <string name="editor_cabin_note_title">这一路还不能挪位置、改大小</string>
-    <string name="editor_cabin_note_summary">旋转、镜像、画面填充、缩放平移已生效；位置和大小暂时固定</string>
-    <string name="editor_position">位置与大小</string>
-    <string name="editor_position_value">左上 %1$s, %2$s · 大小 %3$s × %4$s</string>
-    <string name="editor_position_dialog">位置与大小（容器宽高的比例，0–1）</string>
-    <string name="editor_x">左 x</string>
-    <string name="editor_y">上 y</string>
-    <string name="editor_w">宽</string>
-    <string name="editor_h">高</string>
-    <string name="editor_rotation">旋转</string>
-    <string name="editor_mirror">镜像</string>
-    <string name="editor_mirror_summary">左右翻转，和真实后视镜一致</string>
-    <string name="editor_crop">裁切</string>
-    <string name="editor_crop_value">上 %1$s · 下 %2$s · 左 %3$s · 右 %4$s</string>
-    <string name="editor_fit">画面填充</string>
-    <string name="editor_fit_fit">适应 · 整幅可见，两边留黑</string>
-    <string name="editor_fit_fill">填充 · 铺满，多出来的裁掉</string>
-    <string name="editor_quality_title">录制画质</string>
-    <string name="editor_quality_summary">一次定下每一路的帧率和码率。想单独改某一路，下面细调</string>
-    <string name="editor_quality_current">当前</string>
-    <string name="editor_quality_gb_unit">GB / 小时</string>
-    <string name="editor_quality_hours_unit">小时 · 按剩余空间</string>
-    <string name="editor_quality_space">省空间</string>
-    <string name="editor_quality_space_note">10 fps、低码率；记录完整，细节压缩较多</string>
-    <string name="editor_quality_balanced">均衡</string>
-    <string name="editor_quality_balanced_note">20 fps、中码率；清晰度与占用兼顾</string>
-    <string name="editor_quality_sharp">最清晰</string>
-    <string name="editor_quality_sharp_note">不限帧率、高码率；细节保留最充分</string>
-    <string name="editor_cameras_title">在录 %1$d 路</string>
-    <string name="editor_cameras_summary">关掉的那一路不开相机、也不占空间；点一路展开细调</string>
-    <string name="editor_camera_tuned">已细调</string>
-    <string name="editor_open_lanes">摆位</string>
-    <string name="editor_detail_title">%1$s · 细调</string>
-    <string name="editor_knob_fps">帧率</string>
-    <string name="editor_knob_bitrate">码率</string>
-    <string name="editor_knob_segment">分段（分钟）</string>
-    <string name="editor_knob_resolution">分辨率</string>
-    <string name="editor_knob_resolution_note">预览与录制</string>
-    <string name="editor_knob_photo_size">拍照</string>
-    <string name="editor_knob_photo_size_note">固定最大尺寸</string>
-    <string name="editor_knob_codec">编码</string>
-    <string name="editor_budget_none">没有开启任何相机，不会录下任何东西</string>
-    <string name="editor_budget">在录 %1$s 路，合计 %2$s，每小时约 %3$s GB</string>
-    <string name="editor_budget_with_space">在录 %1$s 路，合计 %2$s，每小时约 %3$s GB，剩余空间还能录约 %4$s 小时</string>
-    <string name="editor_crop_off">暂不可用</string>
-    <string name="editor_crop_dialog">裁切（各边切掉多少，画面的比例）</string>
-    <string name="editor_top">上</string>
-    <string name="editor_bottom">下</string>
-    <string name="editor_left">左</string>
-    <string name="editor_right">右</string>
-    <string name="editor_scale">缩放与平移</string>
-    <string name="editor_scale_value">缩放 %1$s × %2$s · 平移 %3$s, %4$s</string>
-    <string name="editor_scale_dialog">缩放与平移（缩放 1 为原样，平移是这一格的比例）</string>
-    <string name="editor_scale_x">缩放 x</string>
-    <string name="editor_scale_y">缩放 y</string>
-    <string name="editor_pan_x">平移 x</string>
-    <string name="editor_pan_y">平移 y</string>
-    <string name="editor_auto">自动</string>
-    <string name="editor_max">最大</string>
+    <string name="editor_pick_lane">Tap a cell to edit it</string>
+    <string name="editor_stage">Drag a cell to move it, drag a corner to resize</string>
+    <string name="editor_lanes_lost">Could not open. Go back and open Edit stream profile again</string>
+    <string name="editor_no_camera">This profile has no camera yet</string>
+    <string name="editor_cabin_note_title">Position and size are fixed for this camera</string>
+    <string name="editor_cabin_note_summary">Rotation, mirror, fit and zoom apply</string>
+    <string name="editor_position">Position and size</string>
+    <string name="editor_position_value">Top-left %1$s, %2$s · size %3$s × %4$s</string>
+    <string name="editor_position_dialog">Position and size (fraction of the view, 0–1)</string>
+    <string name="editor_x">Left x</string>
+    <string name="editor_y">Top y</string>
+    <string name="editor_w">Width</string>
+    <string name="editor_h">Height</string>
+    <string name="editor_rotation">Rotation</string>
+    <string name="editor_mirror">Mirror</string>
+    <string name="editor_mirror_summary">Flip left to right, like a real mirror</string>
+    <string name="editor_crop">Crop</string>
+    <string name="editor_crop_value">Top %1$s · bottom %2$s · left %3$s · right %4$s</string>
+    <string name="editor_fit">Fit to pane</string>
+    <string name="editor_fit_fit">Fit · whole picture, bars at the sides</string>
+    <string name="editor_fit_fill">Fill · covers the pane, excess cropped</string>
+    <string name="editor_quality_title">Recording quality</string>
+    <string name="editor_quality_summary">Frame rate and bitrate for all cameras. Tune a camera below.</string>
+    <string name="editor_quality_current">current</string>
+    <string name="editor_quality_gb_unit">GB / hour</string>
+    <string name="editor_quality_hours_unit">hours on free space</string>
+    <string name="editor_quality_space">Save space</string>
+    <string name="editor_quality_space_note">10 fps, low bitrate. Most compression</string>
+    <string name="editor_quality_balanced">Balanced</string>
+    <string name="editor_quality_balanced_note">20 fps, medium bitrate. Balances detail and storage</string>
+    <string name="editor_quality_sharp">Sharpest</string>
+    <string name="editor_quality_sharp_note">No frame rate cap, high bitrate. Most detail</string>
+    <string name="editor_cameras_title">Cameras recording: %1$d</string>
+    <string name="editor_cameras_summary">Cameras that are off are not opened and use no space. Tap one to tune it</string>
+    <string name="editor_camera_tuned">tuned</string>
+    <string name="editor_open_lanes">Placement</string>
+    <string name="editor_detail_title">%1$s · tuning</string>
+    <string name="editor_knob_fps">Frame rate</string>
+    <string name="editor_knob_bitrate">Bitrate</string>
+    <string name="editor_knob_segment">Clip length (min)</string>
+    <string name="editor_knob_resolution">Resolution</string>
+    <string name="editor_knob_resolution_note">Preview and recording</string>
+    <string name="editor_knob_photo_size">Photos</string>
+    <string name="editor_knob_photo_size_note">Always the largest size</string>
+    <string name="editor_knob_codec">Codec</string>
+    <string name="editor_budget_none">No camera is on; nothing will be recorded</string>
+    <string name="editor_budget">Cameras: %1$s · %2$s total · about %3$s GB/hour</string>
+    <string name="editor_budget_with_space">Cameras: %1$s · %2$s total · about %3$s GB/hour · about %4$s hours of free space</string>
+    <string name="editor_crop_off">Unavailable for now</string>
+    <string name="editor_crop_dialog">Crop (how much to cut from each side, fraction of the picture)</string>
+    <string name="editor_top">Top</string>
+    <string name="editor_bottom">Bottom</string>
+    <string name="editor_left">Left</string>
+    <string name="editor_right">Right</string>
+    <string name="editor_scale">Zoom and pan</string>
+    <string name="editor_scale_value">Zoom %1$s × %2$s · pan %3$s, %4$s</string>
+    <string name="editor_scale_dialog">Zoom and pan (1 = unchanged; pan is a fraction of the cell)</string>
+    <string name="editor_scale_x">Zoom x</string>
+    <string name="editor_scale_y">Zoom y</string>
+    <string name="editor_pan_x">Pan x</string>
+    <string name="editor_pan_y">Pan y</string>
+    <string name="editor_auto">Auto</string>
+    <string name="editor_max">Max</string>
     <string name="editor_resolved">%1$s → %2$s</string>
-    <string name="editor_resolved_by_camera">由相机按最接近 1280x800 挑</string>
-    <string name="editor_per_cell">每格 %1$s</string>
-    <string name="editor_landing">录成 %1$s</string>
-    <string name="editor_fps_unlimited">原始帧率（不限制）</string>
-    <string name="editor_fps_cap">%1$s fps（上限）</string>
-    <string name="editor_bitrate_auto">跟随画质等级（中）</string>
-    <string name="editor_very_low">极低</string>
-    <string name="editor_low">低</string>
-    <string name="editor_medium">中</string>
-    <string name="editor_high">高</string>
-    <string name="editor_codec_auto">自动（优先 H.265）</string>
-    <string name="editor_issue_no_cameras">这份配置里一路相机都没有</string>
-    <string name="editor_issue_none_enabled">一路相机都没启用，什么都不会显示也不会录</string>
-    <string name="editor_issue_undeclared_size">%1$s 的%2$s尺寸 %3$dx%4$d 这一路没有声明过</string>
-    <string name="editor_issue_preview_split_only">%1$s：预览拆四格但录制不拆，录出来的是一整幅画面</string>
-    <string name="editor_issue_record_split_only">%1$s：录制拆四格但预览不拆，超级后视镜取不到单独那一路</string>
-    <string name="editor_stream_preview">预览</string>
-    <string name="editor_stream_record">录制</string>
-    <string name="editor_stream_photo">拍照</string>
-    <string name="editor_camera_missing">（找不到对应的相机）</string>
-    <string name="editor_camera_summary">相机 %1$s · 最大 %2$s</string>
-    <string name="editor_size_unknown">尺寸未知</string>
-    <string name="editor_splits">拆四格</string>
+    <string name="editor_resolved_by_camera">picked by the camera, closest to 1280x800</string>
+    <string name="editor_per_cell">per cell %1$s</string>
+    <string name="editor_landing">on disk %1$s</string>
+    <string name="editor_fps_unlimited">Native (no limit)</string>
+    <string name="editor_fps_cap">%1$s fps (cap)</string>
+    <string name="editor_bitrate_auto">Follow quality level (medium)</string>
+    <string name="editor_very_low">Very low</string>
+    <string name="editor_low">Low</string>
+    <string name="editor_medium">Medium</string>
+    <string name="editor_high">High</string>
+    <string name="editor_codec_auto">Auto (H.265 first)</string>
+    <string name="editor_issue_no_cameras">This profile has no cameras</string>
+    <string name="editor_issue_none_enabled">No camera is enabled, so nothing will show or record</string>
+    <string name="editor_issue_undeclared_size">%1$s: the %2$s size %3$dx%4$d is not declared by this camera</string>
+    <string name="editor_issue_preview_split_only">%1$s: preview is split into four but recording is not, so the recording is one whole frame</string>
+    <string name="editor_issue_record_split_only">%1$s: recording is split into four but preview is not, so the super mirror cannot show a single view</string>
+    <string name="editor_stream_preview">preview</string>
+    <string name="editor_stream_record">recording</string>
+    <string name="editor_stream_photo">photo</string>
+    <string name="editor_camera_missing">(camera not found)</string>
+    <string name="editor_camera_summary">Camera %1$s · max %2$s</string>
+    <string name="editor_size_unknown">size unknown</string>
+    <string name="editor_splits">split in four</string>
 
-    <!-- 连续回放 -->
-    <string name="player_session_title">%1$s · %2$d 段 · %3$s</string>
-    <string name="player_share_chooser">分享录像</string>
-    <string name="player_delete_title">删除这段录像？</string>
-    <string name="player_delete_msg">将删除这段录像的全部 %1$d 个文件，共 %2$s。删除后无法恢复。</string>
-    <string name="player_deleted">已删除 %1$d 个文件</string>
-    <string name="player_info">时间轴 %1$d/%2$d · 起于 %3$s · 共 %4$d 段 · 时长 %5$s</string>
-    <string name="player_clip_count">%1$d 段</string>
+    <!-- Continuous playback -->
+    <string name="player_session_title">%1$s · %2$d clip(s) · %3$s</string>
+    <string name="player_share_chooser">Share recording</string>
+    <string name="player_delete_title">Delete this recording?</string>
+    <string name="player_delete_msg">All %1$d file(s) of this recording (%2$s) will be deleted. This cannot be undone.</string>
+    <string name="player_deleted">Deleted %1$d file(s)</string>
+    <string name="player_info">Timeline %1$d/%2$d · from %3$s · %4$d clip(s) · %5$s</string>
+    <string name="player_clip_count">%1$d clip(s)</string>
 
-    <!-- 保存配置前看一眼 -->
+    <!-- Look before saving a profile -->
 
-    <!-- 开发者选项解锁 -->
-    <string name="dev_unlock_hint">密码</string>
-    <string name="dev_unlock_title">开发者选项</string>
-    <string name="dev_unlock_msg">这里面是没做完的和排查用的功能。打开后一直开着，要关的话回到这里再点一次。</string>
-    <string name="dev_unlocked">开发者选项已打开</string>
-    <string name="dev_wrong_password">密码不对</string>
-    <string name="dev_lock_title">关闭开发者选项</string>
-    <string name="dev_lock_msg">关掉后，开发者选项会隐藏起来，锁在里面的功能（比如熄屏录制、诊断页的发送到手机）不再生效。要再打开，回到这里输密码。</string>
-    <string name="dev_lock_confirm">关闭</string>
-    <string name="dev_locked">开发者选项已关闭</string>
+    <!-- Developer options unlock -->
+    <string name="dev_unlock_hint">Password</string>
+    <string name="dev_unlock_title">Developer options</string>
+    <string name="dev_unlock_msg">Unfinished and troubleshooting features. They stay on until you come back here and tap again.</string>
+    <string name="dev_unlocked">Developer options on</string>
+    <string name="dev_wrong_password">Wrong password</string>
+    <string name="dev_lock_title">Turn off developer options</string>
+    <string name="dev_lock_msg">Developer options will be hidden, and the features behind them (such as screen-off recording and sending the diagnostics to a phone) stop working. To turn them on again, come back here and enter the password.</string>
+    <string name="dev_lock_confirm">Turn off</string>
+    <string name="dev_locked">Developer options off</string>
 
-    <!-- 通知 -->
-    <string name="notif_recording_title">正在录制</string>
-    <string name="notif_recording_text">正在录制行车视频</string>
-    <string name="notif_recording_tap">录制进行中，点这里回到应用</string>
-    <string name="notif_channel_recording">录制服务</string>
-    <string name="notif_channel_recording_desc">保持录制服务在后台运行</string>
-    <string name="notif_background_title">在后台运行</string>
-    <string name="notif_tap_to_return">点这里回到应用</string>
+    <!-- Notifications -->
+    <string name="notif_recording_title">Recording</string>
+    <string name="notif_recording_text">Recording driving video</string>
+    <string name="notif_recording_tap">Recording. Tap to return to the app</string>
+    <string name="notif_channel_recording">Recording service</string>
+    <string name="notif_channel_recording_desc">Keeps recording running in the background</string>
+    <string name="notif_background_title">Running in the background</string>
+    <string name="notif_tap_to_return">Tap to return to the app</string>
 
-    <!-- 存储卷 -->
-    <string name="storage_volume_desc">%1$s（剩余 %2$s / 共 %3$s）</string>
-    <string name="storage_external_named">U 盘（%1$s）</string>
-    <string name="storage_external_n">U 盘 %1$d</string>
-    <string name="storage_external_n_named">U 盘 %1$d（%2$s）</string>
+    <!-- Storage volumes -->
+    <string name="storage_volume_desc">%1$s (%2$s free of %3$s)</string>
+    <string name="storage_external_named">USB drive (%1$s)</string>
+    <string name="storage_external_n">USB drive %1$d</string>
+    <string name="storage_external_n_named">USB drive %1$d (%2$s)</string>
 
-    <!-- 图片回看 -->
-    <string name="photo_count_badge">%1$d 张</string>
-    <string name="cd_expand">展开或收起</string>
-    <string name="cd_selected">已选中</string>
+    <!-- Photo playback -->
+    <string name="photo_count_badge">%1$d photo(s)</string>
+    <string name="cd_expand">Expand or collapse</string>
+    <string name="cd_selected">Selected</string>
 
-    <!-- 开发者：预览矫正 · 当前配置 -->
+    <!-- Developer: preview correction · current profile -->
 
-    <!-- 主界面：状态条上的环视流摘要 · 超视 · 调试覆盖层 -->
-    <string name="composite_summary">环视流 %1$d×%2$d · %3$s</string>
-    <string name="composite_split">拆四格</string>
-    <string name="composite_whole">整幅显示</string>
-    <string name="composite_probed">探测结果 %1$d×%2$d</string>
-    <string name="composite_kind_real">合成流</string>
-    <string name="composite_kind_plain">普通相机</string>
-    <string name="debug_on">调试信息已开启</string>
-    <string name="debug_off">调试信息已关闭</string>
-    <string name="debug_recording">录制：%1$s</string>
-    <string name="debug_rec">● 录制中</string>
-    <string name="debug_stopped">○ 停止</string>
-    <string name="debug_mode">模式：%1$s</string>
-    <string name="debug_memory">内存：%1$d/%2$d MB</string>
-    <string name="debug_model">车型：%1$s · 相机数：%2$d</string>
-    <string name="debug_version">版本：%1$s</string>
+    <!-- Main screen: surround stream summary in the status bar · super view · debug overlay -->
+    <string name="composite_summary">Surround stream %1$d×%2$d · %3$s</string>
+    <string name="composite_split">split in four</string>
+    <string name="composite_whole">shown whole</string>
+    <string name="composite_probed">probed %1$d×%2$d</string>
+    <string name="composite_kind_real">composite</string>
+    <string name="composite_kind_plain">plain camera</string>
+    <string name="debug_on">Debug info on</string>
+    <string name="debug_off">Debug info off</string>
+    <string name="debug_recording">Recording: %1$s</string>
+    <string name="debug_rec">● REC</string>
+    <string name="debug_stopped">○ stopped</string>
+    <string name="debug_mode">mode: %1$s</string>
+    <string name="debug_memory">Memory: %1$d/%2$d MB</string>
+    <string name="debug_model">Model: %1$s · cameras: %2$d</string>
+    <string name="debug_version">Version: %1$s</string>
 
-    <!-- 诊断信息 -->
-    <string name="diag_subtitle">相机 / 屏幕 / 存储 / 日志。可保存为文件带走，或复制后发回分析。</string>
-    <string name="diag_btn_save">保存到存储</string>
-    <string name="diag_btn_copy">复制</string>
-    <string name="diag_btn_refresh">重新采集</string>
-    <string name="diag_send_phone_note">诊断报告是一个 .json 文件。存到手机后，直接发给要看的人即可。</string>
-    <string name="diag_collecting">正在采集诊断信息…</string>
-    <string name="diag_collect_failed">采集失败：%1$s</string>
-    <string name="diag_not_ready">诊断信息尚未生成</string>
-    <string name="diag_mkdir_failed">无法创建目录：%1$s</string>
-    <string name="diag_saved">已保存到：\n%1$s</string>
-    <string name="diag_save_failed">保存失败：%1$s</string>
-    <string name="diag_clipboard_unavailable">剪贴板不可用</string>
-    <string name="diag_clip_label">诊断报告</string>
-    <string name="diag_copied">已复制到剪贴板</string>
-    <string name="diag_copy_failed">复制失败：%1$s</string>
-    <string name="diag_exporting">正在导出…</string>
+    <!-- Diagnostics -->
+    <string name="diag_subtitle">Cameras, display, storage and logs. Save or copy the report to send it.</string>
+    <string name="diag_btn_save">Save</string>
+    <string name="diag_btn_copy">Copy</string>
+    <string name="diag_btn_refresh">Collect again</string>
+    <string name="diag_send_phone_note">The report is a .json file. Once it is on your phone, send it to whoever needs to see it.</string>
+    <string name="diag_collecting">Collecting diagnostics…</string>
+    <string name="diag_collect_failed">Collection failed: %1$s</string>
+    <string name="diag_not_ready">The report is not ready yet</string>
+    <string name="diag_mkdir_failed">Could not create the folder: %1$s</string>
+    <string name="diag_saved">Saved to:\n%1$s</string>
+    <string name="diag_save_failed">Save failed: %1$s</string>
+    <string name="diag_clipboard_unavailable">Clipboard unavailable</string>
+    <string name="diag_clip_label">Diagnostics report</string>
+    <string name="diag_copied">Copied to the clipboard</string>
+    <string name="diag_copy_failed">Copy failed: %1$s</string>
+    <string name="diag_exporting">Exporting…</string>
 
-    <!-- 画面调节悬浮窗 -->
-    <string name="adj_title">亮度/降噪调节</string>
-    <string name="adj_unsupported">当前设备不支持亮度/降噪调节</string>
-    <string name="adj_exposure">曝光补偿</string>
-    <string name="adj_exposure_value">当前：%1$s（调暗 ← → 调亮）</string>
-    <string name="adj_awb">白平衡</string>
-    <string name="adj_tonemap">色调映射</string>
-    <string name="adj_edge">边缘增强/锐化</string>
-    <string name="adj_noise">降噪</string>
-    <string name="adj_effect">特效</string>
-    <string name="adj_default">默认</string>
-    <string name="adj_reset">恢复默认</string>
-    <string name="adj_save_close">保存并关闭</string>
-    <string name="awb_auto">自动</string>
-    <string name="awb_incandescent">白炽灯</string>
-    <string name="awb_fluorescent">荧光灯</string>
-    <string name="awb_warm_fluorescent">暖荧光灯</string>
-    <string name="awb_daylight">日光</string>
-    <string name="awb_cloudy">阴天</string>
-    <string name="awb_twilight">黄昏</string>
-    <string name="awb_shade">阴影</string>
-    <string name="mode_off">关闭</string>
-    <string name="mode_fast">快速</string>
-    <string name="mode_high_quality">高质量</string>
-    <string name="tonemap_contrast_curve">对比度曲线</string>
-    <string name="effect_mono">黑白</string>
-    <string name="effect_negative">负片</string>
-    <string name="effect_solarize">曝光过度</string>
-    <string name="effect_sepia">怀旧</string>
-    <string name="effect_aqua">水蓝</string>
+    <!-- Image adjustment floating window -->
+    <string name="adj_title">Brightness &amp; noise</string>
+    <string name="adj_unsupported">This device does not support brightness or noise adjustments</string>
+    <string name="adj_exposure">Exposure compensation</string>
+    <string name="adj_exposure_value">Now: %1$s (darker ← → brighter)</string>
+    <string name="adj_awb">White balance</string>
+    <string name="adj_tonemap">Tone mapping</string>
+    <string name="adj_edge">Edge enhancement / sharpening</string>
+    <string name="adj_noise">Noise reduction</string>
+    <string name="adj_effect">Effect</string>
+    <string name="adj_default">Default</string>
+    <string name="adj_reset">Reset</string>
+    <string name="adj_save_close">Save and close</string>
+    <string name="awb_auto">Auto</string>
+    <string name="awb_incandescent">Incandescent</string>
+    <string name="awb_fluorescent">Fluorescent</string>
+    <string name="awb_warm_fluorescent">Warm fluorescent</string>
+    <string name="awb_daylight">Daylight</string>
+    <string name="awb_cloudy">Cloudy</string>
+    <string name="awb_twilight">Twilight</string>
+    <string name="awb_shade">Shade</string>
+    <string name="mode_off">Off</string>
+    <string name="mode_fast">Fast</string>
+    <string name="mode_high_quality">High quality</string>
+    <string name="tonemap_contrast_curve">Contrast curve</string>
+    <string name="effect_mono">Mono</string>
+    <string name="effect_negative">Negative</string>
+    <string name="effect_solarize">Solarize</string>
+    <string name="effect_sepia">Sepia</string>
+    <string name="effect_aqua">Aqua</string>
 
-    <!-- 开发者选项分区 -->
-    <string name="set_section_developer">开发者选项</string>
-    <string name="dev_permissions_title">权限设置</string>
-    <string name="dev_permissions_summary">管理应用所需的各项权限</string>
-    <string name="dev_raw_frame_title">拍照时另存原始整帧</string>
-    <string name="dev_raw_frame_summary">不切分、不盖角标，连同画面几何一起存到 photos/raw。用来分析合成流的排布和鱼眼参数</string>
-    <string name="dev_gpu_fisheye_preview_title">预览：GPU 逐像素鱼眼校正</string>
-    <string name="dev_gpu_fisheye_preview_summary">主界面环视预览的鱼眼校正改用 GPU 逐像素计算，直线和图片回看一样直，不再分格近似。相机画面会先经过应用自己的 GL 再显示。只换算法，开不开还看鱼眼校正按钮。重启应用后生效</string>
-    <string name="dev_gpu_fisheye_video_title">视频回看：GPU 逐像素鱼眼校正</string>
-    <string name="dev_gpu_fisheye_video_summary">视频回看里环视那一格的鱼眼校正改用 GPU 逐像素计算。只换算法，开不开还看鱼眼校正按钮。下次打开视频回看时生效</string>
-    <string name="dev_repair_mp4_title">修复未封口的视频</string>
-    <string name="dev_repair_mp4_summary">断电时正在录的那一段没有索引，播放器打不开。按同一路相机完好片段的参数补一个索引回去，文件名不变</string>
-    <string name="dev_archive_title">归档到固态盘</string>
-    <string name="dev_archive_summary">把录像、照片、日志从录像盘搬到另一个盘，统一管理。录制中不能归档</string>
-    <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。在「关于」里点「安全须知」可以关掉开发者选项，关掉后本区隐藏。</string>
+    <!-- Developer options section -->
+    <string name="set_section_developer">Developer options</string>
+    <string name="dev_permissions_title">Permissions</string>
+    <string name="dev_permissions_summary">Manage the permissions the app needs</string>
+    <string name="dev_raw_frame_title">Also save the raw frame</string>
+    <string name="dev_raw_frame_summary">Uncut and unstamped, with a note on the frame geometry, in photos/raw. For working out the lane layout and the lens parameters</string>
+    <string name="dev_gpu_fisheye_preview_title">Preview: per-pixel fisheye correction on the GPU</string>
+    <string name="dev_gpu_fisheye_preview_summary">The live surround view is corrected pixel by pixel on the GPU, as straight as in photo playback, instead of in patches. The camera picture goes through the app\'s own GL before it is shown. This picks the method only; the Straighten button still turns correction on and off. Takes effect after restarting the app</string>
+    <string name="dev_gpu_fisheye_video_title">Video playback: per-pixel fisheye correction on the GPU</string>
+    <string name="dev_gpu_fisheye_video_summary">The surround view in video playback is corrected pixel by pixel on the GPU. This picks the method only; the Straighten button still turns correction on and off. Takes effect the next time video playback opens</string>
+    <string name="dev_repair_mp4_title">Repair unfinalised videos</string>
+    <string name="dev_repair_mp4_summary">A clip cut short by a power loss has no index, so nothing will open it. Rebuilds one using a healthy clip from the same camera, keeping the file name</string>
+    <string name="dev_archive_title">Archive to another drive</string>
+    <string name="dev_archive_summary">Move recordings, photos and logs from the recording drive to another drive. Not while recording</string>
+    <string name="dev_note">“Custom” in Stream profile is only available here. Tap “Safety notice” in About to turn developer options off; this section then hides.</string>
+<string name="nav_header_alt_name">Zeekr Shortcut</string>
+<string name="about_title">关于与致谢</string>
 </resources>

@@ -329,6 +329,24 @@
                     android:text="@string/action_send_to_phone"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
                     style="@style/Widget.Cam.RailSmall" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_save_to_usb"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:minWidth="72dp"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/action_save_to_usb"
+                    android:textAppearance="@style/TextAppearance.Cam.Body"
+                    style="@style/Widget.Cam.RailSmall" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_upload_drive"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:minWidth="72dp"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/action_upload_drive"
+                    android:textAppearance="@style/TextAppearance.Cam.Body"
+                    style="@style/Widget.Cam.RailSmall" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

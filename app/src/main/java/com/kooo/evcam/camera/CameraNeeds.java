@@ -43,7 +43,11 @@ public final class CameraNeeds {
          * 拍照：从按下快门到这一张存完（或放弃）。相机没开就为它开，主界面不在前台时由出帧口出画面；
          * 拍完注销，没人要了照常关（1.67.0）。
          */
-        PHOTO
+        PHOTO,
+        /** 打转向灯弹出的侧视窗，只在弹着的时候登记。 */
+        SIDE_POPUP,
+        /** 快捷键同时打开的左右侧视，和侧视弹窗、超级后视镜共用那一路附加输出。 */
+        BOTH_MIRRORS
     }
 
     private static final CameraNeeds CURRENT = new CameraNeeds();

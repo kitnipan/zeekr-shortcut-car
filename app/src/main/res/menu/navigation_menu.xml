@@ -24,6 +24,10 @@
             android:id="@+id/nav_photo_playback"
             android:icon="@drawable/ic_photo"
             android:title="@string/nav_photo_playback" />
+        <item
+            android:id="@+id/nav_remote"
+            android:icon="@drawable/ic_camera"
+            android:title="@string/nav_remote" />
     </group>
 
     <item android:title="@string/nav_group_switches">

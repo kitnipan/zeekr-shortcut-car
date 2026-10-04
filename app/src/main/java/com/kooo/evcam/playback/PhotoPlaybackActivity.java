@@ -103,6 +103,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private boolean lockEnabled;
     /** 照片目录里锁定的文件名（开关关着时是空的）。 */
     private Set<String> lockedPhotos = new HashSet<>();
+    private Button btnSaveToUsb;
+    private Button btnUploadDrive;
     private View controlsLayout;
 
     // 数据
@@ -229,6 +231,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         btnViewMode = findViewById(R.id.btn_view_mode);
         btnSendToPhone = findViewById(R.id.btn_send_to_phone);
         btnLock = findViewById(R.id.btn_lock);
+        btnSaveToUsb = findViewById(R.id.btn_save_to_usb);
+        btnUploadDrive = findViewById(R.id.btn_upload_drive);
         controlsLayout = findViewById(R.id.controls_layout);
 
         // 设置列表（竖屏2列，横屏1列，日期头部跨越所有列）
@@ -308,6 +312,12 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         }
         if (btnLock != null) {
             btnLock.setOnClickListener(v -> toggleLockGroup());
+        }
+        if (btnSaveToUsb != null) {
+            btnSaveToUsb.setOnClickListener(v -> saveCurrentPhotoToUsb());
+        }
+        if (btnUploadDrive != null) {
+            btnUploadDrive.setOnClickListener(v -> uploadCurrentPhotoToDrive());
         }
     }
 
@@ -396,15 +406,56 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      * <p>这一组没拍到环视时，按 {@link #POSITIONS} 的顺序发第一张有的。</p>
      */
     private void sendCurrentPhotoToPhone() {
-        String position = currentGroup == null ? null
-                : expandedPosition != null ? expandedPosition : firstPhotoPosition();
-        if (position == null) {
+        File file = currentPhotoFile();
+        if (file == null) {
             Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this,
-                currentGroup.getPhotoFile(position));
+        com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this, file);
+    }
+
+    /** 这一组里勾上的照片落到 U 盘的 exports。只有一张时直接存。 */
+    private void saveCurrentPhotoToUsb() {
+        com.kooo.evcam.share.ExportChoice.ask(PhotoPlaybackActivity.this, photosInGroup(),
+                R.string.action_save_to_usb, com.kooo.evcam.share.UsbExport::save);
+    }
+
+    /** 和存到 U 盘同一批可选照片，传到 Google Drive。 */
+    private void uploadCurrentPhotoToDrive() {
+        com.kooo.evcam.share.ExportChoice.ask(PhotoPlaybackActivity.this, photosInGroup(),
+                R.string.action_upload_drive, com.kooo.evcam.share.DriveExport::upload);
+    }
+
+    /** 这一组里每一张还在的照片。 */
+    private java.util.List<com.kooo.evcam.share.ExportChoice.Item> photosInGroup() {
+        java.util.List<com.kooo.evcam.share.ExportChoice.Item> items = new java.util.ArrayList<>();
+        if (currentGroup == null) {
+            return items;
+        }
+        for (String position : POSITIONS) {
+            if (!currentGroup.hasPhoto(position)) {
+                continue;
+            }
+            File file = currentGroup.getPhotoFile(position);
+            if (file != null && file.isFile() && file.length() > 0) {
+                items.add(new com.kooo.evcam.share.ExportChoice.Item(getPositionLabel(position), file));
+            }
+        }
+        return items;
+    }
+
+    /**
+     * 放大着哪一路就用哪一路；什么都没放大时用环视那张。
+     * 这一组没拍到环视时，按 {@link #POSITIONS} 的顺序用第一张有的。一张都没有返回 null。
+     */
+    private File currentPhotoFile() {
+        String position = currentGroup == null ? null
+                : expandedPosition != null ? expandedPosition : firstPhotoPosition();
+        if (position == null) {
+            return null;
+        }
+        return currentGroup.getPhotoFile(position);
     }
 
     /** 这一组里按 {@link #POSITIONS} 顺序第一张有的照片（环视排第一）；一张都没有返回 null。 */
