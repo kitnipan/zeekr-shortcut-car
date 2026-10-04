@@ -154,7 +154,9 @@
     <string name="save_moment_usb">Copied %1$d file(s) to the moments folder on USB</string>
     <string name="save_moment_no_usb">No USB stick. The moment stays on the car</string>
     <string name="set_save_moment_usb_title">Save moment to USB</string>
-    <string name="set_save_moment_usb_summary">The save-moment shortcut also copies finished clips into the moments folder on the USB stick</string>
+    <string name="set_save_moment_usb_summary">On by default. Copies finished clips into the moments folder on the USB stick</string>
+    <string name="set_save_moment_drive_title">Upload moment to Google Drive</string>
+    <string name="set_save_moment_drive_summary">Also upload those clips when Drive is signed in. Off until you turn it on</string>
     <string name="shortcut_access_title">Turn on accessibility</string>
     <string name="shortcut_access_msg">For now the button works while this app is in front. To make it work on every screen, the app needs its accessibility service. The head unit has no screen for that, so the app turns it on itself.\n\nStart Shizuku, then tap Grant with Shizuku. Or run this once from a computer:\n\n%1$s\n\nThen reopen this app.</string>
     <string name="shortcut_shizuku">Grant with Shizuku</string>

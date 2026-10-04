@@ -173,7 +173,9 @@
     <string name="save_moment_usb">已拷 %1$d 个文件到 U 盘的 moments</string>
     <string name="save_moment_no_usb">没有 U 盘。这一刻仍留在车机上</string>
     <string name="set_save_moment_usb_title">瞬间保存到 U 盘</string>
-    <string name="set_save_moment_usb_summary">保存这一刻时，把已完成的录像再拷一份到 U 盘的 moments 文件夹</string>
+    <string name="set_save_moment_usb_summary">默认开。把已完成的录像拷到 U 盘的 moments 文件夹</string>
+    <string name="set_save_moment_drive_title">瞬间上传到 Google Drive</string>
+    <string name="set_save_moment_drive_summary">已登录时再上传这些录像。默认关</string>
     <string name="shortcut_access_title">打开无障碍服务</string>
     <string name="shortcut_access_msg">现在快捷键只在本应用在前台时有效。要在别的界面也能用，需要无障碍服务；车机没有它的设置页，就让本应用自己打开。\n\n先启动 Shizuku 再点「用 Shizuku 授权」，或者用电脑执行一次：\n\n%1$s\n\n之后重开本应用即可。</string>
     <string name="shortcut_shizuku">用 Shizuku 授权</string>

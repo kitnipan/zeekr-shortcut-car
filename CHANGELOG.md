@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta27] - 2026-10-04
+
+### New and improved
+
+- Save this moment copies finished clips to the USB moments folder by default. Upload to Google Drive is a separate switch, off until you turn it on. Settings, System.
+
 ## [2.0.3-beta26] - 2026-10-04
 
 ### New and improved

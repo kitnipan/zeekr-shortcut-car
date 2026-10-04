@@ -22,9 +22,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * After a save-moment, copy finished files to the USB moments folder when that
- * option is on, and upload them to Drive when signed in. Straighten runs when
- * that setting is on (same rule as the share button).
+ * After a save-moment, copy finished files to the USB moments folder (on by
+ * default) and upload them to Drive only when that option is on and signed in.
+ * Straighten runs when that setting is on (same rule as the share button).
  */
 public final class SaveMomentUpload {
 
@@ -42,9 +42,10 @@ public final class SaveMomentUpload {
         }
         Context app = context.getApplicationContext();
         AppConfig config = new AppConfig(app);
-        boolean drive = config.hasDriveClient() && config.hasDriveRefreshToken();
+        boolean drive = config.isSaveMomentDrive()
+                && config.hasDriveClient() && config.hasDriveRefreshToken();
         if (!drive && !config.isSaveMomentUsb()) {
-            AppLog.d(TAG, "没登录 Drive，也没开存到 U 盘，跳过");
+            AppLog.d(TAG, "没开存到 U 盘，也没开上传 Drive，跳过");
             return;
         }
         synchronized (PENDING) {
@@ -122,7 +123,8 @@ public final class SaveMomentUpload {
                         Toast.LENGTH_SHORT).show());
             }
         }
-        if (config.hasDriveClient() && config.hasDriveRefreshToken()) {
+        if (config.isSaveMomentDrive()
+                && config.hasDriveClient() && config.hasDriveRefreshToken()) {
             int sent = DriveExport.uploadQuiet(app, files);
             AppLog.i(TAG, "保存瞬间上传完成 " + sent + "/" + files.size());
             if (sent > 0) {
