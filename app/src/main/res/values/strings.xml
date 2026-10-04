@@ -292,6 +292,11 @@
     <string name="save_moment_uploaded">Uploaded %1$d saved file(s) to Drive</string>
     <string name="save_moment_usb">Copied %1$d file(s) to the moments folder on USB</string>
     <string name="save_moment_no_usb">No USB stick. The moment stays on the car</string>
+    <string name="instant_capture_start">Saving the 10 seconds before and after…</string>
+    <string name="instant_capture_saved">Saved %1$d clip(s) to instant captures</string>
+    <string name="instant_capture_uploaded">Uploaded %1$d clip(s) to Drive</string>
+    <string name="instant_capture_failed">Could not save the instant capture</string>
+    <string name="instant_capture_upload_failed">Could not upload the instant capture</string>
     <string name="set_save_moment_usb_title">Save moment to USB</string>
     <string name="set_save_moment_usb_summary">On by default. Copies finished clips into the moments folder on the USB stick</string>
     <string name="set_save_moment_drive_title">Upload moment to Google Drive</string>
@@ -426,7 +431,7 @@
     <string name="set_footage_lock_horn_title">鸣笛时自动锁定当前录像</string>
     <string name="set_footage_lock_horn_summary">车上还读不到喇叭信号，暂时不能打开</string>
     <string name="msg_flash_locked">闪远光：已锁定前后 10 秒的录像</string>
-    <string name="msg_shortcut_locked">已锁定前后 10 秒的录像，并按保存这一刻复制到 U 盘</string>
+    <string name="msg_shortcut_locked">已锁定前后 10 秒的录像</string>
     <string name="msg_storage_locked_stopped">锁定的影像占满了空间，录制已停止。请在回放里解锁一些</string>
     <string name="msg_storage_locked_refuse">锁定的影像占满了空间，无法开始录制。请在回放里解锁一些</string>
     <string name="action_lock_footage">锁定</string>

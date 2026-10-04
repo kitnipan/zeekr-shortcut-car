@@ -82,6 +82,14 @@ public final class DriveExport {
      * Straighten runs when that setting is on.
      */
     public static int uploadQuiet(Context context, List<File> files) {
+        return uploadQuiet(context, files, true);
+    }
+
+    /**
+     * Same as {@link #uploadQuiet(Context, List)}. {@code straighten} is false when the
+     * caller already flattened surround clips, so they are not corrected twice.
+     */
+    public static int uploadQuiet(Context context, List<File> files, boolean straighten) {
         if (context == null || files == null || files.isEmpty()) {
             return 0;
         }
@@ -112,7 +120,7 @@ public final class DriveExport {
                 File payload = file;
                 File temp = null;
                 try {
-                    if (SurroundDefish.wanted(app, file)) {
+                    if (straighten && SurroundDefish.wanted(app, file)) {
                         File dir = new File(app.getCacheDir(), "drive");
                         if (!dir.exists() && !dir.mkdirs()) {
                             throw new java.io.IOException("mkdir " + dir.getAbsolutePath());

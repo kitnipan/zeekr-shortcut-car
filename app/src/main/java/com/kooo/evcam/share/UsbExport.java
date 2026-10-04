@@ -46,6 +46,9 @@ public final class UsbExport {
     /** 保存这一刻另存的文件夹，也在 U 盘根目录。 */
     public static final String MOMENTS_DIR = "moments";
 
+    /** 锁定并保存切出来的前后各 10 秒，也在 U 盘根目录。 */
+    public static final String INSTANT_DIR = "instant captures";
+
     private static final AtomicBoolean BUSY = new AtomicBoolean(false);
 
     private UsbExport() {
@@ -59,6 +62,11 @@ public final class UsbExport {
     /** {@code usbRoot/moments}。 */
     public static File moments(File usbRoot) {
         return new File(usbRoot, MOMENTS_DIR);
+    }
+
+    /** {@code usbRoot/instant captures}。 */
+    public static File instantCaptures(File usbRoot) {
+        return new File(usbRoot, INSTANT_DIR);
     }
 
     /**

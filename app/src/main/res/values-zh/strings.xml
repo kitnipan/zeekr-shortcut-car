@@ -175,6 +175,11 @@
     <string name="save_moment_uploaded">已上传 %1$d 个保存的文件到云端</string>
     <string name="save_moment_usb">已拷 %1$d 个文件到 U 盘的 moments</string>
     <string name="save_moment_no_usb">没有 U 盘。这一刻仍留在车机上</string>
+    <string name="instant_capture_start">正在保存按下前后各 10 秒…</string>
+    <string name="instant_capture_saved">已保存 %1$d 个片段到 instant captures</string>
+    <string name="instant_capture_uploaded">已上传 %1$d 个片段到云端</string>
+    <string name="instant_capture_failed">即时片段保存失败</string>
+    <string name="instant_capture_upload_failed">即时片段上传失败</string>
     <string name="set_save_moment_usb_title">瞬间保存到 U 盘</string>
     <string name="set_save_moment_usb_summary">默认开。把已完成的录像拷到 U 盘的 moments 文件夹</string>
     <string name="set_save_moment_drive_title">瞬间上传到 Google Drive</string>

@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.1.0-beta4] - 2026-10-04
+
+### New and improved
+
+- Lock and save writes the 10 seconds before the press and the 10 seconds after into the USB folder instant captures, as soon as that span has finished recording. It uploads those clips to Google Drive when Upload moment to Google Drive is on. A toast shows when it starts, when the USB save finishes, and when the upload finishes.
+
 ## [2.1.0-beta3] - 2026-10-04
 
 ### New and improved

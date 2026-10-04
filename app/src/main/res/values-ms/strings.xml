@@ -183,6 +183,11 @@
     <string name="save_moment_uploaded">%1$d fail tersimpan dimuat naik ke Drive</string>
     <string name="save_moment_usb">%1$d fail disalin ke folder moments pada USB</string>
     <string name="save_moment_no_usb">Tiada pemacu USB. Saat ini kekal dalam kereta</string>
+    <string name="instant_capture_start">Menyimpan 10 saat sebelum dan selepas…</string>
+    <string name="instant_capture_saved">%1$d klip disimpan ke instant captures</string>
+    <string name="instant_capture_uploaded">%1$d klip dimuat naik ke Drive</string>
+    <string name="instant_capture_failed">Tidak dapat menyimpan rakaman segera</string>
+    <string name="instant_capture_upload_failed">Tidak dapat memuat naik rakaman segera</string>
     <string name="set_save_moment_usb_title">Simpan saat ke USB</string>
     <string name="set_save_moment_usb_summary">Hidup secara lalai. Salin klip siap ke folder moments pada pemacu USB</string>
     <string name="set_save_moment_drive_title">Muat naik saat ke Google Drive</string>
@@ -425,7 +430,7 @@
     <string name="set_footage_lock_horn_title">Kunci rakaman semasa hon dibunyikan</string>
     <string name="set_footage_lock_horn_summary">Isyarat hon kereta belum dapat dibaca, jadi ini belum boleh dihidupkan buat masa ini</string>
     <string name="msg_flash_locked">Kelip lampu tinggi: rakaman 10 saat sebelum dan selepas telah dikunci</string>
-    <string name="msg_shortcut_locked">Rakaman 10 saat sebelum dan selepas dikunci, dan disalin ke USB seperti Simpan saat ini</string>
+    <string name="msg_shortcut_locked">Rakaman 10 saat sebelum dan selepas dikunci</string>
     <string name="msg_storage_locked_stopped">Rakaman yang dikunci telah memenuhi ruang, rakaman dihentikan. Buka kunci sebahagian dalam main semula</string>
     <string name="msg_storage_locked_refuse">Rakaman yang dikunci telah memenuhi ruang, rakaman tidak dapat dimulakan. Buka kunci sebahagian dalam main semula</string>
     <string name="action_lock_footage">Kunci</string>

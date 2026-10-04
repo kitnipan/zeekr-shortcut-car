@@ -182,6 +182,11 @@
     <string name="save_moment_uploaded">Uploaded %1$d saved file(s) to Drive</string>
     <string name="save_moment_usb">Copied %1$d file(s) to the moments folder on USB</string>
     <string name="save_moment_no_usb">No USB stick. The moment stays on the car</string>
+    <string name="instant_capture_start">Saving the 10 seconds before and after…</string>
+    <string name="instant_capture_saved">Saved %1$d clip(s) to instant captures</string>
+    <string name="instant_capture_uploaded">Uploaded %1$d clip(s) to Drive</string>
+    <string name="instant_capture_failed">Could not save the instant capture</string>
+    <string name="instant_capture_upload_failed">Could not upload the instant capture</string>
     <string name="set_save_moment_usb_title">Save moment to USB</string>
     <string name="set_save_moment_usb_summary">On by default. Copies finished clips into the moments folder on the USB stick</string>
     <string name="set_save_moment_drive_title">Upload moment to Google Drive</string>
@@ -424,7 +429,7 @@
     <string name="set_footage_lock_horn_title">Lock footage on horn</string>
     <string name="set_footage_lock_horn_summary">The car\'s horn signal can\'t be read yet, so this can\'t be turned on for now</string>
     <string name="msg_flash_locked">Flash-to-pass: locked the footage 10 seconds before and after</string>
-    <string name="msg_shortcut_locked">Locked the footage 10 seconds before and after, and saved it to USB like Save this moment</string>
+    <string name="msg_shortcut_locked">Locked the footage 10 seconds before and after</string>
     <string name="msg_storage_locked_stopped">Locked footage has filled the space, so recording stopped. Unlock some in playback</string>
     <string name="msg_storage_locked_refuse">Locked footage has filled the space, so recording can\'t start. Unlock some in playback</string>
     <string name="action_lock_footage">Lock</string>
