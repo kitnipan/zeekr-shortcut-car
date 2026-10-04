@@ -159,6 +159,7 @@
     <string name="shortcut_scan">扫描码 %1$d</string>
     <string name="shortcut_action_record">开始/停止录制</string>
     <string name="shortcut_action_mirror">打开/关闭超级后视镜</string>
+    <string name="shortcut_action_both_mirrors">打开/关闭左右侧视</string>
     <string name="shortcut_action_app">打开应用</string>
     <string name="shortcut_action_dim">遮罩屏幕</string>
     <string name="shortcut_action_save">保存这一刻</string>

@@ -33,6 +33,12 @@ public final class ShortcutPerformer {
                     toast(context);
                 }
                 return;
+            case BOTH_MIRRORS:
+                AppConfig both = new AppConfig(context);
+                if (!OverlayCoordinator.setBothMirrorsEnabled(context, !both.isBothMirrorsEnabled())) {
+                    toast(context);
+                }
+                return;
             case APP:
                 Intent open = new Intent(context, MainActivity.class);
                 open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP

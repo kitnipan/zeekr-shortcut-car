@@ -107,6 +107,15 @@ public class SideViewPopupService extends Service {
             }
             svc.evaluate();
         }
+        BothMirrorsService.applyConfig();
+    }
+
+    /** 左右侧视或超级后视镜抢走了相机槽位：按新情况再判一次。 */
+    public static void refresh() {
+        SideViewPopupService svc = instance;
+        if (svc != null) {
+            svc.handler.post(svc::evaluate);
+        }
     }
 
     /**
@@ -215,7 +224,8 @@ public class SideViewPopupService extends Service {
         in.minSpeedKmh = appConfig.getSidePopupMinSpeed();
         in.showing = popup != null && popup.isShowing() ? popup.lane() : SideViewDecision.NONE;
 
-        boolean blocked = ScreenState.dark() || RearViewMirrorService.isRunning();
+        boolean blocked = ScreenState.dark() || RearViewMirrorService.isRunning()
+                || BothMirrorsService.isRunning();
         int want = blocked ? SideViewDecision.NONE : SideViewDecision.decide(in);
         lastReady = !blocked && appConfig.isSidePopupInstant() && SideViewDecision.shouldStayReady(in);
 

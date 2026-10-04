@@ -103,6 +103,7 @@ public class AppConfig {
     private static final String KEY_INFO_BAR = "info_bar_enabled";  // 录像下方的行驶信息条
     private static final String KEY_INFO_BAR_ALL = "info_bar_all";  // 开发者：连没验证的栏目一起启用
     private static final String KEY_SIDE_POPUP = "side_popup_enabled";  // 打转向灯弹侧视
+    private static final String KEY_BOTH_MIRRORS = "both_mirrors_enabled";  // 快捷键同时打开左右侧视
     private static final String KEY_SIDE_POPUP_MIN_SPEED = "side_popup_min_speed";  // 侧视弹窗的车速门槛 km/h
     /** 默认 30 km/h：再慢原厂自己会弹侧方小窗。 */
     public static final int SIDE_POPUP_DEFAULT_MIN_SPEED = 30;
@@ -1486,6 +1487,16 @@ public class AppConfig {
     public void setSidePopupEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_SIDE_POPUP, enabled).apply();
         AppLog.i(TAG, "打转向灯弹侧视: " + (enabled ? "开" : "关"));
+    }
+
+    /** 快捷键同时打开左右侧视。和超级后视镜共用一路相机输出，所以开着时后视镜关掉。 */
+    public boolean isBothMirrorsEnabled() {
+        return prefs.getBoolean(KEY_BOTH_MIRRORS, false);
+    }
+
+    public void setBothMirrorsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_BOTH_MIRRORS, enabled).apply();
+        AppLog.i(TAG, "左右侧视: " + (enabled ? "开" : "关"));
     }
 
     /** 低于这个车速（km/h）不弹；0 表示不看车速。 */

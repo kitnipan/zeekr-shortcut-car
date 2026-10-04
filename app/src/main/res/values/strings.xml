@@ -140,6 +140,7 @@
     <string name="shortcut_scan">scan %1$d</string>
     <string name="shortcut_action_record">Start/Stop recording</string>
     <string name="shortcut_action_mirror">Open/Close Super mirror</string>
+    <string name="shortcut_action_both_mirrors">Open/Close both side mirrors</string>
     <string name="shortcut_action_app">Open app</string>
     <string name="shortcut_action_dim">Dim display</string>
     <string name="shortcut_action_save">Save this moment</string>

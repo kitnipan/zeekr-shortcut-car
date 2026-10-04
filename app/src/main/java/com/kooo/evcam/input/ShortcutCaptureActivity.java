@@ -34,6 +34,7 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
         bindPress(R.id.shortcut_press_double, PressKind.DOUBLE);
         bind(R.id.shortcut_action_record, ShortcutAction.RECORD);
         bind(R.id.shortcut_action_mirror, ShortcutAction.MIRROR);
+        bind(R.id.shortcut_action_both_mirrors, ShortcutAction.BOTH_MIRRORS);
         bind(R.id.shortcut_action_app, ShortcutAction.APP);
         bind(R.id.shortcut_action_dim, ShortcutAction.DIM);
         bind(R.id.shortcut_action_save, ShortcutAction.SAVE);

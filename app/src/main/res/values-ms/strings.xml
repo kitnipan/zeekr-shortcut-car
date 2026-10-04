@@ -141,6 +141,7 @@
     <string name="shortcut_scan">imbasan %1$d</string>
     <string name="shortcut_action_record">Mula/Henti rakaman</string>
     <string name="shortcut_action_mirror">Buka/Tutup cermin super</string>
+    <string name="shortcut_action_both_mirrors">Buka/Tutup kedua-dua cermin sisi</string>
     <string name="shortcut_action_app">Buka apl</string>
     <string name="shortcut_action_dim">Gelapkan skrin</string>
     <string name="shortcut_action_save">Simpan saat ini</string>

@@ -64,6 +64,13 @@ public class ShortcutBookTest {
     }
 
     @Test
+    public void bothMirrorsActionRoundTrips() {
+        Shortcut item = new Shortcut(96, 0, "Pad", "toggle_both_mirrors", "tap");
+        Shortcut back = ShortcutBook.parse(ShortcutBook.write(Collections.singletonList(item))).get(0);
+        assertEquals("toggle_both_mirrors", back.action);
+    }
+
+    @Test
     public void brokenLinesAreSkipped() {
         assertEquals(0, ShortcutBook.parse("nope\n1,2,not_an_action,Pad").size());
     }

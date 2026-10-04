@@ -122,6 +122,7 @@ public class DimOverlayService extends Service {
             windowManager.addView(shade, layoutParams);
             AppLog.i(TAG, "屏幕遮罩已打开 " + real.x + "x" + real.y);
             com.kooo.evcam.zeekr.SideViewPopupService.raiseAboveShade();
+            com.kooo.evcam.zeekr.BothMirrorsService.raiseAboveShade();
             if (!DimShade.passTouches(config.isDimPassThrough(), config.getDimOpacity())) {
                 raiseFloatingButton();
             }

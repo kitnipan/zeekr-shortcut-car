@@ -9,6 +9,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
+import com.kooo.evcam.zeekr.BothMirrorsService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
 import com.kooo.evcam.zeekr.SideViewPopupService;
 
@@ -72,6 +73,13 @@ public final class OverlayCoordinator {
         if (config.isDimOverlayEnabled() && allowed) {
             DimOverlayService.show(context);
             AppLog.d(TAG, "屏幕遮罩已按设置打开");
+        }
+
+        if (config.isBothMirrorsEnabled() && allowed) {
+            main().postDelayed(() -> {
+                BothMirrorsService.start(context);
+                AppLog.d(TAG, "左右侧视已按设置自动开启");
+            }, REAR_VIEW_DELAY_MS);
         }
 
         if (config.isSidePopupEnabled() && allowed) {
@@ -153,10 +161,35 @@ public final class OverlayCoordinator {
         }
         new AppConfig(context).setRearViewEnabled(enabled);
         if (enabled) {
+            if (new AppConfig(context).isBothMirrorsEnabled()) {
+                setBothMirrorsEnabled(context, false);
+            }
             RearViewMirrorService.start(context);
         } else {
             RearViewMirrorService.stop(context);
         }
+        return true;
+    }
+
+    /**
+     * 开 / 关左右侧视。返回值含义同 {@link #setRecordButtonEnabled}。
+     *
+     * <p>和超级后视镜共用一路相机输出，开这边就关掉后视镜。</p>
+     */
+    public static boolean setBothMirrorsEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setBothMirrorsEnabled(enabled);
+        if (enabled) {
+            if (new AppConfig(context).isRearViewEnabled()) {
+                setRearViewEnabled(context, false);
+            }
+            BothMirrorsService.start(context);
+        } else {
+            BothMirrorsService.stop(context);
+        }
+        SideViewPopupService.refresh();
         return true;
     }
 

@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.0.3-beta25] - 2026-10-04
+
+### New and improved
+
+- Shortcut action: Open/Close both side mirrors. Left and right cameras show together, using the turn-signal side view size and straighten settings. Super mirror turns off while this is on, because they share one camera output.
+
 ## [2.0.3-beta24] - 2026-10-03
 
 ### Fixes
