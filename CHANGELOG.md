@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.1.0-beta2] - 2026-10-04
+
+### Fixes
+
+- Dim pass-through no longer swallows taps. At 72% the veil stayed fully opaque to Android, so every touch under it was dropped, including after a dim shortcut.
+
 ## [2.1.0-beta1] - 2026-10-04
 
 This build is the fork on top of upstream 2.1.0-beta: dim, remote watch, side views, shortcuts, and save-this-moment stay, and upstream's info bar and footage lock are included.

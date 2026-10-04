@@ -29,6 +29,14 @@ public class DimShadeTest {
     }
 
     @Test
+    public void passThroughWindowAlphaStaysUnderTheTouchLimit() {
+        assertEquals(0.72f, DimShade.windowAlpha(true, 72), 0.001f);
+        assertEquals(0.8f, DimShade.windowAlpha(true, 90), 0.001f);
+        assertEquals(1f, DimShade.windowAlpha(true, 100), 0.001f);
+        assertEquals(1f, DimShade.windowAlpha(false, 40), 0.001f);
+    }
+
+    @Test
     public void percentsOutsideZeroToHundredAreClamped() {
         assertEquals(DimShade.argb(100, 0, 0), DimShade.argb(150, -5, -1));
     }

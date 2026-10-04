@@ -117,7 +117,7 @@ public class DimOverlayService extends Service {
             layoutParams.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
-        shade.setBackgroundColor(color(config));
+        applyLook(config);
         try {
             windowManager.addView(shade, layoutParams);
             AppLog.i(TAG, "屏幕遮罩已打开 " + real.x + "x" + real.y);
@@ -140,8 +140,7 @@ public class DimOverlayService extends Service {
         Point real = realSize();
         layoutParams.width = real.x;
         layoutParams.height = real.y;
-        layoutParams.flags = flags(config);
-        shade.setBackgroundColor(color(config));
+        applyLook(config);
         try {
             windowManager.updateViewLayout(shade, layoutParams);
             if (!DimShade.passTouches(config.isDimPassThrough(), config.getDimOpacity())) {
@@ -180,6 +179,24 @@ public class DimOverlayService extends Service {
 
     private int color(AppConfig config) {
         return DimShade.argb(config.getDimOpacity(), config.getDimBrightness(), config.getDimWarmth());
+    }
+
+    /**
+     * Pass-through puts the dim in the window alpha and keeps the colour opaque,
+     * so Android 12 still delivers taps. A full blackout keeps alpha at 1 and
+     * takes the touches itself.
+     */
+    private void applyLook(AppConfig config) {
+        boolean pass = DimShade.passTouches(config.isDimPassThrough(), config.getDimOpacity());
+        int packed = color(config);
+        layoutParams.flags = flags(config);
+        if (pass) {
+            layoutParams.alpha = DimShade.windowAlpha(true, config.getDimOpacity());
+            shade.setBackgroundColor(0xFF000000 | (packed & 0x00FFFFFF));
+        } else {
+            layoutParams.alpha = 1f;
+            shade.setBackgroundColor(packed);
+        }
     }
 
     private int flags(AppConfig config) {

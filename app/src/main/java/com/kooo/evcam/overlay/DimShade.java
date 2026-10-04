@@ -35,6 +35,20 @@ public final class DimShade {
         return passThrough && clamp(opacityPercent) < 100;
     }
 
+    /**
+     * Android 12 treats a not-touchable overlay whose window alpha is above 0.8
+     * as a full blackout and drops the taps underneath. The colour alpha is not
+     * what it looks at. Pass-through therefore lives in the window alpha, and
+     * stops at 0.8. A 100% veil is not pass-through, so it can stay fully opaque.
+     */
+    public static float windowAlpha(boolean passThrough, int opacityPercent) {
+        if (!passTouches(passThrough, opacityPercent)) {
+            return 1f;
+        }
+        float amount = clamp(opacityPercent) / 100f;
+        return amount > 0.8f ? 0.8f : amount;
+    }
+
     private static int clamp(int value) {
         if (value < 0) {
             return 0;
