@@ -25,4 +25,28 @@ public class RemoteLiveTest {
         assertEquals(jpeg, live.jpegFor("ch2"));
         assertEquals(jpeg, live.jpegFor("CH2"));
     }
+
+    @Test
+    public void recordingWatchKeepsEveryChannelInMemory() {
+        RemoteLive live = new RemoteLive();
+        String[] slots = {
+                RemoteLive.DRIVE,
+                RemoteLive.CH1,
+                RemoteLive.CH2,
+                RemoteLive.CH3,
+                RemoteLive.CH4,
+                RemoteLive.DRIVER,
+                RemoteLive.BACKSEAT,
+        };
+        for (int i = 0; i < slots.length; i++) {
+            live.put(slots[i], new byte[]{(byte) (i + 1)}, null);
+        }
+        assertEquals(1, live.jpegFor("drive")[0]);
+        assertEquals(2, live.jpegFor("ch1")[0]);
+        assertEquals(3, live.jpegFor("ch2")[0]);
+        assertEquals(4, live.jpegFor("ch3")[0]);
+        assertEquals(5, live.jpegFor("ch4")[0]);
+        assertEquals(6, live.jpegFor("driver")[0]);
+        assertEquals(7, live.jpegFor("backseat")[0]);
+    }
 }

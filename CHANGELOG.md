@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.1.0-beta5] - 2026-10-05
+
+### New and improved
+
+- Remote watch, while a phone is requesting video, keeps a JPEG of each surround channel plus the driver and cabin cameras in memory, including while a clip is recording. The phone receives the camera it asked for. During recording those stills stay in memory so the encode can finish.
+
 ## [2.1.0-beta4] - 2026-10-04
 
 ### New and improved

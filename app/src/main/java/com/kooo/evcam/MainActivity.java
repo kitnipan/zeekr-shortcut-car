@@ -1400,6 +1400,38 @@ public class MainActivity extends AppCompatActivity {
      * Fresh remote path: grab surround (+ cabin) → defish surround → mailbox PNG on USB
      * + JPEG in RAM → push the slot the phone asked for.
      */
+    /** Grab size follows the camera buffer, so the four surround bands stay separate. */
+    private int[] remoteGrabSize(android.view.TextureView view) {
+        com.kooo.evcam.camera.SingleCamera cam =
+                cameraManager == null ? null : cameraManager.getCamera("front");
+        android.util.Size preview = cam == null ? null : cam.getPreviewSize();
+        int bw = preview != null ? preview.getWidth() : 0;
+        int bh = preview != null ? preview.getHeight() : 0;
+        if (bw < 2 || bh < 2) {
+            bw = view.getWidth();
+            bh = view.getHeight();
+        }
+        if (bw < 2 || bh < 2) {
+            return null;
+        }
+        float scale = 960f / Math.max(bw, bh);
+        int w = Math.max(2, ((int) (bw * scale)) / 2 * 2);
+        int h = Math.max(2, ((int) (bh * scale)) / 2 * 2);
+        return new int[]{w, h};
+    }
+
+    private android.graphics.Bitmap grabCabin(android.view.TextureView view) {
+        if (view == null || !view.isAvailable()) {
+            return null;
+        }
+        int w = view.getWidth();
+        int h = view.getHeight();
+        if (w < 2 || h < 2) {
+            return null;
+        }
+        return view.getBitmap(Math.min(640, w), Math.min(360, h));
+    }
+
     private void pushRemoteFrame() {
         if (carLink == null || !carLink.isWatching()) {
             return;
@@ -1417,34 +1449,18 @@ public class MainActivity extends AppCompatActivity {
             remoteBusy.set(false);
             return;
         }
-        int vw = textureFront.getWidth();
-        int vh = textureFront.getHeight();
-        if (vw < 2 || vh < 2) {
-            remoteBusy.set(false);
-            return;
-        }
         boolean hasLanes = compositeContainer != null
                 && compositeContainer.copyLaneWindows(remoteLanes);
         if (!hasLanes) {
             com.kooo.evcam.zeekr.RemoteFrame.equalVerticalLanes(remoteLanes);
         }
-        float scale = 960f / Math.max(vw, vh);
-        int w = Math.max(2, ((int) (vw * scale)) / 2 * 2);
-        int h = Math.max(2, ((int) (vh * scale)) / 2 * 2);
-        final android.graphics.Bitmap surround = textureFront.getBitmap(w, h);
-        final android.graphics.Bitmap cabinDriver = (textureBack != null && textureBack.isAvailable())
-                ? textureBack.getBitmap(Math.min(640, textureBack.getWidth()),
-                Math.min(360, textureBack.getHeight())) : null;
-        final android.graphics.Bitmap cabinBack = (textureLeft != null && textureLeft.isAvailable())
-                ? textureLeft.getBitmap(Math.min(640, textureLeft.getWidth()),
-                Math.min(360, textureLeft.getHeight())) : null;
-        if (surround == null) {
-            if (cabinDriver != null) {
-                cabinDriver.recycle();
-            }
-            if (cabinBack != null) {
-                cabinBack.recycle();
-            }
+        int[] grab = remoteGrabSize(textureFront);
+        final android.graphics.Bitmap surround = grab == null
+                ? null
+                : textureFront.getBitmap(grab[0], grab[1]);
+        final android.graphics.Bitmap cabinDriver = grabCabin(textureBack);
+        final android.graphics.Bitmap cabinBack = grabCabin(textureLeft);
+        if (surround == null && cabinDriver == null && cabinBack == null) {
             remoteBusy.set(false);
             return;
         }
@@ -1456,9 +1472,13 @@ public class MainActivity extends AppCompatActivity {
         final String projection = appConfig.getFisheyeProjection();
         // Surround remote stills are always defished (full strength).
         final float strength = 1f;
+        // While the clip is recording, keep every channel JPEG in RAM only.
+        remoteSnap.setDumpUsb(!isRecording);
         remoteCompose.execute(() -> {
             try {
-                remoteSnap.putSurround(remoteLive, surround, lanes, order, fov, projection, strength);
+                if (surround != null) {
+                    remoteSnap.putSurround(remoteLive, surround, lanes, order, fov, projection, strength);
+                }
                 if (cabinDriver != null) {
                     remoteSnap.putCabin(remoteLive, com.kooo.evcam.remote.RemoteLive.DRIVER, cabinDriver);
                 }
@@ -1472,7 +1492,9 @@ public class MainActivity extends AppCompatActivity {
             } catch (RuntimeException e) {
                 AppLog.w(TAG, "remote live failed: " + e.getMessage());
             } finally {
-                surround.recycle();
+                if (surround != null) {
+                    surround.recycle();
+                }
                 if (cabinDriver != null) {
                     cabinDriver.recycle();
                 }

@@ -30,6 +30,13 @@ public final class RemoteSnap {
     private final float[] fallbackLanes = new float[CompositeStreamGeometry.LANE_COUNT * 4];
     private final Rect srcRect = new Rect();
     private final RectF dstRect = new RectF();
+    /** False while a clip is recording: JPEG stays in RAM, USB PNG is skipped. */
+    private volatile boolean dumpUsb = true;
+
+    /** Recording keeps the mailbox in memory. Idle watch may also dump PNG to USB. */
+    public void setDumpUsb(boolean dumpUsb) {
+        this.dumpUsb = dumpUsb;
+    }
 
     /**
      * Four defished surround channels + a 2×2 drive mosaic.
@@ -107,7 +114,7 @@ public final class RemoteSnap {
 
     private void putEncoded(RemoteLive live, String slot, Bitmap bitmap) {
         byte[] jpeg = compress(bitmap, Bitmap.CompressFormat.JPEG, 55);
-        byte[] png = compress(bitmap, Bitmap.CompressFormat.PNG, 100);
+        byte[] png = dumpUsb ? compress(bitmap, Bitmap.CompressFormat.PNG, 100) : null;
         live.put(slot, jpeg, png);
     }
 
