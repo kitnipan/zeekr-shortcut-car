@@ -298,7 +298,7 @@ public final class AutoLock implements Telemetry.Listener {
         }
     };
 
-    /** 「已锁定前后 10 秒的录像」。离上一次弹不到 {@link #TOAST_GAP_MS} 就不再弹。主线程。 */
+    /** 锁定提示。离上一次弹不到 {@link #TOAST_GAP_MS} 就不再弹。主线程。 */
     private void toastLocked(int message) {
         Context context = app;
         long now = SystemClock.uptimeMillis();
