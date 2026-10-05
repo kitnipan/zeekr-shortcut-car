@@ -58,9 +58,9 @@ android {
         //
         // 这一版是 fork：上游 2.1.2-alpha（261）为底，加上 dim、远程、侧视、快捷键和保存瞬间。
         // versionCode 必须高于已经发出的 2.1.0-beta5（276）才会盖住车上的安装。
-        versionCode = 276
+        versionCode = 277
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "2.1.0-beta5"
+        versionName = "2.1.2-beta1"
 
         buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
         buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))
