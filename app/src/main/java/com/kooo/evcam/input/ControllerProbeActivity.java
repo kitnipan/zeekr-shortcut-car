@@ -216,6 +216,10 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
     }
 
     @Override
+    public void onRssi(String address, int rssi) {
+    }
+
+    @Override
     public void onPhase(String address, int phase) {
     }
 

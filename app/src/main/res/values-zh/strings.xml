@@ -239,6 +239,8 @@
     <string name="sticker_knob_left">旋钮向左</string>
     <string name="sticker_unnamed">未命名</string>
     <string name="sticker_device_meta">%1$s  %2$d dBm</string>
+    <string name="sticker_signal">信号 %1$d dBm</string>
+    <string name="sticker_signal_none">信号 —</string>
     <string name="vi_legend">名字深色：实车实验中观察一致（持续交叉验证）；中灰：能用，细节待定；浅色：读得到但未验证</string>
     <string name="vi_group_drive">行驶</string>
     <string name="vi_group_lamps">灯光</string>

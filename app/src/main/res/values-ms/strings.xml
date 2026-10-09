@@ -263,6 +263,8 @@
     <string name="sticker_knob_left">Tombol kiri</string>
     <string name="sticker_unnamed">Tanpa nama</string>
     <string name="sticker_device_meta">%1$s  %2$d dBm</string>
+    <string name="sticker_signal">Isyarat %1$d dBm</string>
+    <string name="sticker_signal_none">Isyarat —</string>
     
     <string name="vi_group_drive">Pemanduan</string>
     <string name="vi_group_lamps">Lampu</string>

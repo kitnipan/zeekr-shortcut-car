@@ -28,7 +28,10 @@ import androidx.core.content.ContextCompat;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
+import java.util.Date;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,8 +58,20 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     private LinearLayout devices;
     private TextView empty;
     private TextView status;
+    private TextView signal;
     private TextView live;
     private TextView log;
+    private String signalAddress;
+    private final SimpleDateFormat clock = new SimpleDateFormat("HH:mm:ss", Locale.US);
+    private final Runnable rssiPoll = new Runnable() {
+        @Override
+        public void run() {
+            if (signalAddress != null) {
+                StickerHub.readRssi(signalAddress);
+            }
+            handler.postDelayed(this, 2000);
+        }
+    };
     private View actions;
     private TextView scanButton;
     private BluetoothLeScanner scanner;
@@ -97,6 +112,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         devices = findViewById(R.id.sticker_devices);
         empty = findViewById(R.id.sticker_empty);
         status = findViewById(R.id.sticker_status);
+        signal = findViewById(R.id.sticker_signal);
         live = findViewById(R.id.sticker_live);
         log = findViewById(R.id.sticker_log);
         actions = findViewById(R.id.sticker_actions);
@@ -132,10 +148,12 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         StickerHub.addWatch(this);
         StickerHub.sync(this);
         render();
+        handler.post(rssiPoll);
     }
 
     @Override
     protected void onPause() {
+        handler.removeCallbacks(rssiPoll);
         stopScan();
         StickerHub.setCapture(false);
         StickerHub.removeWatch(this);
@@ -287,6 +305,9 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         }
         row.rank = nextRank;
         row.rssi = result.getRssi();
+        if (address.equals(signalAddress)) {
+            showSignal(row.rssi);
+        }
         if (fresh || nameChanged || rssiChanged || nextRank != previousRank) {
             render();
         }
@@ -385,7 +406,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
             } else if (ensurePermission()) {
                 stopScan();
                 status.setText(R.string.sticker_connecting);
-                StickerHub.probe(this, address);
+                noteConnect(address);
             }
         });
         devices.addView(line);
@@ -481,12 +502,56 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
 
     @Override
     public void onPhase(String address, int phase) {
+        signalAddress = StickerDevices.normalize(address);
+        int text;
         if (phase == StickerHub.PHASE_PAIRING) {
-            status.setText(R.string.sticker_pairing);
-        } else if (phase == StickerHub.PHASE_CONNECTING) {
-            status.setText(R.string.sticker_connecting);
+            text = R.string.sticker_pairing;
         } else if (phase == StickerHub.PHASE_DISCOVERING) {
-            status.setText(R.string.sticker_discovering);
+            text = R.string.sticker_discovering;
+        } else {
+            text = R.string.sticker_connecting;
+        }
+        status.setText(text);
+        append(clock.format(new Date()) + "  " + getString(text) + "  " + signalAddress);
+        StickerHub.readRssi(signalAddress);
+    }
+
+    @Override
+    public void onRssi(String address, int rssi) {
+        String mac = StickerDevices.normalize(address);
+        Seen row = seen.get(mac);
+        Integer previous = row == null ? null : row.rssi;
+        if (row != null) {
+            row.rssi = rssi;
+        }
+        if (!mac.equals(signalAddress)) {
+            return;
+        }
+        showSignal(rssi);
+        if (previous == null || Math.abs(previous - rssi) >= 8) {
+            append(clock.format(new Date()) + "  " + getString(R.string.sticker_signal, rssi));
+        }
+    }
+
+    private void noteConnect(String address) {
+        signalAddress = StickerDevices.normalize(address);
+        Seen row = seen.get(signalAddress);
+        Integer rssi = row == null ? null : row.rssi;
+        showSignal(rssi);
+        String line = clock.format(new Date()) + "  " + getString(R.string.sticker_connecting)
+                + "  " + signalAddress;
+        if (rssi != null) {
+            line = line + "  " + getString(R.string.sticker_signal, rssi);
+        }
+        append(line);
+        StickerHub.probe(this, address);
+    }
+
+    private void showSignal(Integer rssi) {
+        if (rssi == null) {
+            signal.setText(R.string.sticker_signal_none);
+        } else {
+            signal.setText(getString(R.string.sticker_signal, rssi));
         }
     }
 

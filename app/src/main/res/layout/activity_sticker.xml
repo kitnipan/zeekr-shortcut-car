@@ -78,6 +78,39 @@
         android:textAppearance="@style/TextAppearance.Cam.Caption"
         android:textColor="@color/text_secondary" />
 
+    <TextView
+        android:id="@+id/sticker_signal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:text="@string/sticker_signal_none"
+        android:textAppearance="@style/TextAppearance.Cam.Row"
+        android:textColor="@color/text_primary" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:fillViewport="true">
+
+        <TextView
+            android:id="@+id/sticker_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="8dp"
+            android:textAppearance="@style/TextAppearance.Cam.Caption"
+            android:textColor="@color/text_primary" />
+    </ScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -189,17 +222,6 @@
                     android:layout_height="52dp"
                     android:text="@string/shortcut_action_hold_speak" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/sticker_log"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:paddingStart="16dp"
-                android:paddingTop="12dp"
-                android:paddingEnd="16dp"
-                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                android:textColor="@color/text_tertiary" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

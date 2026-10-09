@@ -376,6 +376,8 @@
     <string name="sticker_knob_left">Knob left</string>
     <string name="sticker_unnamed">Unnamed</string>
     <string name="sticker_device_meta">%1$s  %2$d dBm</string>
+    <string name="sticker_signal">Signal %1$d dBm</string>
+    <string name="sticker_signal_none">Signal —</string>
     
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
