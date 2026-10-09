@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta8] - 2026-10-10
+
+### Fixed
+
+- Smart sticker connects again. The previous build closed the new link while it was still dropping the old one.
+
 ## [2.10.14-beta7] - 2026-10-10
 
 ### Fixed
