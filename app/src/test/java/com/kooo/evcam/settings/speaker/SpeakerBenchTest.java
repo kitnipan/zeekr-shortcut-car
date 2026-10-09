@@ -1,8 +1,11 @@
 package com.kooo.evcam.settings.speaker;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+
+import android.media.AudioTrack;
 
 import org.junit.Test;
 
@@ -72,5 +75,12 @@ public class SpeakerBenchTest {
                 replay, SpeakerBench.PlayEvent.fault(sounding.generation(),
                         SpeakerBench.Fail.ROUTE_MISMATCH, "8 1"));
         assertSame(replay, stale);
+    }
+
+    @Test
+    public void staticTrackWaitingForItsBufferCountsAsOpen() {
+        assertTrue(SpeakerBench.opened(AudioTrack.STATE_INITIALIZED));
+        assertTrue(SpeakerBench.opened(AudioTrack.STATE_NO_STATIC_DATA));
+        assertFalse(SpeakerBench.opened(AudioTrack.STATE_UNINITIALIZED));
     }
 }

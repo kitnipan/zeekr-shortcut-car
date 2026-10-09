@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta4] - 2026-10-10
+
+### Fixed
+
+- Speaker probe plays the short tone. It no longer stops with "Could not open playback" before the sound is written.
+
 ## [2.10.14-beta3] - 2026-10-10
 
 ### New and improved

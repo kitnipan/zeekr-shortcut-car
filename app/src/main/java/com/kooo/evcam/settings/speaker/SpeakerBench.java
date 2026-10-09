@@ -721,12 +721,18 @@ public final class SpeakerBench {
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .setBufferSizeInBytes(bytes)
                 .build();
-        if (built.getState() != AudioTrack.STATE_INITIALIZED) {
-            int trackState = built.getState();
+        int trackState = built.getState();
+        if (!opened(trackState)) {
             built.release();
             throw new IllegalStateException(Integer.toString(trackState));
         }
         return built;
+    }
+
+    /** Static mode reports {@link AudioTrack#STATE_NO_STATIC_DATA} until {@code write}. */
+    static boolean opened(int trackState) {
+        return trackState == AudioTrack.STATE_INITIALIZED
+                || trackState == AudioTrack.STATE_NO_STATIC_DATA;
     }
 
     private static AudioFormat format(int channels) {
