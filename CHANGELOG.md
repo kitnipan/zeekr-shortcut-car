@@ -11,6 +11,19 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta1] - 2026-10-09
+
+This build is the fork on top of upstream 2.10.14-alpha. Dim, remote watch, both side mirrors, shortcuts, lock and save, and instant captures stay.
+
+### New and improved
+
+- Cameras open one at a time, surround first, then the cabin cameras. The surround closes first, so leaving the app no longer hangs and the next open gets a picture.
+- After you leave the main screen, cameras stay open for 30 seconds, so coming back in that time does not reopen them. With the screen off they still close quickly.
+- Start on boot is one switch, on by default. It keeps the app in the background and, after a restart, brings back Super mirror, the floating button, and auto-recording.
+- The driving info bar is only on the surround recording. Cabin recordings no longer carry it.
+- Photos use JPEG output. That switch stays on, and says it requires developer options while it is locked.
+- Diagnostics: Send to phone is available without developer options.
+
 ## [2.10.14-alpha] - 2026-10-09
 
 - "Use JPEG output for photos" shows "Requires developer options" while it is locked.
