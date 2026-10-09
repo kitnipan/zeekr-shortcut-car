@@ -1262,6 +1262,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
+        onClick("pref_speaker_probe",
+                pref -> openFragment(new SpeakerProbeFragment(), R.string.dev_speaker_probe_title));
 
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);

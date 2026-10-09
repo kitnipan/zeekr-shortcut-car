@@ -993,6 +993,26 @@
 
     <!-- 开发者选项分区 -->
     <string name="set_section_developer">开发者选项</string>
+    <string name="dev_speaker_probe_title">扬声器探测</string>
+    <string name="dev_speaker_probe_summary">列出本进程能寻址的输出，点一行播放短音。不会标出哪一行是车内或车外。</string>
+    <string name="speaker_probe_banner">Android 的设备类型不是车内或车外扬声器。这一页不知道哪一行是哪一只。</string>
+    <string name="speaker_probe_car_listed">车机音频分区已列出。</string>
+    <string name="speaker_probe_car_missing">读不到车机音频接口。</string>
+    <string name="speaker_probe_car_unavailable">车机音频服务不可用。</string>
+    <string name="speaker_probe_car_failed">读取车机音频分区失败。</string>
+    <string name="speaker_probe_sounding">正在播放</string>
+    <string name="speaker_probe_completed">已播完。这不代表有人听到了车内或车外。</string>
+    <string name="speaker_probe_fail_unknown">没有这一路</string>
+    <string name="speaker_probe_fail_disappeared">这一路已经不在</string>
+    <string name="speaker_probe_fail_pcm">这一路不接受 PCM</string>
+    <string name="speaker_probe_fail_track">打不开播放</string>
+    <string name="speaker_probe_fail_write">写入失败</string>
+    <string name="speaker_probe_fail_preferred">指定设备被拒绝</string>
+    <string name="speaker_probe_fail_zone_denied">没有权限切换音频分区</string>
+    <string name="speaker_probe_fail_zone">切换音频分区失败</string>
+    <string name="speaker_probe_fail_routed">实际走到了别的设备</string>
+    <string name="speaker_probe_kind_device">设备</string>
+    <string name="speaker_probe_kind_zone">分区用途</string>
     <string name="dev_permissions_title">权限设置</string>
     <string name="dev_permissions_summary">管理应用所需的各项权限</string>
     <string name="dev_perm_group_basic">基础权限</string>

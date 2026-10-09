@@ -992,6 +992,26 @@
 
     <!-- Developer options section -->
     <string name="set_section_developer">Developer options</string>
+    <string name="dev_speaker_probe_title">Speaker probe</string>
+    <string name="dev_speaker_probe_summary">Lists every output this process can address. Tap a row to play a short tone. This page does not label cabin or outside.</string>
+    <string name="speaker_probe_banner">An Android device type is not the cabin speaker or the outside speaker. This page does not know which row is which.</string>
+    <string name="speaker_probe_car_listed">Car audio zones are listed.</string>
+    <string name="speaker_probe_car_missing">The car audio interface is not on this device.</string>
+    <string name="speaker_probe_car_unavailable">The car audio service is unavailable.</string>
+    <string name="speaker_probe_car_failed">Reading car audio zones failed.</string>
+    <string name="speaker_probe_sounding">Playing</string>
+    <string name="speaker_probe_completed">Finished. That does not mean anyone heard the cabin or the outside.</string>
+    <string name="speaker_probe_fail_unknown">No such route</string>
+    <string name="speaker_probe_fail_disappeared">This route is gone</string>
+    <string name="speaker_probe_fail_pcm">This route does not accept PCM</string>
+    <string name="speaker_probe_fail_track">Could not open playback</string>
+    <string name="speaker_probe_fail_write">Write failed</string>
+    <string name="speaker_probe_fail_preferred">The device refused the request</string>
+    <string name="speaker_probe_fail_zone_denied">Not allowed to switch audio zone</string>
+    <string name="speaker_probe_fail_zone">Switching audio zone failed</string>
+    <string name="speaker_probe_fail_routed">Android routed a different device</string>
+    <string name="speaker_probe_kind_device">Device</string>
+    <string name="speaker_probe_kind_zone">Zone usage</string>
     <string name="dev_permissions_title">Permissions</string>
     <string name="dev_permissions_summary">Manage the permissions the app needs</string>
     <string name="dev_perm_group_basic">Basic permissions</string>

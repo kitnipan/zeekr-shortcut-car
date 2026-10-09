@@ -975,6 +975,26 @@
 
     <!-- Bahagian pilihan pembangun -->
     <string name="set_section_developer">Pilihan pembangun</string>
+    <string name="dev_speaker_probe_title">Ujian pembesar suara</string>
+    <string name="dev_speaker_probe_summary">Senarai setiap output yang proses ini boleh capai. Ketik satu baris untuk memainkan nada pendek. Halaman ini tidak menandakan kabin atau luar.</string>
+    <string name="speaker_probe_banner">Jenis peranti Android bukan pembesar suara kabin atau luar. Halaman ini tidak tahu baris yang mana.</string>
+    <string name="speaker_probe_car_listed">Zon audio kereta disenaraikan.</string>
+    <string name="speaker_probe_car_missing">Antara muka audio kereta tiada pada peranti ini.</string>
+    <string name="speaker_probe_car_unavailable">Perkhidmatan audio kereta tidak tersedia.</string>
+    <string name="speaker_probe_car_failed">Membaca zon audio kereta gagal.</string>
+    <string name="speaker_probe_sounding">Sedang dimainkan</string>
+    <string name="speaker_probe_completed">Sudah selesai. Itu tidak bermakna seseorang mendengar kabin atau luar.</string>
+    <string name="speaker_probe_fail_unknown">Laluan ini tiada</string>
+    <string name="speaker_probe_fail_disappeared">Laluan ini sudah tiada</string>
+    <string name="speaker_probe_fail_pcm">Laluan ini tidak terima PCM</string>
+    <string name="speaker_probe_fail_track">Tidak dapat buka main balik</string>
+    <string name="speaker_probe_fail_write">Tulis gagal</string>
+    <string name="speaker_probe_fail_preferred">Peranti menolak permintaan</string>
+    <string name="speaker_probe_fail_zone_denied">Tidak dibenarkan tukar zon audio</string>
+    <string name="speaker_probe_fail_zone">Tukar zon audio gagal</string>
+    <string name="speaker_probe_fail_routed">Android menghantar ke peranti lain</string>
+    <string name="speaker_probe_kind_device">Peranti</string>
+    <string name="speaker_probe_kind_zone">Kegunaan zon</string>
     <string name="dev_permissions_title">Kebenaran</string>
     <string name="dev_permissions_summary">Urus kebenaran yang diperlukan apl</string>
     <string name="dev_perm_group_basic">Kebenaran asas</string>

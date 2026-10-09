@@ -565,6 +565,11 @@
             android:title="@string/dev_permissions_title"
             android:summary="@string/dev_permissions_summary" />
 
+        <Preference
+            android:key="pref_speaker_probe"
+            android:title="@string/dev_speaker_probe_title"
+            android:summary="@string/dev_speaker_probe_summary" />
+
         <SwitchPreferenceCompat
             android:key="pref_raw_frame_dump"
             android:title="@string/dev_raw_frame_title"
