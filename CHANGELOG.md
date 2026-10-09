@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta3] - 2026-10-10
+
+### New and improved
+
+- Smart sticker (experimental), under Settings, System. Scans for a Bluetooth sticker the head unit does not pair yet. A press can be saved as a shortcut. Use as shortcut stays off until turned on.
+
 ## [2.10.14-beta2] - 2026-10-09
 
 ### New and improved
