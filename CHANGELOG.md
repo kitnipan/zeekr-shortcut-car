@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta10] - 2026-10-10
+
+### New and improved
+
+- Smart sticker connect shows the signal and a live log while the button is connecting.
+
+### Fixed
+
+- Smart sticker connect retries on its own. Pairing no longer runs first, which left the radio silent (fail 2) and made the other button need several taps.
+
 ## [2.10.14-beta8] - 2026-10-10
 
 ### Fixed
