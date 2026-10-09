@@ -1,7 +1,9 @@
 package com.kooo.evcam.input;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -75,6 +77,15 @@ public class ShortcutBookTest {
         Shortcut item = new Shortcut(96, 0, "Pad", "toggle_both_mirrors", "tap");
         Shortcut back = ShortcutBook.parse(ShortcutBook.write(Collections.singletonList(item))).get(0);
         assertEquals("toggle_both_mirrors", back.action);
+    }
+
+    @Test
+    public void holdToSpeakMatchesThatButtonAtAnyPressKind() {
+        Shortcut item = new Shortcut(24, 0, "Wheel", "hold_to_speak", "long");
+        assertTrue(ShortcutBook.holdToSpeak(Collections.singletonList(item), 24, 0, "Wheel"));
+        assertFalse(ShortcutBook.holdToSpeak(Collections.singletonList(item), 25, 0, "Wheel"));
+        Shortcut back = ShortcutBook.parse(ShortcutBook.write(Collections.singletonList(item))).get(0);
+        assertEquals(ShortcutAction.HOLD_SPEAK, ShortcutAction.fromKey(back.action));
     }
 
     @Test

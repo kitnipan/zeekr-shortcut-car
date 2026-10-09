@@ -76,6 +76,20 @@ public final class ShortcutBook {
         return out;
     }
 
+    /** True when this physical button is saved as hold-to-speak, whatever press kind was stored. */
+    public static boolean holdToSpeak(List<Shortcut> items, int keyCode, int scanCode, String deviceName) {
+        if (items == null) {
+            return false;
+        }
+        for (Shortcut item : items) {
+            if (item != null && ShortcutAction.HOLD_SPEAK.key.equals(item.action)
+                    && samePress(item, keyCode, scanCode, deviceName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static Shortcut match(List<Shortcut> items, int keyCode, int scanCode,
                                  String deviceName, PressKind kind) {
         if (items == null) {

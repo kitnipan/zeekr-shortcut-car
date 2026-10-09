@@ -182,6 +182,14 @@
     <string name="shortcut_action_dim">Gelapkan skrin</string>
     <string name="shortcut_action_save">Simpan saat ini</string>
     <string name="shortcut_action_lock_save">Kunci dan simpan</string>
+    <string name="shortcut_action_hold_speak">Tahan untuk bercakap ke luar</string>
+    <string name="megaphone_channel">Tahan untuk bercakap</string>
+    <string name="megaphone_speaking">Bercakap ke luar</string>
+    <string name="megaphone_release">Lepaskan butang untuk berhenti</string>
+    <string name="megaphone_need_mic">Kebenaran mikrofon dimatikan</string>
+    <string name="megaphone_no_speaker">Pembesar suara luar tiada pada peranti ini</string>
+    <string name="megaphone_route">Tidak dapat hala ke pembesar suara luar</string>
+    <string name="megaphone_open">Tidak dapat buka mikrofon</string>
     <string name="shortcut_press_tap">Ketik</string>
     <string name="shortcut_press_long">Tekan lama</string>
     <string name="shortcut_press_double">Dwiklik</string>

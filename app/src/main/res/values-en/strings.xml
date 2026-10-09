@@ -181,6 +181,14 @@
     <string name="shortcut_action_dim">Dim display</string>
     <string name="shortcut_action_save">Save this moment</string>
     <string name="shortcut_action_lock_save">Lock and save</string>
+    <string name="shortcut_action_hold_speak">Hold to speak outside</string>
+    <string name="megaphone_channel">Hold to speak</string>
+    <string name="megaphone_speaking">Speaking outside</string>
+    <string name="megaphone_release">Release the button to stop</string>
+    <string name="megaphone_need_mic">Microphone permission is off</string>
+    <string name="megaphone_no_speaker">Outside speaker is not on this device</string>
+    <string name="megaphone_route">Could not route to the outside speaker</string>
+    <string name="megaphone_open">Could not open the microphone</string>
     <string name="shortcut_press_tap">Tap</string>
     <string name="shortcut_press_long">Long press</string>
     <string name="shortcut_press_double">Double</string>

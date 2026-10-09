@@ -122,6 +122,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         bind(R.id.sticker_action_dim, ShortcutAction.DIM);
         bind(R.id.sticker_action_save, ShortcutAction.SAVE);
         bind(R.id.sticker_action_lock_save, ShortcutAction.LOCK_SAVE);
+        bind(R.id.sticker_action_hold_speak, ShortcutAction.HOLD_SPEAK);
     }
 
     @Override
@@ -154,6 +155,13 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
                 action.key, pending.press.key);
         config.setButtonShortcuts(ShortcutBook.write(
                 ShortcutBook.put(ShortcutBook.parse(config.getButtonShortcuts()), next)));
+        config.setStickerEnabled(true);
+        SwitchCompat use = findViewById(R.id.sticker_use);
+        if (!use.isChecked()) {
+            use.setChecked(true);
+        } else {
+            StickerHub.sync(this);
+        }
         int label = StickerFrame.controlLabel(pending.control);
         String control = label == 0 ? String.valueOf(pending.control) : getString(label);
         status.setText(getString(R.string.sticker_saved_action,

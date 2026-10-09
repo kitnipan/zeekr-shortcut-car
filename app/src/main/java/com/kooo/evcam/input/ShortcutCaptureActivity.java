@@ -12,8 +12,8 @@ import com.google.android.material.button.MaterialButton;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 
-/** Press the external button, pick tap/long/double, then pick the action. */
-public class ShortcutCaptureActivity extends AppCompatActivity {
+/** Press the external button or sticker, pick tap/long/double, then pick the action. */
+public class ShortcutCaptureActivity extends AppCompatActivity implements StickerHub.Watch {
 
     private Shortcut captured;
     private PressKind pressKind = PressKind.TAP;
@@ -39,6 +39,7 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
         bind(R.id.shortcut_action_dim, ShortcutAction.DIM);
         bind(R.id.shortcut_action_save, ShortcutAction.SAVE);
         bind(R.id.shortcut_action_lock_save, ShortcutAction.LOCK_SAVE);
+        bind(R.id.shortcut_action_hold_speak, ShortcutAction.HOLD_SPEAK);
         highlightPress();
     }
 
@@ -46,11 +47,17 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         ShortcutCapture.setActive(true);
+        StickerHub.setCapture(true);
+        StickerHub.addWatch(this);
+        StickerHub.sync(this);
     }
 
     @Override
     protected void onPause() {
         ShortcutCapture.setActive(false);
+        StickerHub.setCapture(false);
+        StickerHub.removeWatch(this);
+        StickerHub.sync(this);
         super.onPause();
     }
 
@@ -86,6 +93,15 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
                 new Shortcut(captured.keyCode, captured.scanCode, captured.deviceName,
                         action.key, pressKind.key));
         config.setButtonShortcuts(ShortcutBook.write(items));
+        if (StickerFrame.isSticker(captured.deviceName)) {
+            config.setStickerEnabled(true);
+            config.setStickerDevices(StickerDevices.write(StickerDevices.put(
+                    StickerDevices.parse(config.getStickerDevices()),
+                    StickerFrame.address(captured.deviceName))));
+            StickerHub.sync(this);
+            finish();
+            return;
+        }
         KeyCatcher.sync(this);
         if (AccessibilityGate.selfEnable(this) || config.isShortcutCatchEverywhere()) {
             finish();
@@ -146,5 +162,45 @@ public class ShortcutCaptureActivity extends AppCompatActivity {
             return name;
         }
         return getString(R.string.shortcut_scan, item.scanCode);
+    }
+
+    @Override
+    public void onPacket(String address, byte[] raw) {
+        if (captured != null) {
+            return;
+        }
+        StickerFrame frame = StickerFrame.parse(raw);
+        if (frame == null) {
+            return;
+        }
+        String device = StickerFrame.deviceName(address);
+        captured = new Shortcut(frame.control, 0, device, "", frame.press.key);
+        pressKind = frame.press;
+        highlightPress();
+        int label = StickerFrame.controlLabel(frame.control);
+        String control = label == 0 ? String.valueOf(frame.control) : getString(label);
+        prompt.setText(getString(R.string.shortcut_picked, control + " " + StickerFrame.tail(device)));
+        pressKinds.setVisibility(View.VISIBLE);
+        actions.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onState(String address, boolean connected) {
+    }
+
+    @Override
+    public void onReady(String address) {
+    }
+
+    @Override
+    public void onFail(String address, int reason, int status) {
+    }
+
+    @Override
+    public void onLog(String line) {
+    }
+
+    @Override
+    public void onPhase(String address, int phase) {
     }
 }

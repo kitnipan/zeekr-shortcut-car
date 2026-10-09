@@ -11,11 +11,14 @@ import android.os.Bundle;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.View;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.button.MaterialButton;
+import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 
 import java.text.SimpleDateFormat;
@@ -27,8 +30,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Shows what a paired controller or button actually sends, so a later shortcut
- * can be bound to a real key code. Nothing is saved.
+ * Shows what a paired controller or sticker actually sends, then saves that
+ * press as a shortcut when an action is picked.
  */
 public class ControllerProbeActivity extends AppCompatActivity implements StickerHub.Watch {
 
@@ -48,6 +51,10 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
     private TextView devicesView;
     private TextView liveView;
     private TextView logView;
+    private View register;
+    private Shortcut pending;
+    private String pendingLabel = "";
+    private PressKind pressKind = PressKind.TAP;
     private final ArrayDeque<String> lines = new ArrayDeque<>();
     private final Map<Integer, float[]> lastAxes = new HashMap<>();
     private final SimpleDateFormat clock = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
@@ -77,12 +84,25 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
         devicesView = findViewById(R.id.controller_devices);
         liveView = findViewById(R.id.controller_live);
         logView = findViewById(R.id.controller_log);
+        register = findViewById(R.id.controller_register);
         findViewById(R.id.controller_close).setOnClickListener(v -> finish());
         findViewById(R.id.controller_clear).setOnClickListener(v -> {
             lines.clear();
             logView.setText("");
             liveView.setText(R.string.ctrl_waiting);
         });
+        bindPress(R.id.controller_press_tap, PressKind.TAP);
+        bindPress(R.id.controller_press_long, PressKind.LONG);
+        bindPress(R.id.controller_press_double, PressKind.DOUBLE);
+        bind(R.id.controller_action_record, ShortcutAction.RECORD);
+        bind(R.id.controller_action_mirror, ShortcutAction.MIRROR);
+        bind(R.id.controller_action_both_mirrors, ShortcutAction.BOTH_MIRRORS);
+        bind(R.id.controller_action_app, ShortcutAction.APP);
+        bind(R.id.controller_action_dim, ShortcutAction.DIM);
+        bind(R.id.controller_action_save, ShortcutAction.SAVE);
+        bind(R.id.controller_action_lock_save, ShortcutAction.LOCK_SAVE);
+        bind(R.id.controller_action_hold_speak, ShortcutAction.HOLD_SPEAK);
+        highlightPress();
         inputs = (InputManager) getSystemService(INPUT_SERVICE);
         if (Build.VERSION.SDK_INT >= 31
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
@@ -143,6 +163,15 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
             push(line);
             refreshDevices();
         }
+        if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            InputDevice device = event.getDevice();
+            if (device == null || !device.isVirtual()) {
+                String name = device == null || device.getName() == null ? "" : device.getName();
+                Shortcut draft = new Shortcut(code, event.getScanCode(), name, "");
+                offer(draft, PressKind.TAP, buttonName(draft));
+                ShortcutKeys.dispatch(this, event);
+            }
+        }
         return true;
     }
 
@@ -158,6 +187,14 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
             action = control + " " + getString(frame.press.labelRes);
         }
         push(getString(R.string.ctrl_sticker, clock.format(new Date()), action, StickerFrame.hex(raw)));
+        if (frame == null) {
+            return;
+        }
+        String device = StickerFrame.deviceName(address);
+        Shortcut draft = new Shortcut(frame.control, 0, device, "", frame.press.key);
+        int label = StickerFrame.controlLabel(frame.control);
+        String control = label == 0 ? String.valueOf(frame.control) : getString(label);
+        offer(draft, frame.press, control + " " + StickerFrame.tail(device));
     }
 
     @Override
@@ -218,6 +255,72 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
                     deviceName(event.getDevice())));
         }
         return true;
+    }
+
+    private void bindPress(int id, PressKind kind) {
+        findViewById(id).setOnClickListener(v -> {
+            pressKind = kind;
+            highlightPress();
+        });
+    }
+
+    private void bind(int id, ShortcutAction action) {
+        findViewById(id).setOnClickListener(v -> save(action));
+    }
+
+    private void offer(Shortcut draft, PressKind kind, String label) {
+        pending = draft;
+        pendingLabel = label;
+        pressKind = kind == null ? PressKind.TAP : kind;
+        highlightPress();
+        register.setVisibility(View.VISIBLE);
+        liveView.setText(getString(R.string.shortcut_picked, label));
+    }
+
+    private void highlightPress() {
+        paint(R.id.controller_press_tap, pressKind == PressKind.TAP);
+        paint(R.id.controller_press_long, pressKind == PressKind.LONG);
+        paint(R.id.controller_press_double, pressKind == PressKind.DOUBLE);
+    }
+
+    private void paint(int id, boolean on) {
+        MaterialButton button = findViewById(id);
+        button.setAlpha(on ? 1f : 0.45f);
+    }
+
+    private void save(ShortcutAction action) {
+        if (pending == null) {
+            return;
+        }
+        AppConfig config = new AppConfig(this);
+        Shortcut next = new Shortcut(pending.keyCode, pending.scanCode, pending.deviceName,
+                action.key, pressKind.key);
+        config.setButtonShortcuts(ShortcutBook.write(
+                ShortcutBook.put(ShortcutBook.parse(config.getButtonShortcuts()), next)));
+        if (StickerFrame.isSticker(pending.deviceName)) {
+            config.setStickerEnabled(true);
+            config.setStickerDevices(StickerDevices.write(StickerDevices.put(
+                    StickerDevices.parse(config.getStickerDevices()),
+                    StickerFrame.address(pending.deviceName))));
+            StickerHub.sync(this);
+        } else {
+            KeyCatcher.sync(this);
+        }
+        liveView.setText(getString(R.string.sticker_saved_action,
+                pendingLabel + " " + getString(pressKind.labelRes),
+                getString(action.labelRes)));
+    }
+
+    private String buttonName(Shortcut item) {
+        if (item.keyCode != 0) {
+            String name = KeyEvent.keyCodeToString(item.keyCode);
+            String prefix = "KEYCODE_";
+            if (name.startsWith(prefix)) {
+                name = name.substring(prefix.length());
+            }
+            return name;
+        }
+        return getString(R.string.shortcut_scan, item.scanCode);
     }
 
     private void push(String line) {

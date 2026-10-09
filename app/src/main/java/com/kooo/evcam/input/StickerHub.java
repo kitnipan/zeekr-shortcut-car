@@ -38,8 +38,10 @@ import java.util.UUID;
  * Keeps a GATT link to saved smart stickers and turns a press into a shortcut.
  *
  * <p>The head unit firmware that pairs this sticker is not on every car. This
- * talks to it directly. The link stays up only while {@link AppConfig#isStickerEnabled()}
- * is on, or while the experimental screen is open.</p>
+ * talks to it directly. The link stays up while {@link AppConfig#isStickerEnabled()}
+ * is on, or while an experimental screen is open. Pairing a second sticker
+ * pauses the other links first, because this head unit will not bond while a
+ * GATT connection is already up.</p>
  */
 public final class StickerHub {
 
@@ -86,7 +88,13 @@ public final class StickerHub {
     private static final Set<String> CLOSING = new HashSet<>();
     private static final List<Watch> WATCHES = new ArrayList<>();
     private static final Set<String> BONDING = new HashSet<>();
+    /** Other links dropped so this head unit can bond a new sticker. */
+    private static final Set<String> PAUSED = new HashSet<>();
+    private static final Set<String> BOND_RETRIED = new HashSet<>();
     private static final Map<String, Runnable> BOND_TIMEOUT = new HashMap<>();
+    private static String queuedAddress;
+    /** Pause delay is still running. Do not bring the other stickers back yet. */
+    private static int holding;
     private static final Map<String, ArrayDeque<BluetoothGattCharacteristic>> SUBSCRIBE = new HashMap<>();
     private static final Map<String, Integer> TRIES = new HashMap<>();
     private static final long BOND_TIMEOUT_MS = 12000L;
@@ -137,7 +145,17 @@ public final class StickerHub {
             app = application;
             close(mac);
             TRIES.remove(mac);
-            pairThenConnect(application, mac);
+            holding++;
+            boolean paused = pauseOthers(mac);
+            Runnable go = () -> {
+                holding = Math.max(0, holding - 1);
+                pairThenConnect(application, mac);
+            };
+            if (paused) {
+                MAIN.postDelayed(go, 600);
+            } else {
+                go.run();
+            }
         });
     }
 
@@ -152,7 +170,7 @@ public final class StickerHub {
             closeAll();
             return;
         }
-        boolean hold = new AppConfig(application).isStickerEnabled() || !WATCHES.isEmpty();
+        boolean hold = linkWanted(application) || !WATCHES.isEmpty();
         if (!hold) {
             closeAll();
             return;
@@ -168,7 +186,7 @@ public final class StickerHub {
             return;
         }
         for (String address : wanted) {
-            if (!OPEN.containsKey(address) && !PENDING.contains(address)) {
+            if (!OPEN.containsKey(address) && !PENDING.contains(address) && !PAUSED.contains(address)) {
                 connect(application, address, true);
             }
         }
@@ -189,6 +207,7 @@ public final class StickerHub {
             device = adapter.getRemoteDevice(address);
         } catch (IllegalArgumentException e) {
             AppLog.w(TAG, "地址无效: " + address);
+            afterAttempt();
             return;
         }
         int bond = BluetoothDevice.BOND_NONE;
@@ -198,6 +217,11 @@ public final class StickerHub {
             fail(address, FAIL_BLUETOOTH, 0);
             return;
         }
+        if (!BONDING.isEmpty() && !BONDING.contains(address)) {
+            queuedAddress = address;
+            phase(address, PHASE_PAIRING);
+            return;
+        }
         if (bond == BluetoothDevice.BOND_BONDED) {
             connect(application, address, false);
             return;
@@ -205,16 +229,16 @@ public final class StickerHub {
         ensureBonds(application);
         BONDING.add(address);
         phase(address, PHASE_PAIRING);
-        boolean started;
-        try {
-            started = device.createBond();
-        } catch (SecurityException e) {
-            BONDING.remove(address);
-            connect(application, address, false);
-            return;
-        }
+        boolean started = startBond(device);
         AppLog.d(TAG, "配对智能贴 " + address + " started=" + started);
         if (!started) {
+            if (BOND_RETRIED.add(address)) {
+                dropBond(device);
+                AppLog.w(TAG, "配对没开始，清掉旧绑定再试 " + address);
+                MAIN.postDelayed(() -> pairThenConnect(application, address), 500);
+                return;
+            }
+            BOND_RETRIED.remove(address);
             BONDING.remove(address);
             connect(application, address, false);
             return;
@@ -281,7 +305,8 @@ public final class StickerHub {
     }
 
     private static void connect(Context application, String address, boolean auto) {
-        if (address.isEmpty() || OPEN.containsKey(address) || PENDING.contains(address)) {
+        if (address.isEmpty() || OPEN.containsKey(address) || PENDING.contains(address)
+                || PAUSED.contains(address)) {
             return;
         }
         if (!canConnect(application)) {
@@ -336,6 +361,15 @@ public final class StickerHub {
             @Override
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                 MAIN.post(() -> {
+                    BluetoothGatt current = OPEN.get(address);
+                    if (current != null && current != gatt) {
+                        try {
+                            gatt.close();
+                        } catch (SecurityException ignored) {
+                            // stale callback
+                        }
+                        return;
+                    }
                     if (newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
                         if (CLOSING.contains(address)) {
                             drop(address, gatt);
@@ -357,9 +391,9 @@ public final class StickerHub {
                         drop(address, gatt);
                         if (!intentional) {
                             scheduleReconnect(address);
-                        }
-                        if (status != BluetoothGatt.GATT_SUCCESS && status != 0) {
-                            failOrRetry(address, FAIL_GATT, status);
+                            if (status != BluetoothGatt.GATT_SUCCESS && status != 0) {
+                                failOrRetry(address, FAIL_GATT, status);
+                            }
                         }
                     }
                 });
@@ -380,8 +414,8 @@ public final class StickerHub {
                         return;
                     }
                     SUBSCRIBE.put(address, new ArrayDeque<>(notifies));
-                    ready(address);
                     PENDING.remove(address);
+                    ready(address);
                     writeNext(gatt, address);
                 });
             }
@@ -490,7 +524,7 @@ public final class StickerHub {
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onPacket(address, raw);
         }
-        if (capture || app == null || !new AppConfig(app).isStickerEnabled()) {
+        if (capture || app == null || !linkWanted(app)) {
             return;
         }
         StickerFrame frame = StickerFrame.parse(raw);
@@ -507,7 +541,8 @@ public final class StickerHub {
 
     private static void scheduleReconnect(String address) {
         MAIN.postDelayed(() -> {
-            if (app == null || OPEN.containsKey(address) || PENDING.contains(address)) {
+            if (app == null || OPEN.containsKey(address) || PENDING.contains(address)
+                    || PAUSED.contains(address)) {
                 return;
             }
             if (!shouldHold(address)) {
@@ -521,7 +556,7 @@ public final class StickerHub {
         if (app == null || UserExit.isExited(app)) {
             return false;
         }
-        if (!new AppConfig(app).isStickerEnabled() && WATCHES.isEmpty()) {
+        if (!linkWanted(app) && WATCHES.isEmpty()) {
             return false;
         }
         return StickerDevices.parse(new AppConfig(app).getStickerDevices()).contains(address);
@@ -568,10 +603,109 @@ public final class StickerHub {
     }
 
     private static void closeAll() {
+        PAUSED.clear();
+        queuedAddress = null;
+        holding = 0;
         for (String address : new ArrayList<>(OPEN.keySet())) {
             close(address);
         }
         PENDING.clear();
+    }
+
+    /** Drop every open link except the one about to bond. */
+    private static boolean pauseOthers(String address) {
+        boolean paused = false;
+        for (String other : new ArrayList<>(OPEN.keySet())) {
+            if (other.equals(address)) {
+                continue;
+            }
+            PAUSED.add(other);
+            close(other);
+            paused = true;
+        }
+        if (paused) {
+            AppLog.d(TAG, "先断开其它智能贴再配对 " + address);
+        }
+        return paused;
+    }
+
+    private static void resumePaused() {
+        if (app == null || holding > 0 || !BONDING.isEmpty()) {
+            return;
+        }
+        for (String address : PENDING) {
+            if (!PAUSED.contains(address)) {
+                return;
+            }
+        }
+        List<String> again = new ArrayList<>(PAUSED);
+        PAUSED.clear();
+        for (String address : again) {
+            if (!OPEN.containsKey(address) && !PENDING.contains(address)) {
+                connect(app, address, false);
+            }
+        }
+    }
+
+    private static void afterAttempt() {
+        if (queuedAddress != null && holding == 0 && BONDING.isEmpty()) {
+            String next = queuedAddress;
+            queuedAddress = null;
+            if (app != null) {
+                probe(app, next);
+            }
+            return;
+        }
+        resumePaused();
+    }
+
+    /** BLE bond. The public no-arg call pairs classic first and fails for a second sticker. */
+    private static boolean startBond(BluetoothDevice device) {
+        Object result = invoke(device, "createBond", new Class<?>[]{int.class},
+                new Object[]{BluetoothDevice.TRANSPORT_LE});
+        if (result instanceof Boolean && (Boolean) result) {
+            return true;
+        }
+        try {
+            return device.createBond();
+        } catch (SecurityException e) {
+            return false;
+        }
+    }
+
+    private static boolean dropBond(BluetoothDevice device) {
+        Object result = invoke(device, "removeBond", new Class<?>[]{}, new Object[]{});
+        return result instanceof Boolean && (Boolean) result;
+    }
+
+    private static Object invoke(BluetoothDevice device, String name, Class<?>[] types, Object[] args) {
+        try {
+            java.lang.reflect.Method method = BluetoothDevice.class.getMethod(name, types);
+            return method.invoke(device, args);
+        } catch (Exception ignored) {
+            // not public on this build
+        }
+        try {
+            java.lang.reflect.Method method = BluetoothDevice.class.getDeclaredMethod(name, types);
+            method.setAccessible(true);
+            return method.invoke(device, args);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /** Switch on, or a sticker shortcut already saved. */
+    private static boolean linkWanted(Context context) {
+        AppConfig config = new AppConfig(context);
+        if (config.isStickerEnabled()) {
+            return true;
+        }
+        for (Shortcut item : ShortcutBook.parse(config.getButtonShortcuts())) {
+            if (item != null && StickerFrame.isSticker(item.deviceName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void logServices(BluetoothGatt gatt) {
@@ -608,9 +742,11 @@ public final class StickerHub {
 
     private static void ready(String address) {
         TRIES.remove(address);
+        BOND_RETRIED.remove(address);
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onReady(address);
         }
+        MAIN.postDelayed(StickerHub::afterAttempt, 1200);
     }
 
     private static void phase(String address, int which) {
@@ -646,9 +782,11 @@ public final class StickerHub {
     private static void fail(String address, int reason, int status) {
         AppLog.w(TAG, "智能贴失败 " + address + " reason=" + reason + " status=" + status);
         log("fail " + reason + " status=" + status);
+        BOND_RETRIED.remove(address);
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onFail(address, reason, status);
         }
+        afterAttempt();
     }
 
     private static void log(String line) {

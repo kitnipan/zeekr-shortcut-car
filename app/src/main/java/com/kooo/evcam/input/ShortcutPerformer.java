@@ -58,6 +58,9 @@ public final class ShortcutPerformer {
                 com.kooo.evcam.storage.AutoLock.get().lockFromShortcut(context);
                 com.kooo.evcam.recording.InstantCapture.perform(context);
                 return;
+            case HOLD_SPEAK:
+                MegaphoneService.toggle(context);
+                return;
             default:
                 return;
         }

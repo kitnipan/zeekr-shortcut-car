@@ -8,9 +8,10 @@ import java.util.Locale;
  * One press report from a Zeekr smart sticker.
  *
  * <p>The sticker is a BLE peripheral. Service {@code 0xFFD0}, notify {@code 0xFFD2}.
- * A control packet is header {@code 0x02} plus a key byte. The sticker already
- * classifies tap, long press, and double press, so this does not go through
- * {@link PressClassifier}.</p>
+ * One report is header {@code 0x02} plus a key byte. The ZEEKR button on the car
+ * sends a single byte instead: {@code 0x31} for one click, {@code 0x32} for a
+ * double click. The device already classifies the press, so this does not go
+ * through {@link PressClassifier}.</p>
  */
 public final class StickerFrame {
 
@@ -30,7 +31,17 @@ public final class StickerFrame {
 
     /** {@code null} when the bytes are not a button or knob press. */
     public static StickerFrame parse(byte[] raw) {
-        if (raw == null || raw.length < 2 || (raw[0] & 0xFF) != 0x02) {
+        if (raw == null || raw.length == 0) {
+            return null;
+        }
+        int head = raw[0] & 0xFF;
+        if (head == 0x31) {
+            return new StickerFrame(CONTROL_BUTTON, PressKind.TAP);
+        }
+        if (head == 0x32) {
+            return new StickerFrame(CONTROL_BUTTON, PressKind.DOUBLE);
+        }
+        if (raw.length < 2 || head != 0x02) {
             return null;
         }
         switch (raw[1] & 0xFF) {
@@ -56,6 +67,14 @@ public final class StickerFrame {
 
     public static boolean isSticker(String deviceName) {
         return deviceName != null && deviceName.startsWith(PREFIX);
+    }
+
+    /** MAC stored after {@code sticker:}, or empty when this is not a sticker binding. */
+    public static String address(String deviceName) {
+        if (!isSticker(deviceName)) {
+            return "";
+        }
+        return deviceName.substring(PREFIX.length());
     }
 
     /** Last two bytes of the MAC, so two stickers can be told apart in the shortcut list. */

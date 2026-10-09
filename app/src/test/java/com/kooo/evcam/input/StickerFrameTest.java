@@ -35,6 +35,16 @@ public class StickerFrameTest {
     }
 
     @Test
+    public void zeekrButtonOneClickAndDoubleClick() {
+        StickerFrame tap = StickerFrame.parse(new byte[]{0x31});
+        StickerFrame twice = StickerFrame.parse(new byte[]{0x32});
+        assertEquals(StickerFrame.CONTROL_BUTTON, tap.control);
+        assertEquals(PressKind.TAP, tap.press);
+        assertEquals(StickerFrame.CONTROL_BUTTON, twice.control);
+        assertEquals(PressKind.DOUBLE, twice.press);
+    }
+
+    @Test
     public void otherPacketsAreNotPresses() {
         assertNull(StickerFrame.parse(null));
         assertNull(StickerFrame.parse(new byte[]{0x02}));
@@ -47,6 +57,7 @@ public class StickerFrameTest {
     public void deviceNameMatchesTheShortcutBook() {
         String name = StickerFrame.deviceName("aa:bb:cc:dd:ee:ff");
         assertEquals("sticker:AA:BB:CC:DD:EE:FF", name);
+        assertEquals("AA:BB:CC:DD:EE:FF", StickerFrame.address(name));
         assertEquals("EE:FF", StickerFrame.tail(name));
         StickerFrame frame = StickerFrame.parse(new byte[]{0x02, 0x41});
         Shortcut saved = new Shortcut(frame.control, 0, name, "toggle_dim", frame.press.key);

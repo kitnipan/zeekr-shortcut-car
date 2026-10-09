@@ -11,7 +11,8 @@ public enum ShortcutAction {
     APP("open_app", R.string.shortcut_action_app),
     DIM("toggle_dim", R.string.shortcut_action_dim),
     SAVE("save_moment", R.string.shortcut_action_save),
-    LOCK_SAVE("lock_and_save", R.string.shortcut_action_lock_save);
+    LOCK_SAVE("lock_and_save", R.string.shortcut_action_lock_save),
+    HOLD_SPEAK("hold_to_speak", R.string.shortcut_action_hold_speak);
 
     public final String key;
     public final int labelRes;

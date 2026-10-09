@@ -39,12 +39,31 @@ public final class ShortcutKeys {
                 }
             });
         }
+        if (holdToSpeak(appContext, event)) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (event.getRepeatCount() == 0) {
+                    MegaphoneService.start(appContext);
+                }
+                return true;
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                MegaphoneService.stop(appContext);
+                return true;
+            }
+        }
         if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
             if (!bound(appContext, event)) {
                 return false;
             }
         }
         return classifier.onKeyEvent(event);
+    }
+
+    private static boolean holdToSpeak(Context context, KeyEvent event) {
+        String device = event.getDevice() == null || event.getDevice().getName() == null
+                ? "" : event.getDevice().getName();
+        List<Shortcut> items = ShortcutBook.parse(new AppConfig(context).getButtonShortcuts());
+        return ShortcutBook.holdToSpeak(items, event.getKeyCode(), event.getScanCode(), device);
     }
 
     /** True when any press kind is saved for this button. */

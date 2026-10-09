@@ -158,6 +158,14 @@
     <string name="shortcut_action_dim">遮罩屏幕</string>
     <string name="shortcut_action_save">保存这一刻</string>
     <string name="shortcut_action_lock_save">锁定并保存</string>
+    <string name="shortcut_action_hold_speak">按住对外喊话</string>
+    <string name="megaphone_channel">按住喊话</string>
+    <string name="megaphone_speaking">正在对外喊话</string>
+    <string name="megaphone_release">松开按钮即停止</string>
+    <string name="megaphone_need_mic">麦克风权限未开</string>
+    <string name="megaphone_no_speaker">这台设备没有车外喇叭</string>
+    <string name="megaphone_route">无法接到车外喇叭</string>
+    <string name="megaphone_open">麦克风打不开</string>
     <string name="shortcut_press_tap">短按</string>
     <string name="shortcut_press_long">长按</string>
     <string name="shortcut_press_double">双击</string>
