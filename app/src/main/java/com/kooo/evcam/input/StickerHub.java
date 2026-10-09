@@ -90,8 +90,6 @@ public final class StickerHub {
     private static final Set<String> BONDING = new HashSet<>();
     /** Other links dropped so this head unit can bond a new sticker. */
     private static final Set<String> PAUSED = new HashSet<>();
-    /** Bumped on each connect so a callback from an older link is ignored. */
-    private static final Map<String, Integer> GEN = new HashMap<>();
     private static final Map<String, Runnable> BOND_TIMEOUT = new HashMap<>();
     private static String queuedAddress;
     /** Pause delay is still running. Do not bring the other stickers back yet. */
@@ -153,7 +151,7 @@ public final class StickerHub {
                 pairThenConnect(application, mac);
             };
             if (paused) {
-                whenRadioFree(go, 0);
+                MAIN.postDelayed(go, 500);
             } else {
                 go.run();
             }
@@ -319,20 +317,15 @@ public final class StickerHub {
             AppLog.w(TAG, "地址无效: " + address);
             return;
         }
-        if (CLOSING.contains(address)) {
-            whenRadioFree(() -> connect(application, address, auto), 0);
-            return;
-        }
         CLOSING.remove(address);
         PENDING.add(address);
         phase(address, PHASE_CONNECTING);
         state(address, false);
-        int gen = nextGen(address);
-        boolean phy = !TRIES.containsKey(address) || TRIES.get(address) == 0;
-        BluetoothGattCallback callback = callback(address, gen);
+        BluetoothGattCallback callback = callback(address);
         BluetoothGatt gatt;
         try {
-            gatt = openLink(device, application, auto, callback, phy);
+            gatt = device.connectGatt(application, auto, callback, BluetoothDevice.TRANSPORT_LE,
+                    BluetoothDevice.PHY_LE_1M, GATT);
         } catch (SecurityException e) {
             PENDING.remove(address);
             fail(address, FAIL_BLUETOOTH, 0);
@@ -355,23 +348,11 @@ public final class StickerHub {
         AppLog.d(TAG, "连接智能贴 " + address + " auto=" + auto);
     }
 
-    private static BluetoothGattCallback callback(String address, int gen) {
+    private static BluetoothGattCallback callback(String address) {
         return new BluetoothGattCallback() {
             @Override
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                 MAIN.post(() -> {
-                    Integer live = GEN.get(address);
-                    if (live == null || live != gen) {
-                        BluetoothGatt current = OPEN.get(address);
-                        if (current != gatt) {
-                            try {
-                                gatt.close();
-                            } catch (SecurityException ignored) {
-                                // stale callback
-                            }
-                        }
-                        return;
-                    }
                     if (newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
                         if (CLOSING.contains(address)) {
                             drop(address, gatt);
@@ -576,9 +557,10 @@ public final class StickerHub {
         }
         PENDING.remove(address);
         OPEN.remove(address);
-        if (current != null) {
+        BluetoothGatt dying = current != null ? current : gatt;
+        if (dying != null) {
             try {
-                current.close();
+                dying.close();
             } catch (SecurityException ignored) {
                 // already gone
             }
@@ -588,6 +570,7 @@ public final class StickerHub {
 
     private static void close(String address) {
         cancelBond(address);
+        CLOSING.add(address);
         PENDING.remove(address);
         BluetoothGatt gatt = OPEN.remove(address);
         state(address, false);
@@ -595,52 +578,12 @@ public final class StickerHub {
             CLOSING.remove(address);
             return;
         }
-        CLOSING.add(address);
         try {
             gatt.disconnect();
-        } catch (SecurityException e) {
-            release(address, gatt);
-            return;
-        }
-        MAIN.postDelayed(() -> {
-            if (CLOSING.contains(address)) {
-                release(address, gatt);
-            }
-        }, 1500);
-    }
-
-    /** close() waits for the disconnect callback. Calling close() here wedges the next connect. */
-    private static void release(String address, BluetoothGatt gatt) {
-        CLOSING.remove(address);
-        try {
             gatt.close();
         } catch (SecurityException ignored) {
             // permission dropped
         }
-    }
-
-    private static void whenRadioFree(Runnable go, int waited) {
-        if (CLOSING.isEmpty() || waited >= 2000) {
-            CLOSING.clear();
-            go.run();
-            return;
-        }
-        MAIN.postDelayed(() -> whenRadioFree(go, waited + 200), 200);
-    }
-
-    private static int nextGen(String address) {
-        int gen = GEN.containsKey(address) ? GEN.get(address) + 1 : 1;
-        GEN.put(address, gen);
-        return gen;
-    }
-
-    private static BluetoothGatt openLink(BluetoothDevice device, Context application, boolean auto,
-                                          BluetoothGattCallback callback, boolean phy) {
-        if (!phy) {
-            return device.connectGatt(application, auto, callback, BluetoothDevice.TRANSPORT_LE);
-        }
-        return device.connectGatt(application, auto, callback, BluetoothDevice.TRANSPORT_LE,
-                BluetoothDevice.PHY_LE_1M, GATT);
     }
 
     private static void closeAll() {
@@ -798,9 +741,9 @@ public final class StickerHub {
             phase(address, PHASE_CONNECTING);
             MAIN.postDelayed(() -> {
                 if (app != null) {
-                    whenRadioFree(() -> connect(app, address, false), 0);
+                    connect(app, address, false);
                 }
-            }, 400);
+            }, 700);
             return;
         }
         fail(address, reason, status);
