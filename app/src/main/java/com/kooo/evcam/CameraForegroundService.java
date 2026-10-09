@@ -150,6 +150,7 @@ public class CameraForegroundService extends Service {
 
         // 启动前台服务
         startForeground(NOTIFICATION_ID, notification);
+        com.kooo.evcam.input.StickerHub.sync(this);
 
         // 标记就绪，执行所有等待的回调
         isForegroundReady = true;

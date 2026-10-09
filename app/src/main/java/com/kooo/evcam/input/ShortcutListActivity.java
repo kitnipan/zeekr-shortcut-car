@@ -82,6 +82,12 @@ public class ShortcutListActivity extends AppCompatActivity {
     }
 
     private String buttonName(Shortcut item) {
+        if (StickerFrame.isSticker(item.deviceName)) {
+            int label = StickerFrame.controlLabel(item.keyCode);
+            String control = label == 0 ? String.valueOf(item.keyCode) : getString(label);
+            String tail = StickerFrame.tail(item.deviceName);
+            return tail.isEmpty() ? control : control + " " + tail;
+        }
         if (item.keyCode != 0) {
             String name = KeyEvent.keyCodeToString(item.keyCode);
             String prefix = "KEYCODE_";

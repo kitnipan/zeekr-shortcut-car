@@ -31,6 +31,7 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.input.ControllerProbeActivity;
+import com.kooo.evcam.input.StickerActivity;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
 
@@ -1159,6 +1160,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
         onClick("pref_controller", pref ->
                 startActivity(new Intent(getContext(), ControllerProbeActivity.class)));
+        onClick("pref_sticker", pref ->
+                startActivity(new Intent(getContext(), StickerActivity.class)));
         onClick("pref_shortcuts", pref ->
                 startActivity(new Intent(getContext(), com.kooo.evcam.input.ShortcutListActivity.class)));
         bindSwitch("pref_save_moment_usb", appConfig.isSaveMomentUsb(),

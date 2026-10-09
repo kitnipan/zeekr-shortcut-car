@@ -55,6 +55,7 @@ public class ZeekrShortcutApp extends Application {
         StallWatch.start(this);
         trackAppInFront();
         com.kooo.evcam.input.KeyCatcher.sync(this);
+        com.kooo.evcam.input.StickerHub.sync(this);
         com.kooo.evcam.overlay.AutoDim.sync(this);
     }
 

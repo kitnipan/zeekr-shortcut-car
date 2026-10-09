@@ -50,7 +50,13 @@
     <!-- 蓝牙权限（用于监听蓝牙状态变化，车机启动会自动连蓝牙） -->
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- 智能贴扫描。neverForLocation：不从广播里推位置 -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
 
     <!-- 声明使用摄像头功能 -->
     <uses-feature android:name="android.hardware.camera" android:required="true" />
@@ -171,6 +177,13 @@
         <activity
             android:name=".input.ControllerProbeActivity"
             android:label="@string/set_controller_title"
+            android:theme="@style/Theme.Cam"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
+        <activity
+            android:name=".input.StickerActivity"
+            android:label="@string/set_sticker_title"
             android:theme="@style/Theme.Cam"
             android:screenOrientation="landscape"
             android:exported="false" />

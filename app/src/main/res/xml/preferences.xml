@@ -498,6 +498,11 @@
             android:summary="@string/set_controller_summary" />
 
         <Preference
+            android:key="pref_sticker"
+            android:title="@string/set_sticker_title"
+            android:summary="@string/set_sticker_summary" />
+
+        <Preference
             android:key="pref_shortcuts"
             android:title="@string/set_shortcuts_title"
             android:summary="@string/set_shortcuts_summary" />

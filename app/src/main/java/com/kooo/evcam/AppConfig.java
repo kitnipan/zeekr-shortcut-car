@@ -2185,6 +2185,27 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_SHORTCUT_CATCH_EVERYWHERE, on).apply();
     }
 
+    private static final String KEY_STICKER_ENABLED = "sticker_enabled";
+    private static final String KEY_STICKER_DEVICES = "sticker_devices";
+
+    /** Smart sticker shortcut. Off until turned on from the experimental screen. */
+    public boolean isStickerEnabled() {
+        return prefs.getBoolean(KEY_STICKER_ENABLED, false);
+    }
+
+    public void setStickerEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_STICKER_ENABLED, on).apply();
+    }
+
+    /** Saved sticker addresses, one MAC per line. */
+    public String getStickerDevices() {
+        return prefs.getString(KEY_STICKER_DEVICES, "");
+    }
+
+    public void setStickerDevices(String raw) {
+        prefs.edit().putString(KEY_STICKER_DEVICES, raw == null ? "" : raw).apply();
+    }
+
     private static final String KEY_SAVED_CLIPS = "saved_clip_groups";
     private static final String KEY_SAVE_MOMENT_USB = "save_moment_usb";
     private static final String KEY_SAVE_MOMENT_DRIVE = "save_moment_drive";
