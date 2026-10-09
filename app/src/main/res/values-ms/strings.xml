@@ -222,6 +222,8 @@
     <string name="ctrl_waiting">Menunggu butang…</string>
     <string name="ctrl_clear">Kosongkan</string>
     <string name="ctrl_pressed">tekan</string>
+    <string name="ctrl_packet">paket</string>
+    <string name="ctrl_sticker">%1$s  %2$s  %3$s</string>
     <string name="ctrl_released">lepas</string>
     <string name="ctrl_key">%1$s  %2$s  %3$s (%4$d)  scan %5$d  · %6$s</string>
     <string name="ctrl_axis">%1$s  %2$s  · %3$s</string>
@@ -236,6 +238,8 @@
     <string name="sticker_other">Peranti berdekatan yang lain</string>
     <string name="sticker_connect">Sambung</string>
     <string name="sticker_connecting">Menyambung…</string>
+    <string name="sticker_pairing">Memasangkan…</string>
+    <string name="sticker_discovering">Bersambung. Membaca perkhidmatan…</string>
     <string name="sticker_forget">Lupakan</string>
     <string name="sticker_connected">Bersambung</string>
     <string name="sticker_waiting">Tekan pelekat</string>

@@ -30,7 +30,7 @@ import java.util.Set;
  * Shows what a paired controller or button actually sends, so a later shortcut
  * can be bound to a real key code. Nothing is saved.
  */
-public class ControllerProbeActivity extends AppCompatActivity {
+public class ControllerProbeActivity extends AppCompatActivity implements StickerHub.Watch {
 
     private static final int MAX_LINES = 80;
     private static final float AXIS_STEP = 0.08f;
@@ -97,6 +97,8 @@ public class ControllerProbeActivity extends AppCompatActivity {
         if (inputs != null) {
             inputs.registerInputDeviceListener(devices, null);
         }
+        StickerHub.addWatch(this);
+        StickerHub.sync(this);
         refreshDevices();
     }
 
@@ -105,6 +107,8 @@ public class ControllerProbeActivity extends AppCompatActivity {
         if (inputs != null) {
             inputs.unregisterInputDeviceListener(devices);
         }
+        StickerHub.removeWatch(this);
+        StickerHub.sync(this);
         super.onPause();
     }
 
@@ -140,6 +144,42 @@ public class ControllerProbeActivity extends AppCompatActivity {
             refreshDevices();
         }
         return true;
+    }
+
+    @Override
+    public void onPacket(String address, byte[] raw) {
+        StickerFrame frame = StickerFrame.parse(raw);
+        String action;
+        if (frame == null) {
+            action = getString(R.string.ctrl_packet);
+        } else {
+            int label = StickerFrame.controlLabel(frame.control);
+            String control = label == 0 ? String.valueOf(frame.control) : getString(label);
+            action = control + " " + getString(frame.press.labelRes);
+        }
+        push(getString(R.string.ctrl_sticker, clock.format(new Date()), action, StickerFrame.hex(raw)));
+    }
+
+    @Override
+    public void onState(String address, boolean connected) {
+        refreshDevices();
+    }
+
+    @Override
+    public void onReady(String address) {
+        refreshDevices();
+    }
+
+    @Override
+    public void onFail(String address, int reason, int status) {
+    }
+
+    @Override
+    public void onLog(String line) {
+    }
+
+    @Override
+    public void onPhase(String address, int phase) {
     }
 
     @Override

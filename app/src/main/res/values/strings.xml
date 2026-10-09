@@ -335,6 +335,8 @@
     <string name="ctrl_waiting">Waiting for a button…</string>
     <string name="ctrl_clear">Clear</string>
     <string name="ctrl_pressed">down</string>
+    <string name="ctrl_packet">packet</string>
+    <string name="ctrl_sticker">%1$s  %2$s  %3$s</string>
     <string name="ctrl_released">up</string>
     <string name="ctrl_key">%1$s  %2$s  %3$s (%4$d)  scan %5$d  · %6$s</string>
     <string name="ctrl_axis">%1$s  %2$s  · %3$s</string>
@@ -349,6 +351,8 @@
     <string name="sticker_other">Other nearby devices</string>
     <string name="sticker_connect">Connect</string>
     <string name="sticker_connecting">Connecting…</string>
+    <string name="sticker_pairing">Pairing…</string>
+    <string name="sticker_discovering">Connected. Reading services…</string>
     <string name="sticker_forget">Forget</string>
     <string name="sticker_connected">Connected</string>
     <string name="sticker_waiting">Press the sticker</string>

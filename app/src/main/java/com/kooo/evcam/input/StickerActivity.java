@@ -127,7 +127,8 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     @Override
     protected void onResume() {
         super.onResume();
-        StickerHub.setWatch(this);
+        StickerHub.setCapture(true);
+        StickerHub.addWatch(this);
         StickerHub.sync(this);
         render();
     }
@@ -135,7 +136,8 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     @Override
     protected void onPause() {
         stopScan();
-        StickerHub.setWatch(null);
+        StickerHub.setCapture(false);
+        StickerHub.removeWatch(this);
         StickerHub.sync(this);
         super.onPause();
     }
@@ -261,18 +263,25 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         }
         boolean service = advertises(result.getScanRecord());
         Seen row = seen.get(address);
+        boolean fresh = row == null;
         if (row == null) {
             row = new Seen();
             row.address = address;
             row.rank = StickerMatch.RANK_OTHER;
             seen.put(address, row);
         }
+        int previousRank = row.rank;
+        int nextRank = Math.min(previousRank, StickerMatch.rank(name, service));
+        boolean nameChanged = name != null && !name.isEmpty() && !name.equals(row.name);
+        boolean rssiChanged = row.rssi == null || Math.abs(row.rssi - result.getRssi()) >= 8;
         if (name != null && !name.isEmpty()) {
             row.name = name;
         }
+        row.rank = nextRank;
         row.rssi = result.getRssi();
-        row.rank = Math.min(row.rank, StickerMatch.rank(row.name, service));
-        render();
+        if (fresh || nameChanged || rssiChanged || nextRank != previousRank) {
+            render();
+        }
     }
 
     private static boolean advertises(ScanRecord record) {
@@ -366,6 +375,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
             if (saved) {
                 forget(address);
             } else if (ensurePermission()) {
+                stopScan();
                 status.setText(R.string.sticker_connecting);
                 StickerHub.probe(this, address);
             }
@@ -458,6 +468,17 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
             status.setText(R.string.sticker_no_service);
         } else {
             status.setText(getString(R.string.sticker_fail, code));
+        }
+    }
+
+    @Override
+    public void onPhase(String address, int phase) {
+        if (phase == StickerHub.PHASE_PAIRING) {
+            status.setText(R.string.sticker_pairing);
+        } else if (phase == StickerHub.PHASE_CONNECTING) {
+            status.setText(R.string.sticker_connecting);
+        } else if (phase == StickerHub.PHASE_DISCOVERING) {
+            status.setText(R.string.sticker_discovering);
         }
     }
 

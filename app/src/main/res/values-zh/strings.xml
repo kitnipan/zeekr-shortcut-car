@@ -198,6 +198,8 @@
     <string name="ctrl_waiting">等待按键…</string>
     <string name="ctrl_clear">清空</string>
     <string name="ctrl_pressed">按下</string>
+    <string name="ctrl_packet">数据包</string>
+    <string name="ctrl_sticker">%1$s  %2$s  %3$s</string>
     <string name="ctrl_released">松开</string>
     <string name="ctrl_key">%1$s  %2$s  %3$s (%4$d)  scan %5$d  · %6$s</string>
     <string name="ctrl_axis">%1$s  %2$s  · %3$s</string>
@@ -212,6 +214,8 @@
     <string name="sticker_other">附近的其他设备</string>
     <string name="sticker_connect">连接</string>
     <string name="sticker_connecting">正在连接…</string>
+    <string name="sticker_pairing">正在配对…</string>
+    <string name="sticker_discovering">已连接。正在读取服务…</string>
     <string name="sticker_forget">忘记</string>
     <string name="sticker_connected">已连接</string>
     <string name="sticker_waiting">按下贴纸</string>
