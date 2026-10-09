@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta7] - 2026-10-10
+
+### Fixed
+
+- Smart sticker connect no longer stops at "fail 2". The previous link is released before the next one starts.
+
 ## [2.10.14-beta6] - 2026-10-10
 
 ### New and improved
