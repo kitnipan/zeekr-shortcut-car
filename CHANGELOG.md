@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta6] - 2026-10-10
+
+### New and improved
+
+- Controller (experimental) can save the button as a shortcut. On a ZEEKR button, one click is a tap and a double click is a double press. Pick the action on the row that appears.
+- A second smart sticker can pair while the first one is already connected.
+- Hold to speak outside, as a shortcut. Hold the button and the microphone plays through the outside speaker. Release to stop.
+
 ## [2.10.14-beta5] - 2026-10-10
 
 ### Fixed
