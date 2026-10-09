@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta5] - 2026-10-10
+
+### Fixed
+
+- Smart sticker connect no longer stays on Connecting. A press shows on Controller (experimental): the press kind and the raw bytes.
+
 ## [2.10.14-beta4] - 2026-10-10
 
 ### Fixed
