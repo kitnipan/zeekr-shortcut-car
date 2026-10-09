@@ -9,6 +9,12 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.10.14-beta2] - 2026-10-09
+
+### New and improved
+
 - Speaker probe, under Developer options, lists each output and each car-audio zone usage this process can address and plays a short tone on the tapped row. It does not label cabin or outside.
 
 ## [2.10.14-beta1] - 2026-10-09
