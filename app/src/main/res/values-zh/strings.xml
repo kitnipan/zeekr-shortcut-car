@@ -12,7 +12,6 @@
     <string name="zeekr_lane_back">后</string>
     <string name="zeekr_lane_left">左</string>
     <string name="zeekr_lane_right">右</string>
-    <string name="zeekr_mode_grid">四宫格</string>
     <string name="zeekr_composite_not_found">未检测到四联合成流，本机可能不支持极氪合成模式</string>
 
     <!-- 关于页面 -->
@@ -129,8 +128,6 @@
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
     <string name="set_screen_off_keep_summary">熄屏前在录像，熄屏后接着录。不会唤醒车机：车机睡了就停在那一刻，醒来接着录</string>
-    <string name="set_keep_alive_title">保活</string>
-    <string name="set_keep_alive_summary">被杀了、车机重启了，尽量把自己拉回来。关掉就不回来了</string>
     <string name="set_recording_mode_title">录制模式</string>
     <string name="set_force_h264_title">强制 H.264</string>
     <string name="set_force_h264_summary">所有相机一律用 H.264，盖过配置编辑里各路的编码选择</string>
@@ -312,7 +309,6 @@
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
-    <string name="info_none_selected">未选择</string>
     <string name="msg_relay_dev_only">会先写内置存储再搬到 U 盘，因此仅限开发者模式</string>
     <string name="dlg_internal_title">确定使用内置存储？</string>
     <string name="dlg_internal_msg">行车记录会持续不断地写入数据 —— 只要在录，就一直在写。\n\n闪存的写入寿命有限，长期把车机内置存储作为记录仪的写入位置会实打实地消耗它的寿命，而车机存储通常不可更换。\n\n建议改用 U 盘：损坏后可随时更换，也便于直接取下拷贝。</string>
@@ -387,11 +383,9 @@
     <string name="action_got_it_guide">我知道了</string>
 
     <!-- 主界面 / 通知 / 回放 -->
-    <string name="msg_camera_not_ready">相机未准备好，请重试</string>
     <string name="msg_need_camera_storage">需要相机和存储权限</string>
     <string name="msg_camera_access_failed">相机访问失败：%1$s</string>
     <string name="msg_codec_fallback">录制故障，已回退到 MediaCodec 模式；若频繁发生请在设置里更改录制模式</string>
-    <string name="msg_record_start_failed">录制启动失败，请重试</string>
     <string name="msg_storage_full_stopped">U 盘已满，录制已停止。没有设置视频存储上限，所以不会自动删除旧录像</string>
     <string name="msg_storage_full_refuse">U 盘空间不足，无法开始录制。没有设置视频存储上限，不会自动删除旧录像</string>
     <string name="msg_storage_cleaning">空间不够，正在删除最旧的录像，完成后开始录制…</string>
@@ -409,20 +403,13 @@
     <string name="msg_recording_started_all">开始录制全部相机</string>
     <string name="msg_recording_started_n">开始录制 %1$d 路</string>
     <string name="msg_sd_fallback">未检测到 U 盘，已回退到内置存储</string>
-    <string name="msg_recording_resumed">已自动恢复录制</string>
     <string name="msg_recording_interrupted">录像被打断：%1$s</string>
     <string name="msg_recording_interrupted_resuming">录像被打断：%1$s。等环视画面恢复后自动继续</string>
-    <string name="msg_recording_resume_gave_up">自动恢复录像连续 %1$d 次没成功，不再尝试</string>
-    <string name="rec_reason_no_data">开始录像后一直没收到画面</string>
     <string name="rec_reason_unknown">录制器自己停了</string>
     <string name="rec_reason_write_stalled">录像写不进文件</string>
     <string name="rec_reason_camera_lost">相机被别的程序拿走了</string>
-    <string name="msg_recording_auto_started">已自动开始录制</string>
-    <string name="msg_resume_failed">相机未就绪，恢复录制失败</string>
-    <string name="msg_auto_record_failed">相机未就绪，自动录制失败</string>
     <string name="msg_screen_off_stopped">熄屏 10 秒，已自动停止录制</string>
     <string name="msg_screen_off_background">熄屏 15 秒，已退到后台</string>
-    <string name="msg_screen_on_resumed">亮屏 10 秒，已自动恢复录制</string>
     <string name="msg_stats_on">录制状态显示已开启</string>
     <string name="msg_stats_off">录制状态显示已关闭</string>
     <string name="msg_need_overlay_adjust">需要悬浮窗权限才能打开调节窗口</string>
@@ -437,8 +424,6 @@
     <string name="action_record_anyway">仍然录制</string>
     <string name="notif_channel_name">相机服务</string>
     <string name="notif_channel_desc">用于后台拍照和录制</string>
-    <string name="notif_running">相机服务运行中</string>
-    <string name="notif_running_desc">正在处理拍照 / 录制请求</string>
     <string name="msg_starting_recording">正在启动录制，请稍候…</string>
     <string name="msg_recording_service_failed">录制服务启动失败，请重试</string>
     <string name="msg_segment_unplayable">这段录像无法播放，已停止</string>
@@ -454,15 +439,12 @@
     <string name="action_delete_clip">删除这段录像</string>
     <string name="action_pause">暂停</string>
     <string name="action_play">播放</string>
-    <string name="info_clip_count">%1$d 段 · %2$s</string>
     <string name="date_today">今天</string>
     <string name="date_yesterday">昨天</string>
     <string name="date_before_yesterday">前天</string>
     <string name="msg_selected_n">已选择 %1$d 项</string>
     <string name="dlg_delete_photos_title">删除所选照片？</string>
-    <string name="dlg_delete_photos_msg">这 %1$d 组里每一路相机的照片都会删掉，删除后无法恢复。</string>
     <string name="action_delete">删除</string>
-    <string name="msg_photos_deleted">已删除 %1$d 张照片</string>
     <string name="msg_select_photos_first">请先选择要分享的图片</string>
     <string name="msg_no_photos_to_share">没有可分享的图片文件</string>
     <string name="action_share_photos">分享图片</string>
@@ -510,7 +492,6 @@
     <string name="upd_later">稍后</string>
     <string name="upd_guide_start">知道了，开始下载</string>
     <string name="upd_guide_image">安装提醒：下载完成后会跳到车机的安装界面。装好后点左上角「返回」，不要点中间的「打开」</string>
-    <string name="upd_downloading">正在下载…</string>
     <string name="upd_downloading_pct">正在下载… %1$d%%（%2$s / %3$s MB）</string>
     <string name="upd_download_title">下载 %1$s</string>
     <string name="upd_download_failed">下载失败：%1$s</string>
@@ -531,13 +512,10 @@
     <string name="msg_refuse_no_external">未检测到 U 盘，不会开始录制。为避免持续写入损耗车机内置闪存，正常模式下只录到 U 盘。</string>
 
     <!-- 关于页 -->
-    <string name="date_group_count">%1$d 组</string>
 
     <!-- 图片回看 -->
     <string name="photo_mode_multi">多路</string>
     <string name="photo_mode_single">%1$s</string>
-    <string name="photo_share_count">已选择 %1$d 组图片，共 %2$d 个文件</string>
-    <string name="photo_share_total">共 %1$d 个图片文件</string>
     <string name="msg_share_failed">分享失败：%1$s</string>
     <string name="msg_share_path_unsupported">分享失败：文件路径不受支持</string>
 
@@ -679,14 +657,12 @@
 
     <!-- 视频流配置编辑 -->
     <string name="editor_reset">重置</string>
-    <string name="editor_record_codec">录制 · 编码</string>
     <string name="editor_resolution">分辨率</string>
     <string name="editor_reset_msg">把这份配置改回新建时的样子，你在这里改的会丢掉。</string>
     <string name="editor_reset_ok">恢复</string>
     <string name="editor_reset_done">已重置</string>
     <string name="editor_whole_frame">整幅画面</string>
     <string name="editor_lane_group">%1$s · %2$s</string>
-    <string name="editor_pick_lane">点一格来改它</string>
     <string name="editor_stage">拖格子换位置，拖四个角改大小</string>
     <string name="editor_lanes_lost">打不开。请退回去重新进一次视频流配置编辑</string>
     <string name="editor_no_camera">这份配置里还没有相机</string>
@@ -733,7 +709,6 @@
     <string name="editor_knob_codec">编码</string>
     <string name="editor_budget_none">没有开启任何相机，不会录下任何东西</string>
     <string name="editor_budget">在录 %1$s 路，合计 %2$s，每小时约 %3$s GB</string>
-    <string name="editor_budget_with_space">在录 %1$s 路，合计 %2$s，每小时约 %3$s GB，剩余空间还能录约 %4$s 小时</string>
     <string name="editor_crop_off">暂不可用</string>
     <string name="editor_crop_dialog">裁切（各边切掉多少，画面的比例）</string>
     <string name="editor_top">上</string>
@@ -755,32 +730,22 @@
     <string name="editor_landing">录成 %1$s</string>
     <string name="editor_fps_unlimited">原始帧率（不限制）</string>
     <string name="editor_fps_cap">%1$s fps（上限）</string>
-    <string name="editor_bitrate_auto">跟随画质等级（中）</string>
     <string name="editor_very_low">极低</string>
     <string name="editor_low">低</string>
     <string name="editor_medium">中</string>
     <string name="editor_high">高</string>
     <string name="editor_codec_auto">自动（优先 H.265）</string>
-    <string name="editor_issue_no_cameras">这份配置里一路相机都没有</string>
     <string name="editor_issue_none_enabled">一路相机都没启用，什么都不会显示也不会录</string>
     <string name="editor_issue_undeclared_size">%1$s 的%2$s尺寸 %3$dx%4$d 这一路没有声明过</string>
-    <string name="editor_issue_preview_split_only">%1$s：预览拆四格但录制不拆，录出来的是一整幅画面</string>
-    <string name="editor_issue_record_split_only">%1$s：录制拆四格但预览不拆，超级后视镜取不到单独那一路</string>
     <string name="editor_stream_preview">预览</string>
     <string name="editor_stream_record">录制</string>
-    <string name="editor_stream_photo">拍照</string>
     <string name="editor_camera_missing">（找不到对应的相机）</string>
     <string name="editor_camera_summary">相机 %1$s · 最大 %2$s</string>
     <string name="editor_splits">拆四格</string>
 
     <!-- 连续回放 -->
-    <string name="player_session_title">%1$s · %2$d 段 · %3$s</string>
     <string name="player_share_chooser">分享录像</string>
     <string name="player_delete_title">删除这段录像？</string>
-    <string name="player_delete_msg">将删除这段录像的全部 %1$d 个文件，共 %2$s。删除后无法恢复。</string>
-    <string name="player_deleted">已删除 %1$d 个文件</string>
-    <string name="player_info">时间轴 %1$d/%2$d · 起于 %3$s · 共 %4$d 段 · 时长 %5$s</string>
-    <string name="player_clip_count">%1$d 段</string>
 
     <!-- 保存配置前看一眼 -->
 
@@ -797,10 +762,7 @@
 
     <!-- 通知 -->
     <string name="notif_recording_title">正在录制</string>
-    <string name="notif_recording_text">正在录制行车视频</string>
     <string name="notif_recording_tap">录制进行中，点这里回到应用</string>
-    <string name="notif_channel_recording">录制服务</string>
-    <string name="notif_channel_recording_desc">保持录制服务在后台运行</string>
     <string name="notif_background_title">在后台运行</string>
     <string name="notif_tap_to_return">点这里回到应用</string>
 
@@ -811,7 +773,6 @@
     <string name="storage_external_n_named">U 盘 %1$d（%2$s）</string>
 
     <!-- 图片回看 -->
-    <string name="photo_count_badge">%1$d 张</string>
     <string name="cd_expand">展开或收起</string>
     <string name="cd_selected">已选中</string>
 

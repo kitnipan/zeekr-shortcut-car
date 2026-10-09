@@ -21,6 +21,17 @@ public class RecordingStopsTest {
         assertTrue("写不进文件：重开一次录制就是新编码器、新文件",
                 RecordingStops.resumesOnSurround(RecordingStops.Reason.WRITE_STALLED));
         assertTrue(RecordingStops.resumesOnSurround(RecordingStops.Reason.CAMERA_LOST));
+        assertTrue("开录时一路都没起来：用户要录，环视好了再试，走同一份额度",
+                RecordingStops.resumesOnSurround(RecordingStops.Reason.START_FAILED));
+    }
+
+    /** 相机被别的程序拿走不花额度；没人占着却被断开（自己顶自己）要花，否则无限循环（2026-10-08）。 */
+    @Test
+    public void onlyACameraTakenByAnotherAppIsFreeToResume() {
+        assertFalse(RecordingStops.countsTowardBudget(RecordingStops.Reason.CAMERA_LOST, true));
+        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.CAMERA_LOST, false));
+        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.NO_DATA, true));
+        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.START_FAILED, false));
     }
 
     @Test

@@ -102,7 +102,7 @@ public class TimelineSessionAdapter
     /** 每一条有没有锁定的文件（锁定影像），和 sessions 一一对应。 */
     private boolean[] sessionLocked = new boolean[0];
 
-    /** 哪几条含锁定的文件：行尾多写一句「含锁定」。 */
+    /** 哪几条含锁定的文件：行尾多写一句「含已锁定文件」。 */
     public void setLocked(boolean[] locked) {
         sessionLocked = locked != null ? locked : new boolean[0];
         notifyDataSetChanged();
@@ -323,8 +323,8 @@ public class TimelineSessionAdapter
 
             metaText.setText(TimelineFormat.duration(session.totalDurationMs)
                     + " · " + TimelineFormat.size(bytes)
-                    + " · " + itemView.getContext().getString(
-                            R.string.player_clip_count, session.segmentCount())
+                    + " · " + itemView.getContext().getResources().getQuantityString(
+                            R.plurals.player_clip_count, session.segmentCount(), session.segmentCount())
                     + (locked ? " · " + itemView.getContext().getString(R.string.player_session_locked) : ""));
 
             // 正在播的那条留着红条；多选时右边多一个勾

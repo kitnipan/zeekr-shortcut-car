@@ -9,8 +9,6 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
-import com.kooo.evcam.camera.CameraManagerHolder;
-import com.kooo.evcam.camera.MultiCameraManager;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -43,8 +41,7 @@ public final class SaveMoment {
             return;
         }
         Context app = context.getApplicationContext();
-        MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
-        boolean recording = manager != null && manager.isRecording();
+        boolean recording = RecordingCoordinator.get(app).isRecording();
         File videoDir = StorageHelper.getVideoDir(app);
         List<String> stamps = listGroupStamps(videoDir);
         Set<String> toProtect = new LinkedHashSet<>();

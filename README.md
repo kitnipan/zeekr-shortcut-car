@@ -4,6 +4,9 @@ A surround-view dash cam for the ZEEKR 7X head unit.
 
 [中文说明](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Credits](NOTICE.md) · [Platform notes](docs/zeekr-platform-notes.md)
 
+> [!IMPORTANT]
+> **Known issue: App Lab lost after a restart.** Some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. If this happens, or the app stutters or camera images are unavailable, **export a report from Settings → System → Diagnostics before restarting the head unit** and report it via a [GitHub issue](https://github.com/dts88/zeekr-shortcut-car/issues) or other channels. Apologies for the inconvenience.
+
 > [!WARNING]
 > Experimental, unofficial software. Not affiliated with, approved by, or endorsed by ZEEKR,
 > and not certified for any vehicle safety function. It does **not** replace the factory dash cam,
@@ -53,7 +56,7 @@ Photo playback uses the same layout.
 
 ### Send to your phone
 
-While viewing a photo or a video segment, tap **send to phone**: the app shows a QR code, your
+While viewing a photo or a video segment, tap **Send to phone**: the app shows a QR code, your
 phone's browser opens that file, and you save it. Nothing to install on the phone.
 
 The file is served over your local network only while the dialog is open, from a random one-off
@@ -84,6 +87,14 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 
 The repo ships a public AOSP test signing key (password `android`). Override it with your own
 through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEKR_KEY_PASSWORD`.
+
+---
+
+## Recommended
+
+**[CarPiano](https://github.com/jlunnn/CarPiano)** plays sound through the car's exterior speaker at any speed — no longer limited to Park like the factory feature. It's still early in development, but very promising.
+
+Check your local rules before using the exterior speaker on public roads.
 
 ---
 

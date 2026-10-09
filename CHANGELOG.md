@@ -11,6 +11,132 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-alpha] - 2026-10-09
+
+- "Use JPEG output for photos" shows "Requires developer options" while it is locked.
+- The driving info bar is added only below the surround view recording; the cabin recordings no longer carry it.
+
+## [2.10.13-alpha] - 2026-10-09
+
+- "Use JPEG output for photos" is back in Settings > Recording. It stays on and greyed out unless developer options are on.
+
+## [2.10.12-alpha] - 2026-10-09
+
+- Cameras stay open for 30 s after nothing needs them (minimizing, opening diagnostics or playback), so coming back within that time needs no reopen; with the screen off, or without the background service, they still close after 1.5 s. While the main screen is away during those 30 s, the cameras keep streaming into a hidden output.
+- The background service starts with the main screen when Start on boot is on; after exiting and reopening the app it did not.
+- "Use JPEG output for photos" is always on and moves to Developer options; if it was off, it is turned on once on upgrade. With it off, photos taken while the main screen is in the background had no picture.
+
+## [2.10.11-alpha] - 2026-10-09
+
+- The surround camera closes on its own first, and the cabin cameras close only after it has finished; opening stays surround first, cabins after it streams. When the surround finished closing after the cabins (2.10.5-2.10.10), that close took 4-17 s (the floating button lingered on exit) and the next open of the surround never delivered a frame.
+- Opening waits until the previous round of closing is over; the watchdog acts on one camera at a time and stays out of the way while cameras are opening or closing.
+
+## [2.10.10-alpha] - 2026-10-09
+
+- The surround camera closes first as well as opening first. Closed after the cabin cameras (2.10.5-2.10.9) its close took 8-17 s and the next open of it never delivered a frame; closed first it takes 0.1-0.3 s and reopens normally, the same as the surround-only setup.
+- One recovery path: a camera that reports an error or gets disconnected only closes its handle; the watchdog reopens it at the next check (every 30 s while another app holds the camera), three tries then a pause. The per-camera reconnect ladder that raced the watchdog is gone; the watchdog stays out of the way while the ordered open is running.
+- Exit releases the camera pipeline once instead of three times; closing the main screen no longer waits on a 3 s background release.
+- Diagnostics: Send to phone is available to everyone, not only with developer options on.
+
+## [2.10.9-alpha] - 2026-10-09
+
+- Cameras close together again instead of one after another. On the head unit, closing the last open camera by itself took 8-17 s (whichever camera was last), and reopening it right after produced a session that never delivered a frame; closing all cameras at once takes 0.1-0.3 s each, and the next open works. Exit is back to well under a second.
+- The ordered open waits for any camera that is still closing before it starts, so no camera is opened while another one is being torn down.
+
+## [2.10.8-alpha] - 2026-10-08
+
+- Cameras open one at a time only once the previous one is actually delivering frames, not merely configured: with three cameras the surround often configured and then never delivered a frame while the cabin cameras were started on top of it.
+- A session that never delivered a frame is no longer rebuilt first: rebuilding it always timed out and ended in a device error before the reopen that actually helps (4-13 s lost each time); the watchdog now reopens the camera directly.
+
+## [2.10.7-alpha] - 2026-10-08
+
+- Coming back to the main screen touches the camera service less: the preview is registered only once its views exist, so each camera\'s first session already carries the preview instead of being built twice (the surround\'s second build stalled 12 s on 2026-10-08).
+- Leaving the main screen while nothing needs the cameras no longer rebuilds the sessions just to drop the preview; the cameras close 1.5 s later anyway.
+
+## [2.10.6-alpha] - 2026-10-08
+
+- Fixed: with three cameras open, quitting closed only the first camera and then waited 20 s; the ordered close now survives the cleanup that runs during exit, so the process no longer dies holding cameras.
+- Fixed: on a head unit that had restarted, quitting could be undone seconds later by the "rebooted" check and the app restarted itself while exiting; an exit now only yields to a restart that happens after it.
+- Coming back while cameras are still being closed leaves the not-yet-closed ones open instead of closing and reopening them.
+- The black box records the open and close order with each camera\'s time, e.g. 环视 1.1s → 后座舱 0.2s → 前座舱 0.3s.
+
+## [2.10.5-alpha] - 2026-10-08
+
+- A camera that is opening, closing, reconnecting or reconfiguring is left alone: the watchdog and forced reopen no longer put a second open on top of it. That second open made the camera service kick out the app\'s own first handle (seven times on 2026-10-08) and the recording looped stop/resume until the app hung.
+- A recording stopped because a camera was disconnected now spends the auto-resume budget unless another app actually holds the camera, so it stops after three failures instead of looping forever.
+- Starting a recording and laying out the preview no longer ask the camera service on the main thread (the ANR of 2026-10-08 was blocked there); camera parameters are cached when a camera opens.
+- Cameras open one at a time, surround first, then rear cabin, then front cabin, and close in the reverse order; recording starts once the sequence is done.
+- Exit waits up to 20 s for the cameras to close in order, instead of 3 s, so the process does not die holding a camera.
+
+## [2.10.4-alpha] - 2026-10-08
+
+- Settings → System: Start on boot and Keep running in background are now one switch, Start on boot, on by default. It keeps the app running in the background and, after the head unit restarts or the system closes the app, restarts it and restores Super mirror, the floating button and auto-recording. On upgrade it is on if either of the two switches was on.
+
+## [2.10.3-beta] - 2026-10-08
+
+Upgrade from 2.1.0-beta. Same code as 2.10.3-alpha.
+
+- **Reworked how the app records, and how it takes and releases the cameras.** Starting, stopping and recovering now go through one path:
+  - If no camera starts recording, the app says so and retries, instead of showing that it is recording.
+  - Stopping, even right after starting, fully releases the cameras' recording outputs and the video encoder, so the next recording starts cleanly.
+  - Stopping now stops all cameras at once and no longer hangs on a stuck USB drive; the last frames are no longer cut off.
+  - No more short skips at high bitrate and full frame rate: writing to the USB drive has its own thread and a few seconds of buffer. If the drive can't keep up, the app says so.
+  - The floating button always shows the real recording state.
+- Photos are saved to the USB drive only, like videos.
+- Interface text reviewed and reworded in all three languages.
+
+### Known issue: App Lab lost after a restart
+
+Some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. If this happens, or the app stutters or camera images are unavailable, **export a report from Settings → System → Diagnostics before restarting the head unit** and report it via a GitHub issue or other channels. Apologies for the inconvenience.
+
+**已知问题：重启车机后 App Lab 丢失。** 部分用户反馈，重启车机后 App Lab 消失，需重新安装。该问题疑似与本应用有关，原因仍在排查。如遇此问题，或出现应用异常卡顿、摄像头画面无法获取，请**在重启车机前**于「设置 → 系统 → 诊断信息」导出诊断报告，并通过 GitHub 等渠道反馈。给您带来不便，深表歉意。
+
+## [2.10.3-alpha] - 2026-10-08
+
+- Fixed short skips in recordings at high bitrate and full frame rate: writing to the USB drive now happens on its own thread with a few seconds of memory buffer, so a slow moment on the drive no longer drops frames. If the drive keeps falling behind, the app says so once instead of silently dropping frames.
+- Stopping a recording now stops all cameras at once and finishes within a fixed time even on a stuck drive; what is still in memory is copied to another drive if possible.
+- The last frames of a recording are no longer cut off at stop.
+- Moving a recording to another drive when the current one fails now works (it never did before).
+- Flash-to-pass auto lock waits a little longer for its second pass, so a camera whose file is created late is still locked.
+
+## [2.10.2-alpha] - 2026-10-08
+
+- Fixed: the floating button could show not recording while a recording was running, after the main screen was rebuilt (for example on a day/night switch).
+- The floating button's recording time no longer goes wrong when the head unit adjusts its clock.
+
+## [2.10.1-alpha] - 2026-10-07
+
+- Developer options: new switch to log apps that may be using a camera. When another app takes or releases a camera, the diagnostics note which apps started or stopped a foreground service or switched to or from the foreground around that moment (a hint, not proof). Needs usage access, which can be granted from the permissions page in developer options.
+
+## [2.10.0-alpha] - 2026-10-06
+
+Version jump: the whole interface text was reviewed and reworded in the 2.1.x alphas; this build finishes it and reworks the recording start/stop.
+
+- Super mirror, floating button, System info and vehicle-signal texts reworded in all three languages; System info is now called System info in English and Malay too.
+- The System info status line is translated and no longer shows raw error text.
+- "Camera in use" on the Super mirror no longer tells you to restart the head unit.
+- When no camera starts recording, the notification and floating button no longer stay on recording: the app shows "Recording didn't start. Retrying…" and retries when the surround view is back, up to three times.
+- A recording that starts while the screen is off now holds the wake lock from the start when Screen-off recording (keep awake) is on.
+- Stopping right after starting no longer leaves a dead recording output on the cameras or stops the next recording; a stop during a MediaRecorder rebuild is no longer undone.
+
+## [2.1.4-alpha] - 2026-10-06
+
+- Photos are saved to the USB drive only, like videos; with no drive the shutter says so instead of saving to internal storage (developer options excepted).
+- Turning on the driving info bar no longer asks for location permission; latitude and longitude show when the head unit already allows it.
+- English: correct singular and plural forms, full stops on multi-sentence texts, and failure messages no longer show raw error text or "null".
+
+## [2.1.3-alpha] - 2026-10-06
+
+- Interface text reworded across the app in all three languages, following one terminology and style guide (docs/ui-text-style.md).
+- Turning developer options off now really switches their features off; turning them back on restores the previous settings.
+- Removed the extra cleanup rule that deleted 20% of files on internal storage below 3 GB; storage caps are the only cleanup rules.
+- "Deleting oldest recordings" now only shows when recordings are actually being deleted.
+- Settings: Image adjustment opens its window again; Video folder shows when no USB drive is found; the stream profile editor remembers the chosen quality and marks cameras tuned by hand; the photo size row shows the size actually saved.
+- Recording stats and the debug overlay follow the setting without reopening the app; the overlay shows the pipeline in use.
+- The info bar shows "—" for missing data, as the System info page does.
+- Developer tools (permissions, repair, archive) are translated.
+- Ending a recording now actually frees the video encoder's graphics resources, and no longer races the last frame being drawn.
+
 ## [2.1.2-beta1] - 2026-10-05
 
 This build is the fork on top of upstream 2.1.2-alpha. Dim, remote watch, both side mirrors, shortcuts, lock and save, and instant captures stay.

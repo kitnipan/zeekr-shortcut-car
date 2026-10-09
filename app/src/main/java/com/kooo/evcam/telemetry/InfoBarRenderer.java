@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.graphics.Typeface;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.R;
 import com.kooo.evcam.settings.LicensePlate;
 
 import java.util.List;
@@ -30,15 +31,15 @@ import java.util.Locale;
  *   <li>转向灯、双闪一格（项目所有者 2026-10-04）：左箭头 | 双层嵌套三角（同实车双闪键）| 右箭头。
  *       灭 = 灰色空心描边（和自动驻车、哨兵的「灭」同一个画法）；亮 = 近白实心 + 绿色光晕（像实车的转向指示，
  *       和日行灯、远近光的「亮」同一个路数）—— 亮灭靠明度分，去掉颜色也分得开；双闪 = 两只箭头都亮、三角填红。</li>
- *   <li>前视、后视一样宽（106），是同一台 7X 的车头和车尾：车身轮廓、风挡、轮子同一条路径（项目所有者 2026-10-04）。
- *       前视：深色星门灯带正中一个徽标（不亮），灯带下沿左右两条平直的日行灯条（徽标下面那一段不亮），
+ *   <li>前灯组、后灯组一样宽（106），是同一台 7X 的车头和车尾：车身轮廓、风挡、轮子同一条路径（项目所有者 2026-10-04）。
+ *       前灯组：深色星门灯带正中一个徽标（不亮），灯带下沿左右两条平直的日行灯条（徽标下面那一段不亮），
  *       两条灯条外端下面各一块扁的大灯模块。灯的档次靠明度和光晕分，不靠颜色：灭 = 实心灰；日行灯 = 灯条近白 + 光晕；
  *       近光 = 模块近白 + 光晕；远光（含闪远光）= 再加一圈把整块灯包住的圆形光晕。近光 + 远光那一格先留着
  *       （项目所有者还要看它好不好认）。</li>
- *   <li>灯组靠「哪一块亮、怎么亮」分状态，不靠颜色深浅：前视近远光看模块亮不亮、有没有包住整块的圆光，
+ *   <li>灯组靠「哪一块亮、怎么亮」分状态，不靠颜色深浅：前灯组近远光看模块亮不亮、有没有包住整块的圆光，
  *       近光 + 远光那一格看光线方向，刹车看高位刹车灯那一块，后雾灯 / 倒车灯各占保险杠上的位置。</li>
  *   <li>车牌数字（彩蛋，项目所有者 2026-10-04）：设置 → 录制里填了车牌（{@link AppConfig#getLicensePlate} 不是空串），
- *       信息条前视正中那块车牌上用白字写车牌里的数字，只留数字、多于四位留最后四位（{@link LicensePlate#infoBarDigits}）；
+ *       信息条前灯组正中那块车牌上用白字写车牌里的数字，只留数字、多于四位留最后四位（{@link LicensePlate#infoBarDigits}）；
  *       没填或者没有数字，车牌照旧空着。车牌那块的位置、大小和格子里别的东西都不变。它不是读数，是上面那几条规矩的例外：
  *       字只有约 10 px 高、笔画 1–2 px，用的是中粗（500）不是粗体（为了 6 px 一格里空心更开、0 和 8 分得开）——
  *       原尺寸、压缩后认得出，缩到一半看（2560 的录像在 1280 宽上看）认不出，车牌号以左上角那行字为准。车辆状态面板不写。</li>
@@ -68,7 +69,7 @@ public final class InfoBarRenderer {
     private static final int TEXT_DIM = 0xFFA3A6AB;
     /** 方向盘左偏的数字。 */
     private static final int LEFT_YELLOW = 0xFFFFD54F;
-    /** 车身轮廓（前视、后视、车厢）。 */
+    /** 车身轮廓（前灯组、后灯组、座舱）。 */
     private static final int OUTLINE = 0xFFA3A6AB;
     /** 灯的核心色（偏白）。 */
     private static final int LAMP_CORE = 0xFFFFF3EA;
@@ -91,7 +92,7 @@ public final class InfoBarRenderer {
      */
     private static final float STEER_DIGIT_ROOM = 56f;
 
-    /** 前视灯光状态只有一个值：远光（含闪远光）优先，其次近光，否则关。 */
+    /** 前灯组灯光状态只有一个值：远光（含闪远光）优先，其次近光，否则关。 */
     private static final int BEAM_OFF = 0, BEAM_LOW = 1, BEAM_HIGH = 2;
 
     /**
@@ -103,7 +104,7 @@ public final class InfoBarRenderer {
     private static final int HIGH_BEAM_BLOOM_PASSES = 3;
 
     /**
-     * 前视车牌那块（不变，{@link #drawFrontView} 里照旧那样画）：x cx-13..cx+13、y 70..80。车牌数字只画在它里面（裁在这块里）。
+     * 前灯组车牌那块（不变，{@link #drawFrontView} 里照旧那样画）：x cx-13..cx+13、y 70..80。车牌数字只画在它里面（裁在这块里）。
      */
     private static final float PLATE_HALF = 13f, PLATE_TOP = 70f, PLATE_BOTTOM = 80f;
     /**
@@ -143,6 +144,12 @@ public final class InfoBarRenderer {
     private List<InfoBarLayout.Placed> cells;
     /** 文字格要用字串；车辆状态面板没有文字格，是 null。 */
     private final Context context;
+    /**
+     * 没数据的读数写的字：vi_v_none「—」，和系统信息页（{@link SignalText}）同一个字，建的时候按界面语言取一次。
+     * 量过（Roboto Bold 和等宽字，样稿 JPEG q22、缩一半看）：30 px 的「—」墨迹 22×4 px，和以前画的「--」一样宽、一样粗，
+     * 压缩后照样认得出；车机字体里没有这个字时 Android 退到后备字体去画，不会是方框。
+     */
+    private final String none;
     /** 摆的时候用的勾选版本（{@link InfoBar#selectionVersion}）：变了就重新摆，正在录的下一帧就换。 */
     private int fittedSelection;
     private final Bitmap bitmap;
@@ -155,7 +162,7 @@ public final class InfoBarRenderer {
     /** 车牌数字单用一支笔：字重（{@link #PLATE_WEIGHT}）和按车牌量过的 textScaleX 都是它专用的，{@link #text} 的 textScaleX 得一直是 1。 */
     private final Paint plate = new Paint(Paint.ANTI_ALIAS_FLAG);
     /**
-     * 前视车牌上写的数字（{@link LicensePlate#infoBarDigits}）；空串 = 不写，车牌照旧空着。
+     * 前灯组车牌上写的数字（{@link LicensePlate#infoBarDigits}）；空串 = 不写，车牌照旧空着。
      * 信息条建的时候读一次设置（{@link #readPlate}），和录像左上角那行字里的车牌同时定下、整段录像不变；车辆状态面板一直是空串。
      */
     private String plateDigits = "";
@@ -170,7 +177,7 @@ public final class InfoBarRenderer {
 
     /**
      * 录像下面那一条：宽 = 视频宽，高 {@link #HEIGHT}；放哪几格看系统信息里勾的（{@link InfoBar#selection}）。
-     * 前视车牌上的数字这时读一次设置（和录像左上角那行字里的车牌同一个来源、同一个时候），整段录像不变。
+     * 前灯组车牌上的数字这时读一次设置（和录像左上角那行字里的车牌同一个来源、同一个时候），整段录像不变。
      */
     public InfoBarRenderer(Context context, int width) {
         // 文字格的字按应用语言取（Application 的 Context 在 Android 13 以下是系统语言）
@@ -181,14 +188,16 @@ public final class InfoBarRenderer {
         readPlate();
     }
 
-    /** 别的摆法（车辆状态面板）：按 scale 画到实际像素上，图标不糊。车牌上不写数字。 */
-    public InfoBarRenderer(InfoBarLayout.Arrangement arrangement, float scale) {
-        this(null, arrangement.cells, arrangement.width, arrangement.height, scale, false);
+    /** 别的摆法（车辆状态面板）：按 scale 画到实际像素上，图标不糊。车牌上不写数字；context 只用来取没数据的字（{@link #none}）。 */
+    public InfoBarRenderer(Context context, InfoBarLayout.Arrangement arrangement, float scale) {
+        this(context, arrangement.cells, arrangement.width, arrangement.height, scale, false);
     }
 
     private InfoBarRenderer(Context context, List<InfoBarLayout.Placed> cells, int logicalWidth,
                             int logicalHeight, float scale, boolean strip) {
-        this.context = context;
+        // 车辆状态面板只取没数据的字，不留 Context（它没有文字格，也不读车牌）
+        this.context = strip ? context : null;
+        this.none = context.getString(R.string.vi_v_none);
         this.cells = cells;
         this.logicalWidth = logicalWidth;
         this.scale = scale;
@@ -212,7 +221,7 @@ public final class InfoBarRenderer {
     }
 
     /**
-     * 读设置里的车牌，换成前视车牌上要写的数字，并按 {@link #PLATE_ROOM} 量好宽（数字录制当中不变，量一次就够）。
+     * 读设置里的车牌，换成前灯组车牌上要写的数字，并按 {@link #PLATE_ROOM} 量好宽（数字录制当中不变，量一次就够）。
      * 只有信息条读（{@code context} 不是 null）；只在建的时候调一次，不是每帧。
      */
     private void readPlate() {
@@ -557,7 +566,7 @@ public final class InfoBarRenderer {
         canvas.drawLine(cx, cy + r, cx, cy + inner, stroke);
         canvas.restore();
         if (degrees == null) {
-            centeredText("--", cx, cy + 11, 32f, TEXT_DIM, text);
+            centeredText(none, cx, cy + 11, 32f, TEXT_DIM, text);
             slash(cx - 34, cy + 34, cx + 34, cy - 34);
             return;
         }
@@ -653,7 +662,7 @@ public final class InfoBarRenderer {
 
     private void drawDepthBar(int cellWidth, float top, Float value, int color) {
         float bottom = top + 24f;
-        String number = value == null ? "--" : String.format(Locale.US, "%d", Math.round(value * 100f));
+        String number = value == null ? none : String.format(Locale.US, "%d", Math.round(value * 100f));
         text.setTextSize(30f);
         text.setColor(value == null ? TEXT_DIM : TEXT);
         text.setTextAlign(Paint.Align.RIGHT);
@@ -683,7 +692,7 @@ public final class InfoBarRenderer {
      */
     private void drawSpeed(float cx, float cy, Float kmh) {
         float cellWidth = cx * 2f;
-        String number = kmh == null ? "--" : String.format(Locale.US, "%d", Math.round(kmh));
+        String number = kmh == null ? none : String.format(Locale.US, "%d", Math.round(kmh));
         text.setTextSize(64f);
         float room = cellWidth - 60f;
         float tw = text.measureText(number);
@@ -855,7 +864,7 @@ public final class InfoBarRenderer {
     }
 
     /**
-     * 前视（106 宽，和后灯组一样）：7X 车头，和后视同一套画法 —— 车身轮廓、风挡、轮子是后视那一条路径，
+     * 前灯组（106 宽，和后灯组一样）：7X 车头，和后灯组同一套画法 —— 车身轮廓、风挡、轮子是后灯组那一条路径，
      * 都相对 cx 画，前后看着是同一台车。车头一道深色星门灯带，正中徽标（不亮）；灯带下沿左右两条平直的日行灯条，
      * 徽标下面那一段不亮；两条灯条外端下面各一块扁的大灯模块（16 × 6），车牌在两块中间。
      * 灯的档次靠明度和光晕分，不靠颜色：灭 = 实心灰；日行灯 = 两条灯条近白 + 光晕；近光 = 模块近白 + 光晕；
@@ -872,7 +881,7 @@ public final class InfoBarRenderer {
         boolean stripsOn = Boolean.TRUE.equals(drl);
         int beam = Boolean.TRUE.equals(high) ? BEAM_HIGH : (Boolean.TRUE.equals(low) ? BEAM_LOW : BEAM_OFF);
         int lampOff = unknown ? UNKNOWN_FILL : OFF;
-        // 车身轮廓、风挡、轮子：后视那一条路径
+        // 车身轮廓、风挡、轮子：后灯组那一条路径
         path.reset();
         path.moveTo(cx - 45, 86);
         path.lineTo(cx - 43, 50);
@@ -1146,7 +1155,7 @@ public final class InfoBarRenderer {
     }
 
     private void drawOdometer(float cx, float cy, Float km) {
-        String label = km == null ? "-- km" : String.format(Locale.US, "%d km", Math.round(km));
+        String label = km == null ? none + " km" : String.format(Locale.US, "%d km", Math.round(km));
         mono.setTextSize(28f);
         mono.setColor(km == null ? TEXT_DIM : TEXT);
         mono.setTextAlign(Paint.Align.LEFT);
@@ -1159,7 +1168,7 @@ public final class InfoBarRenderer {
     /**
      * 文字格：没有图标的信号（项目所有者 2026-10-03：先用文字，要的话之后再画）。
      * 上面一行名称（小、灰），下面一行值（大、白），写法和系统信息页一样（{@link SignalText}）；
-     * 没数据是「--」加斜杠，和别的格一个规矩。放不下的截掉，末尾一个省略号。
+     * 没数据是「—」（{@link SignalText} 给的就是 {@link #none} 那个字）加斜杠，和别的格一个规矩。放不下的截掉，末尾一个省略号。
      */
     private void drawText(Signal signal, int cellWidth, Readings readings) {
         if (context == null) {
@@ -1173,8 +1182,7 @@ public final class InfoBarRenderer {
         canvas.drawText(fit(context.getString(signal.labelRes), room, text), 4, 36, text);
         text.setTextSize(30f);
         text.setColor(value == null ? TEXT_DIM : TEXT);
-        canvas.drawText(fit(value == null ? "--" : SignalText.text(context, signal, value), room, text),
-                4, 76, text);
+        canvas.drawText(fit(SignalText.text(context, signal, value), room, text), 4, 76, text);
         if (value == null) {
             float cx = cellWidth / 2f;
             float cy = HEIGHT / 2f;
@@ -1200,8 +1208,8 @@ public final class InfoBarRenderer {
         mono.setTextSize(26f);
         mono.setColor(known ? TEXT : TEXT_DIM);
         mono.setTextAlign(Paint.Align.LEFT);
-        canvas.drawText(known ? String.format(Locale.US, "%.6f", lat) : "--", 4, 44, mono);
-        canvas.drawText(known ? String.format(Locale.US, "%.6f", lon) : "--", 4, 78, mono);
+        canvas.drawText(known ? String.format(Locale.US, "%.6f", lat) : none, 4, 44, mono);
+        canvas.drawText(known ? String.format(Locale.US, "%.6f", lon) : none, 4, 78, mono);
         if (!known) {
             slash(cx - 28, cy + 28, cx + 28, cy - 28);
         }

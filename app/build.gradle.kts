@@ -56,8 +56,8 @@ android {
         // 每次发布 tag 前同步更新这两个值：versionCode 决定能否覆盖安装，
         // versionName 会成为 Release 名称与 APK 文件名
         //
-        // 这一版是 fork：上游 2.1.2-alpha（261）为底，加上 dim、远程、侧视、快捷键和保存瞬间。
-        // versionCode 必须高于已经发出的 2.1.0-beta5（276）才会盖住车上的安装。
+        // 这一版是 fork：上游 2.10.14-alpha（279）为底，加上 dim、远程、侧视、快捷键和保存瞬间。
+        // 已经发出的是 2.1.2-beta1（277）。下一次 tag 的 versionCode 必须高于上游 279。
         versionCode = 277
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
         versionName = "2.1.2-beta1"

@@ -68,12 +68,86 @@ public class MultiCameraManager {
     private volatile int expectedSessionCount = 0;
     private Runnable pendingRecordingStart = null;
     private android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+
+    // ---- 环视单独开、单独关：它开、关的时候座舱不动（项目所有者 2026-10-09：「依照单个环视的思路」）----
+    // 开：环视先开，出了画面再开后座舱、前座舱（一路出了画面再开下一路）；开之前等上一轮关完。
+    // 关：环视先关，关完了再把两路座舱一起关。
+    // 为什么（2026-10-09 黑匣子，16 次关相机对下一次打开）：环视比座舱先关完的 4 次，下一次打开都正常；
+    // 环视最后关完的 11 次里 9 次那一次关要 4–17 秒，下一次打开它一帧不出（隔 3 分钟再开也一样），
+    // 其中一次紧接着再开就报错 4，一直坏到 12 小时后重启车机。一起关的时候（2.10.9 / 2.10.10）谁先关完
+    // 看运气，所以有时快有时慢 —— 车主看到的「退出时悬浮按钮很久才消失，下一次打开就没画面」就是这个。
+    // 只开环视时它开、关的时候也没有别的相机在动，所以从来不出这种事。
+    /** 一路开到「出画面 / 报错」最多等多久；再久就先开下一路，别让一路坏的挡住全部，它自己由看门狗救。 */
+    private static final long OPEN_STEP_MAX_MS = 15_000L;
+    /** 配好会话之后多久看一眼出没出画面。 */
+    private static final long FIRST_FRAME_POLL_MS = 250L;
+    /** 会话配好以后，这么长时间里有帧就算出画面了。 */
+    private static final long FIRST_FRAME_FRESH_MS = 1_000L;
+    /** 开第一路之前等别的相机关完：多久看一次、最多等多久（相机服务一次关卡住时不能永远不开）。 */
+    private static final long OPEN_WAIT_POLL_MS = 100L;
+    private static final long OPEN_WAIT_FOR_CLOSES_MS = SingleCamera.IN_FLIGHT_MAX_MS;
+    /** 环视单独关最多等多久；到点（相机服务卡住）不再等它，接着关座舱，别让退出等满。 */
+    private static final long SURROUND_CLOSE_MAX_MS = 10_000L;
+    /** 座舱一起关最多等多久都关完；到点记一行哪几路还没关，不再等它们。 */
+    private static final long CLOSE_ALL_MAX_MS = 30_000L;
+    private final java.util.ArrayDeque<Step> openQueue = new java.util.ArrayDeque<>();
+    /** 正在等它出画面的那一路；null = 没有一路在开（可能还在等别的相机关完，看 openWaitStartedAt）。 */
+    private Step openingStep;
+    /** 开第一路之前从什么时候起在等别的相机关完（uptime）；0 = 没在等。 */
+    private long openWaitStartedAt;
+    /** 正在单独关、还没关完的环视；null = 环视不在关。 */
+    private Step surroundClosing;
+    /** 等环视关完再关的那几路（座舱）。 */
+    private final List<Step> closeAfterSurround = new ArrayList<>();
+    /** 一起发出去关、还没关完的那几路（座舱）。 */
+    private final List<Step> closingSteps = new ArrayList<>();
+    /** 这一轮关的原因（第一次叫关时给的），座舱那一步沿用。 */
+    private String closeWhy;
+    private final Runnable openStepTimeout = this::openStepTimedOut;
+    private final Runnable openWhenClosed = this::openNext;
+    private final Runnable surroundCloseTimeout = this::surroundCloseTimedOut;
+    private final Runnable closeAllTimeout = this::closeAllTimedOut;
+    /**
+     * 开关相机自己的 Handler（同一个主线程 Looper）。不用 mainHandler：release() 开头会
+     * removeCallbacksAndMessages(null)，而退出时 release() 会被调三次 —— 2.10.5 时第二次把
+     * 「上一路关完、关下一路」的续命清掉了，后两路没关进程就退了（2026-10-08 23:18，退出等满 20 秒）。
+     */
+    private final android.os.Handler rollCall = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final List<String> openTrail = new ArrayList<>();
+    /** 这一轮环视关了多久（「环视 0.1s」）；null = 这一轮没有关环视。 */
+    private String surroundTrail;
+    private final List<String> closeTrail = new ArrayList<>();
+    /** 有没有哪份管理器的相机还在关（这一轮还没全部关完）。开相机、退出都等它（openNext、MainActivity.finishExit）。 */
+    private static volatile boolean closingAll;
     private Runnable sessionTimeoutRunnable = null;
     private final Object sessionLock = new Object();  // 用于同步 session 配置计数
     
     // 按摄像头维度跟踪配置状态（解决超时强制启动问题）
     private final Map<String, Boolean> cameraSessionReady = new LinkedHashMap<>();
-    private RecordingStatusCallback recordingStatusCallback;
+    private PipelineCallback pipelineCallback;
+
+    /**
+     * 录像的代数：每次开录、每次停录都 +1（和会话重建的代数号一个意思）。
+     *
+     * <p>开录之后排着的任务 —— 会话都建好后延迟 300ms 的那一下、等画面稳定的重试、3 秒超时、
+     * MediaRecorder 重建前等的 500ms —— 都带着开录时的那一代，跑的时候对不上就作废，什么都不报。
+     * 以前停录只清 {@link #pendingRecordingStart}，已经 post 出去的这几个照样跑：开 → 停 → 开两秒内，
+     * 上一次剩下的开录任务会打到这一次的编码器上，再走「一路都没起来」把这一次弄死；
+     * 重建那 500ms 里人按了停，停也会被它撤销。</p>
+     */
+    private volatile int recordGeneration;
+    /** {@link #pendingRecordingStart} 是哪一代的（会话全配不上时报失败要带上它）。 */
+    private int pendingStartGeneration;
+    /**
+     * 停录的收拾一次只做一份（停一路编码器最长要几秒，不能在主线程上做）。空闲几秒线程就退，
+     * 管线释放后再停也照样能用。
+     */
+    private final java.util.concurrent.ThreadPoolExecutor teardown = new java.util.concurrent.ThreadPoolExecutor(
+            0, 1, 5, java.util.concurrent.TimeUnit.SECONDS, new java.util.concurrent.LinkedBlockingQueue<>(),
+            runnable -> new Thread(runnable, "StopRecording"));
+    /** 还在跑或排着的收拾有几份。 */
+    private final java.util.concurrent.atomic.AtomicInteger teardownsRunning =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     /**
      * 状态回调里的取值。这是模块之间的约定，不上界面，所以用固定的英文标记 ——
@@ -84,7 +158,6 @@ public class MultiCameraManager {
     public static final String STATUS_CLOSED = "closed";
     /** 后面跟错误码，例如 {@code error:-4}。 */
     public static final String STATUS_ERROR_PREFIX = "error:";
-    public static final String STATUS_RECORDING_FAILED = "recording_failed";
 
     public interface StatusCallback {
         void onCameraStatusUpdate(String cameraId, String status);
@@ -123,15 +196,26 @@ public class MultiCameraManager {
     }
     
     /**
-     * 录制状态回调（用于通知部分摄像头录制失败）
+     * 开录、停录走到哪一步了，报给 RecordingCoordinator。「在不在录」只有它说了算（RecordingLifecycle），
+     * 这里只报事实；过时的任务（代数对不上）不报。可能在任何线程上调。
      */
-    public interface RecordingStatusCallback {
+    public interface PipelineCallback {
         /**
-         * 当部分摄像头启动录制成功，部分失败时调用
-         * @param activeCameras 成功启动录制的摄像头 key 集合
-         * @param failedCameras 启动录制失败的摄像头 key 集合
+         * 至少一路录制器启动了（含 MediaRecorder 重建后又启动）。
+         *
+         * @param active 启动了的几路
+         * @param failed 没起来的几路
          */
-        void onPartialRecordingStart(Set<String> activeCameras, Set<String> failedCameras);
+        void onPipelineStarted(Set<String> active, Set<String> failed);
+
+        /**
+         * 开录走到底一路都没起来：会话全配不上、录制器全启动失败、MediaRecorder 重建没起来。
+         * 这里不收拾 —— 协调器走停录那条路，由 {@link #stopRecording()} 按同一套收拾。
+         */
+        void onPipelineStartFailed(String why);
+
+        /** 停录收拾完了：编码器放了，录像输出摘了，会话重建了。 */
+        void onPipelineStopped();
     }
 
     /**
@@ -163,18 +247,56 @@ public class MultiCameraManager {
         mainHandler.postDelayed(livenessTick, LIVENESS_TICK_MS);
         // 登记表一变就来看：有人要就开，没人要就关（相机开关的唯一裁判）
         CameraNeeds.current().setListener(this::reconcileCameras);
+        // 熄屏时没人要相机就不等 30 秒（ScreenState 在主线程上叫）
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            com.kooo.evcam.screen.ScreenState.addListener(screenListener);
+        } else {
+            mainHandler.post(() -> com.kooo.evcam.screen.ScreenState.addListener(screenListener));
+        }
     }
+
+    /** 熄屏：没人要相机的话，原来排着的 30 秒改成 1.5 秒 —— 车机熄屏约 6 秒就深睡，相机不能开着睡过去。 */
+    private final com.kooo.evcam.screen.ScreenState.Listener screenListener =
+            new com.kooo.evcam.screen.ScreenState.Listener() {
+                @Override
+                public void onScreenOff() {
+                    reconcileCameras();
+                }
+
+                @Override
+                public void onScreenOn() {
+                    // 亮屏不自己开相机：主界面在前面时它自己登记「预览」
+                }
+            };
 
     // ------------------------------------------------------------------ 相机开关的裁判
 
-    /** 没人要相机了多久才关：主界面重建、切去回看那一下会先注销再登记，别跟着关了又开。 */
-    private static final long CLOSE_WHEN_UNNEEDED_MS = 1_500L;
+    /**
+     * 没人要相机了多久才关（项目所有者 2026-10-09 定 30 秒，原来 1.5 秒）：最小化、进诊断信息 / 回看，
+     * 报告里 79% 在 30 秒内回来 —— 这段时间里相机不关，回来不用重开，通道不动。
+     */
+    private static final long CLOSE_WHEN_UNNEEDED_MS = 30_000L;
+    /**
+     * 熄屏、或者前台服务不在时，没人要了还是 1.5 秒就关：车机熄屏约 6 秒就深睡，相机不能开着睡过去；
+     * 后台拿着相机安卓要求有前台服务，没有它我们一退到后台相机就会被系统停掉。
+     */
+    private static final long CLOSE_WHEN_UNNEEDED_NOW_MS = 1_500L;
+
+    /** 这一次没人要了，等多久关：亮屏、前台服务在 → 30 秒；否则 1.5 秒。 */
+    private static long closeDelayMs() {
+        boolean canHoldInBackground = !com.kooo.evcam.screen.ScreenState.dark()
+                && com.kooo.evcam.CameraForegroundService.isRunning();
+        return canHoldInBackground ? CLOSE_WHEN_UNNEEDED_MS : CLOSE_WHEN_UNNEEDED_NOW_MS;
+    }
 
     private final Runnable closeWhenUnneeded = () -> {
         if (isRecording || CameraNeeds.current().heldByAnyone()) {
             return;
         }
         com.kooo.evcam.blackbox.BlackBox.noteImportant("没人要相机了，让相机去关");
+        for (SingleCamera camera : cameras.values()) {
+            camera.setKeepStreaming(false);
+        }
         closeAllCameras("nobody-needs");
     };
 
@@ -182,8 +304,10 @@ public class MultiCameraManager {
      * 相机开不开、关不关，只看登记表（{@link CameraNeeds}）：谁要用就登记，没人登记才关（1.65.0）。
      *
      * <p>主界面预览、录像、拍照要的是全部启用的路，登记了就开；后视镜只要自己那一路，它自己开（{@code bindCamera}）。
-     * 开着的每一路再按登记表调整自己的输出（{@link SingleCamera#followNeeds}：等拍照而没有别的输出时挂上出帧口）。
-     * 没人要了等 {@link #CLOSE_WHEN_UNNEEDED_MS} 再关 —— 熄屏后 1.5 秒也正好是深睡之前。
+     * 没人要了等 {@link #CLOSE_WHEN_UNNEEDED_MS}（30 秒）再关；熄屏、或者前台服务不在时 1.5 秒就关（{@link #closeDelayMs}）。
+     * 等的这 30 秒里相机照常出帧：主界面看不见，画面没地方显示，就送进不显示的出帧口
+     * （{@link SingleCamera#setKeepStreaming}）—— 停了流再起，和关了再开一样要动通道。
+     * 开着的每一路再按这些调整自己的输出（{@link SingleCamera#followNeeds}）。
      * 以前这个判断散在主界面退后台、熄屏 1.5 秒、熄屏 15 秒、后视镜四处，各问一遍登记表。</p>
      */
     public void reconcileCameras() {
@@ -193,6 +317,7 @@ public class MultiCameraManager {
         }
         CameraNeeds needs = CameraNeeds.current();
         mainHandler.removeCallbacks(closeWhenUnneeded);
+        boolean waitingToClose = false;
         if (needs.heldByAnyone()) {
             if (!isReleased() && (needs.isHeld(CameraNeeds.Holder.PREVIEW)
                     || needs.isHeld(CameraNeeds.Holder.RECORDING)
@@ -200,9 +325,13 @@ public class MultiCameraManager {
                 openAllCameras();   // 已经开着的那几路会被 openCamera 自己跳过
             }
         } else {
-            mainHandler.postDelayed(closeWhenUnneeded, CLOSE_WHEN_UNNEEDED_MS);
+            long delay = closeDelayMs();
+            waitingToClose = delay == CLOSE_WHEN_UNNEEDED_MS;
+            mainHandler.postDelayed(closeWhenUnneeded, delay);
         }
         for (SingleCamera camera : cameras.values()) {
+            // 等关的这 30 秒照常出帧；1.5 秒就关的不必为它重建会话。只剩后视镜要的时候（座舱没人看）不出帧，和以前一样
+            camera.setKeepStreaming(waitingToClose);
             camera.followNeeds();
         }
     }
@@ -237,10 +366,18 @@ public class MultiCameraManager {
      * 这一层只看有没有帧，不看任何状态标志。</p>
      */
     private void checkLiveness() {
-        if (cameras.isEmpty() || CameraTaken.othersHold()) {
-            // 别的程序拿着相机时不算卡：重开只会失败，它放开时 retryTaken 会接
+        if (cameras.isEmpty() || !openInOrderDone() || closingAll) {
+            // 正在按次序开、或者正在关：开到哪一路、关到哪一路由次序管，看门狗这时不插手
             return;
         }
+        for (SingleCamera camera : cameras.values()) {
+            if (camera != null && camera.isBusy()) {
+                // 一次只动一路：有一路在开 / 关 / 重开 / 配会话，别的路这时也不动 —— 环视开、关的时候座舱不能跟着变
+                return;
+            }
+        }
+        // 别的程序拿着相机时重开多半失败：只每 30 秒试一次（CameraLiveness 里判），它放开时 retryTaken 立刻接
+        boolean othersHold = CameraTaken.othersHold();
         long now = android.os.SystemClock.uptimeMillis();
         for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
             SingleCamera camera = entry.getValue();
@@ -252,23 +389,29 @@ public class MultiCameraManager {
                 state = new CameraLiveness.State();
                 livenessStates.put(entry.getKey(), state);
             }
-            long age = camera.progressAgeMs();
+            // 设备报错 / 被断开之后不用等 8 秒：有人要画面，下一次检查就动手（2.10.10 起相机自己不重连）
+            boolean lost = camera.deviceLost();
+            long age = lost ? Long.MAX_VALUE : camera.progressAgeMs();
             // 有人要画面就盯着 —— 包括「打开发出去了、一直没回音」的那种（以前靠前台服务每 10 秒
             // 一次的修复循环兜着，那个循环会把退避和放弃全部作废，1.62.0 删了）
-            boolean watch = camera.wantsFrames();
-            CameraLiveness.Action action = CameraLiveness.step(state, watch, age, now);
+            boolean watch = wanted(camera);
+            CameraLiveness.Action action = CameraLiveness.step(state, watch, age, now, othersHold);
+            String since = lost ? "设备报错 / 被断开" : "已经 " + age + "ms 没有画面";
             if (action == CameraLiveness.Action.RESET) {
-                if (state.attempts() == 1 && camera.isConnected()) {
-                    // 第一次先只重建会话（便宜、快）；再不行才重开相机。
+                if (state.attempts() == 1 && camera.isConnected() && camera.sessionHasStreamed()) {
+                    // 出过画面、后来停了的：第一次先只重建会话（便宜、快）；再不行才重开相机。
+                    // 配好之后一帧都没出过的不走这一步：它没有东西可排空，重建每次都 waitUntilIdle 超时、
+                    // 报设备错误、再关一次设备（2026-10-08，环视一次 4–13 秒），直接重开设备才出画面
                     // 这两级以前是 SingleCamera 自己那套 2.5 秒墙钟检测在做，现在只有这一处判
-                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 已经 "
-                            + age + "ms 没有画面，先重建会话");
+                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") " + since + "，先重建会话");
                     camera.recreateSession();
                 } else {
-                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 已经 "
-                            + age + "ms 没有画面，重开（第 " + state.attempts() + " 次）");
+                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") " + since + "，重开"
+                            + (othersHold ? "（别的程序占着 " + CameraTaken.describe() + "，每 "
+                            + (CameraTaken.RETRY_WHILE_HELD_MS / 1000) + " 秒试一次）" : "（第 " + state.attempts() + " 次）"));
                     camera.forceReopen();
                 }
+                return;   // 一次只动一路：这一路在动，别的等它动完（它还忙着的那几次检查整轮跳过）
             } else if (action == CameraLiveness.Action.GIVE_UP) {
                 AppLog.e(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 连着重开 "
                         + CameraLiveness.MAX_ATTEMPTS + " 次都没救回来，先停手 "
@@ -280,6 +423,20 @@ public class MultiCameraManager {
                         + "最后一次报错: " + camera.lastErrorName());
             }
         }
+    }
+
+    /**
+     * 这一路该不该出画面：有输出挂着（预览 / 后视镜 / 录像）、有人等拍照，或者登记表上有人要全部的路
+     * （预览 / 录像 / 拍照 —— 和 {@link #reconcileCameras} 开相机的条件同一个）。只看输出不够：
+     * 打开就报错的那一路从来没有过输出，看门狗得知道它是该开着的。
+     */
+    private static boolean wanted(SingleCamera camera) {
+        if (camera.wantsFrames()) {
+            return true;
+        }
+        CameraNeeds needs = CameraNeeds.current();
+        return needs.isHeld(CameraNeeds.Holder.PREVIEW) || needs.isHeld(CameraNeeds.Holder.RECORDING)
+                || needs.isHeld(CameraNeeds.Holder.PHOTO);
     }
 
     /**
@@ -369,6 +526,10 @@ public class MultiCameraManager {
     private void noteRecordingDir() {
         try {
             File dir = StorageHelper.getRecordingDir(context);
+            if (dir == null) {
+                // 刚开录盘就没了（没有地方可存）：录制器写不进会自己换盘或报停，这里没有目录可记
+                return;
+            }
             StorageHelper.noteRecordingDir(dir);
             String custom = new AppConfig(context).getCustomSdCardPath();
             boolean offTarget = custom != null && !custom.isEmpty()
@@ -386,6 +547,27 @@ public class MultiCameraManager {
     public interface WriteStallCallback {
         /** @param everWrote false：这次录像一个字节都没写出过（「没收到画面」） */
         void onWriteStalled(long stalledMs, boolean everWrote);
+    }
+
+    /** 写盘跟不上：某一路的写入排队满了，开始在相机这一侧丢帧（录像照常在录）。 */
+    public interface WriteBacklogCallback {
+        void onWriteBacklog(String cameraId);
+    }
+
+    private WriteBacklogCallback writeBacklogCallback;
+
+    public void setWriteBacklogCallback(WriteBacklogCallback callback) {
+        this.writeBacklogCallback = callback;
+    }
+
+    /** 录制器报写盘跟不上（主线程）。提示不提示、多久提示一次由 RecordingCoordinator 定。 */
+    private void onWriteBacklog(String cameraId) {
+        if (!isRecording) {
+            return;
+        }
+        if (writeBacklogCallback != null) {
+            writeBacklogCallback.onWriteBacklog(cameraId);
+        }
     }
 
     /** 录着的一路被相机服务断开了（别的程序拿走了相机）。 */
@@ -520,8 +702,8 @@ public class MultiCameraManager {
         this.corruptedFilesCallback = callback;
     }
     
-    public void setRecordingStatusCallback(RecordingStatusCallback callback) {
-        this.recordingStatusCallback = callback;
+    public void setPipelineCallback(PipelineCallback callback) {
+        this.pipelineCallback = callback;
     }
     
     public void setSegmentSwitchCallback(SegmentSwitchCallback callback) {
@@ -556,7 +738,7 @@ public class MultiCameraManager {
      * 正好落在两步之间，相机线程就空指针崩溃 —— 而且是在录制中。换成空实现就没有这个窗口，
      * 也不再握着那个已经销毁的界面。</p>
      *
-     * <p>盘满、写不进、相机被拿走、一路都没起来这四个<b>不在这里动</b>：它们是
+     * <p>盘满、写不进、相机被拿走、开录 / 停录走到哪一步这四个<b>不在这里动</b>：它们是
      * RecordingCoordinator 接的，它不随主界面走 —— 换掉的话主界面一重建，录像就没人停、没人接了。</p>
      */
     public void detachUiCallbacks() {
@@ -632,6 +814,11 @@ public class MultiCameraManager {
         updatePreviewTextureView("right", rightView);
     }
 
+    /**
+     * 主界面的画布没了（退后台、界面重建）。预览输出从这一路摘掉，重配会话：有人要画面（在录、后视镜）、
+     * 或者在等关的那 30 秒里（照常出帧，画面送进不显示的出帧口），都不能让会话对着一块已经没了的画布。
+     * 只有马上就关的（熄屏、没有前台服务，1.5 秒后关）不重配：不必为了摘掉预览再进一次相机服务。
+     */
     public void onPreviewTextureDestroyed(String cameraKey) {
         SingleCamera camera = cameras.get(cameraKey);
         if (camera == null) {
@@ -639,6 +826,10 @@ public class MultiCameraManager {
         }
         camera.setTextureView(null);
         camera.clearPreviewSurface();
+        if (!CameraNeeds.current().heldByAnyone() && !camera.keepsStreaming()) {
+            AppLog.d(TAG, "Preview texture for " + cameraKey + " gone and the camera closes in a moment; not rebuilding the session");
+            return;
+        }
         camera.recreateSession();
     }
 
@@ -678,7 +869,8 @@ public class MultiCameraManager {
                            String leftId, TextureView leftView,
                            String rightId, TextureView rightView) {
 
-        // 清空之前的摄像头实例
+        // 清空之前的摄像头实例；排着队要开的也作废（关的队自己拿着相机对象，照常关）
+        cancelOpenInOrder();
         cameras.clear();
 
         // 同一路相机只建一份：两个槽位指到同一个 id（手动映射填错）时，后面的槽位空着。
@@ -728,6 +920,7 @@ public class MultiCameraManager {
             @Override
             public void onCameraConfigured(String cameraId) {
                 AppLog.d(TAG, "Callback: Camera " + cameraId + " configured");
+                onCameraSettled(cameraId, true);
                 if (statusCallback != null) {
                     statusCallback.onCameraStatusUpdate(cameraId, STATUS_PREVIEW_STARTED);
                 }
@@ -795,6 +988,7 @@ public class MultiCameraManager {
             @Override
             public void onCameraClosed(String cameraId) {
                 AppLog.d(TAG, "Callback: Camera " + cameraId + " closed");
+                onCameraClosedInRound(cameraId);
                 if (statusCallback != null) {
                     statusCallback.onCameraStatusUpdate(cameraId, STATUS_CLOSED);
                 }
@@ -804,6 +998,7 @@ public class MultiCameraManager {
             public void onCameraError(String cameraId, int errorCode) {
                 String errorMsg = getErrorMessage(errorCode);
                 AppLog.e(TAG, "Callback: Camera " + cameraId + " error: " + errorCode + " - " + errorMsg);
+                onCameraSettled(cameraId, false);
                 if (statusCallback != null) {
                     statusCallback.onCameraStatusUpdate(cameraId, STATUS_ERROR_PREFIX + errorCode);
                 }
@@ -835,7 +1030,8 @@ public class MultiCameraManager {
                             sessionConfiguredCount = 0;
                             expectedSessionCount = 0;
                         } else if (expectedSessionCount == 0) {
-                            // 所有会话都失败了
+                            // 所有会话都失败了：开录到此为止。以前到这里就清掉待办、什么都不报，
+                            // 协调器一直以为在录（2026-10-05）
                             AppLog.e(TAG, "All sessions failed to configure");
                             if (sessionTimeoutRunnable != null) {
                                 mainHandler.removeCallbacks(sessionTimeoutRunnable);
@@ -843,7 +1039,10 @@ public class MultiCameraManager {
                             }
                             sessionConfiguredCount = 0;
                             expectedSessionCount = 0;
-                            pendingRecordingStart = null;
+                            if (pendingRecordingStart != null) {
+                                pendingRecordingStart = null;
+                                reportStartFailed(pendingStartGeneration, "所有相机会话都配置失败");
+                            }
                         }
                     }
                 }
@@ -1040,30 +1239,195 @@ public class MultiCameraManager {
         }
     }
 
+    /** 开关里的一路：key 只给日志，相机对象自己拿着 —— release() 会先把 cameras 清空，按 key 再查就查不到了。 */
+    private static final class Step {
+        final String key;
+        final SingleCamera camera;
+        long startedAt;
+
+        Step(String key, SingleCamera camera) {
+            this.key = key;
+            this.camera = camera;
+        }
+    }
+
+    /** 黑匣子里的叫法：环视 / 后座舱 / 前座舱；别的 key 原样。 */
+    private static String roleName(String key) {
+        if (CameraSlots.KEY_SURROUND.equals(key)) {
+            return "环视";
+        }
+        if (CameraSlots.KEY_CABIN_REAR.equals(key)) {
+            return "后座舱";
+        }
+        if (CameraSlots.KEY_CABIN_FRONT.equals(key)) {
+            return "前座舱";
+        }
+        return key;
+    }
+
+    /** 一路走完，记到这一轮的轨迹里；整轮走完黑匣子记一行「环视 1.1s → 后座舱 0.2s → 前座舱 0.3s」（关的那行按关完的先后）。 */
+    private static void noteStep(List<String> trail, Step step) {
+        if (step != null) {
+            trail.add(roleName(step.key) + " "
+                    + String.format(java.util.Locale.US, "%.1fs",
+                    (android.os.SystemClock.uptimeMillis() - step.startedAt) / 1000f));
+        }
+    }
+
+    private static void noteTrail(String what, List<String> trail, String separator) {
+        if (!trail.isEmpty()) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(what + "：" + String.join(separator, trail));
+            trail.clear();
+        }
+    }
+
     /**
-     * 打开所有摄像头
+     * 打开所有摄像头 —— 按次序，一路出了画面再开下一路（项目所有者 2026-10-08 定）：
+     * 环视先开，再后座舱，最后前座舱；开第一路之前先等所有在关的相机关完（不在别的相机关的途中开）。
+     * 已经在按次序开的话，这一次只把还没开的排进队。
      */
     public void openAllCameras() {
-        AppLog.d(TAG, "Opening all cameras...");
-
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            rollCall.post(this::openAllCameras);
+            return;
+        }
         activeCameraKeys.clear();
-        int opened = 0;
         Set<String> openedIds = new HashSet<>();
-        for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
-            if (opened >= maxOpenCameras) {
+        List<Step> order = new ArrayList<>();
+        for (String key : CameraSlots.openOrder(cameras.keySet())) {
+            if (order.size() >= maxOpenCameras) {
                 break;
             }
-            SingleCamera camera = entry.getValue();
-            String id = camera.getCameraId();
-            if (!openedIds.add(id)) {
+            SingleCamera camera = cameras.get(key);
+            if (camera == null || !openedIds.add(camera.getCameraId())) {
                 continue;
             }
-            activeCameraKeys.add(entry.getKey());
-            camera.openCamera();
-            opened++;
+            activeCameraKeys.add(key);
+            order.add(new Step(key, camera));
         }
+        AppLog.d(TAG, "Opening cameras in order: " + activeCameraKeys);
+        if (openingStep != null || openWaitStartedAt != 0) {
+            // 正在开（或者还在等别的相机关完）：没排进去的排进去，照原来的节奏走
+            for (Step step : order) {
+                if ((openingStep == null || step.camera != openingStep.camera) && !queued(openQueue, step.camera)) {
+                    openQueue.add(step);
+                }
+            }
+            return;
+        }
+        openQueue.clear();
+        openQueue.addAll(order);
+        openNext();
+    }
 
-        AppLog.d(TAG, "Requested open cameras: " + activeCameraKeys);
+    private static boolean queued(java.util.Collection<Step> queue, SingleCamera camera) {
+        for (Step step : queue) {
+            if (step.camera == camera) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 开下一路：先等这一轮关完（环视、座舱都关完，任何一份实例）—— 环视要在没有别的相机在动的时候开；
+     * 已经开着、在出画面的跳过；其余的开一路，等它出画面或报错（最多 OPEN_STEP_MAX_MS）。
+     */
+    private void openNext() {
+        rollCall.removeCallbacks(openStepTimeout);
+        rollCall.removeCallbacks(openWhenClosed);
+        noteStep(openTrail, openingStep);
+        openingStep = null;
+        long now = android.os.SystemClock.uptimeMillis();
+        if (!openQueue.isEmpty() && (closingAll || SingleCamera.anyClosing())) {
+            if (openWaitStartedAt == 0) {
+                openWaitStartedAt = now;
+            }
+            if (now - openWaitStartedAt < OPEN_WAIT_FOR_CLOSES_MS) {
+                rollCall.postDelayed(openWhenClosed, OPEN_WAIT_POLL_MS);
+                return;
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开相机：等别的相机关完等了 "
+                    + (OPEN_WAIT_FOR_CLOSES_MS / 1000) + " 秒还没完（相机服务卡住？），照样开");
+        }
+        if (openWaitStartedAt != 0) {
+            long waited = now - openWaitStartedAt;
+            openWaitStartedAt = 0;
+            if (waited >= 500) {
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开相机：等上一次关完用了 " + waited + "ms");
+            }
+        }
+        while (!openQueue.isEmpty()) {
+            Step step = openQueue.poll();
+            if (step.camera.isSessionReady() && step.camera.hasFramesWithin(FIRST_FRAME_FRESH_MS)) {
+                continue;
+            }
+            step.startedAt = android.os.SystemClock.uptimeMillis();
+            openingStep = step;
+            step.camera.openCamera();   // 已经在开、在重连的它自己会跳过；我们照样等它的「配好 / 报错」
+            rollCall.postDelayed(openStepTimeout, OPEN_STEP_MAX_MS);
+            return;
+        }
+        noteTrail("按次序开相机", openTrail, " → ");
+    }
+
+    private void openStepTimedOut() {
+        Step step = openingStep;
+        if (step == null) {
+            return;
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("按次序开相机：" + roleName(step.key) + "(" + step.camera.getCameraId()
+                + ") 等了 " + (OPEN_STEP_MAX_MS / 1000) + " 秒还没出画面，先开下一路");
+        openNext();
+    }
+
+    /**
+     * 配好了、或者报错了：是正在等的那一路就往下走。报错的直接开下一路；配好的还要等它真出画面 ——
+     * 三路配置下环视配好会话之后常常一帧都不出（2026-10-08），「配好」不等于「在出画面」，
+     * 这时就开下一路等于三路一起起管线。回调来自相机线程，挪到主线程。
+     */
+    private void onCameraSettled(String cameraId, boolean configured) {
+        rollCall.post(() -> {
+            Step step = openingStep;
+            if (step == null || !step.camera.getCameraId().equals(cameraId)) {
+                return;
+            }
+            if (configured) {
+                waitForFirstFrame(step);
+            } else {
+                openNext();
+            }
+        });
+    }
+
+    private void waitForFirstFrame(Step step) {
+        if (openingStep != step) {
+            return;
+        }
+        if (step.camera.hasFramesWithin(FIRST_FRAME_FRESH_MS)) {
+            openNext();
+            return;
+        }
+        rollCall.postDelayed(() -> waitForFirstFrame(step), FIRST_FRAME_POLL_MS);
+    }
+
+    private void cancelOpenInOrder() {
+        rollCall.removeCallbacks(openStepTimeout);
+        rollCall.removeCallbacks(openWhenClosed);
+        openWaitStartedAt = 0;
+        openQueue.clear();
+        openingStep = null;
+        openTrail.clear();
+    }
+
+    /** 按次序开相机走完了没有。开录前要等它：没开完就开录，晚开的那一路这一段就录不上。 */
+    public boolean openInOrderDone() {
+        return openingStep == null && openQueue.isEmpty();
+    }
+
+    /** 有没有哪份管理器的相机还在关（这一轮还没全部关完）。 */
+    public static boolean closingAll() {
+        return closingAll;
     }
 
     /**
@@ -1074,15 +1438,162 @@ public class MultiCameraManager {
     }
 
     /**
-     * 关闭所有摄像头：每一路交给自己的相机线程去关，这里不等（见 {@link SingleCamera#closeCamera(String)}）。
+     * 关闭所有摄像头 —— 环视单独先关，关完了再把座舱一起关（项目所有者 2026-10-09：「依照单个环视的思路」）。
+     * 环视关的时候座舱还开着、不动，和开的时候对称（环视单独先开，出了画面再开座舱）。为什么见类顶上的说明：
+     * 环视比座舱晚关完，那一次关就慢、下一次打开一帧不出。每一路交给自己的相机线程去关
+     * （见 {@link SingleCamera#closeCamera(String)}），这里不等；整轮关完黑匣子记一行每一路用了多久。
+     * 关的途中又来叫关的（退出时 release 在「没人要」那一轮还没走完时来）：已经在这一轮里的不再排。
      *
      * @param why 为什么关（英文短语）。给了的话，每一路关完时往黑匣子记一行，带用时
      */
     public void closeAllCameras(String why) {
-        for (SingleCamera camera : cameras.values()) {
-            camera.closeCamera(why);
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            // 退出那条路会看这个标志等我们：先立起来，再挪到主线程
+            closingAll = true;
+            rollCall.post(() -> closeAllCameras(why));
+            return;
+        }
+        cancelOpenInOrder();
+        boolean running = closeRoundRunning();
+        if (!running) {
+            closeWhy = why;
+            surroundTrail = null;
+            closeTrail.clear();
+        }
+        Step surround = null;
+        List<Step> others = new ArrayList<>();
+        for (String key : CameraSlots.closeOrder(cameras.keySet())) {
+            SingleCamera camera = cameras.get(key);
+            if (camera == null || inCloseRound(camera)) {
+                continue;
+            }
+            Step step = new Step(key, camera);
+            if (CameraSlots.KEY_SURROUND.equals(key) && camera.holdsOrIsOpening() && surroundClosing == null) {
+                surround = step;
+            } else {
+                others.add(step);
+            }
+        }
+        if (surround == null && others.isEmpty()) {
+            if (!running) {
+                closingAll = false;   // 没有要关的、也没有在关的（release() 第二次来就是这样）
+            }
+            return;
+        }
+        closingAll = true;
+        closeAfterSurround.addAll(others);
+        if (surround != null) {
+            surround.startedAt = android.os.SystemClock.uptimeMillis();
+            surroundClosing = surround;   // 先记再关：关完的回调可能就在 closeCamera 里同步来
+            rollCall.postDelayed(surroundCloseTimeout, SURROUND_CLOSE_MAX_MS);
+            surround.camera.closeCamera(closeWhy);
+        } else if (surroundClosing == null) {
+            // 环视没开着（或者不在这一轮）：座舱现在就关
+            closeTheRest();
         }
         AppLog.d(TAG, "All cameras asked to close");
+    }
+
+    /** 这一轮还没关完：环视在关、座舱在等、或者座舱在关。 */
+    private boolean closeRoundRunning() {
+        return surroundClosing != null || !closeAfterSurround.isEmpty() || !closingSteps.isEmpty();
+    }
+
+    private boolean inCloseRound(SingleCamera camera) {
+        return (surroundClosing != null && surroundClosing.camera == camera)
+                || queued(closeAfterSurround, camera) || queued(closingSteps, camera);
+    }
+
+    /** 环视关完了（或者不用关）：剩下的几路一起关。没开着的只清标志、不进相机服务，当场就完。 */
+    private void closeTheRest() {
+        List<Step> rest = new ArrayList<>(closeAfterSurround);
+        closeAfterSurround.clear();
+        for (Step step : rest) {
+            step.startedAt = android.os.SystemClock.uptimeMillis();
+            if (!step.camera.holdsOrIsOpening()) {
+                step.camera.closeCamera(closeWhy);
+                continue;
+            }
+            closingSteps.add(step);   // 先记再关：关完的回调可能就在 closeCamera 里同步来
+            step.camera.closeCamera(closeWhy);
+        }
+        if (closingSteps.isEmpty()) {
+            finishClose();
+        } else {
+            rollCall.removeCallbacks(closeAllTimeout);
+            rollCall.postDelayed(closeAllTimeout, CLOSE_ALL_MAX_MS);
+        }
+    }
+
+    private void surroundCloseTimedOut() {
+        Step step = surroundClosing;
+        if (step == null) {
+            return;
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("关相机：环视等了 " + (SURROUND_CLOSE_MAX_MS / 1000)
+                + " 秒还没关完（相机服务卡住？），先关座舱");
+        surroundTrail = roleName(step.key) + " >" + (SURROUND_CLOSE_MAX_MS / 1000) + "s";
+        surroundClosing = null;
+        closeTheRest();
+    }
+
+    private void closeAllTimedOut() {
+        if (closingSteps.isEmpty()) {
+            return;
+        }
+        StringBuilder stuck = new StringBuilder();
+        for (Step step : closingSteps) {
+            stuck.append(stuck.length() > 0 ? "、" : "")
+                    .append(roleName(step.key)).append("(").append(step.camera.getCameraId()).append(")");
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("关相机：座舱等了 " + (CLOSE_ALL_MAX_MS / 1000)
+                + " 秒还没关完：" + stuck + "，不再等");
+        closingSteps.clear();
+        finishClose();
+    }
+
+    /** 整轮关完：黑匣子一行「关相机：环视 0.1s → 后座舱 0.1s、前座舱 0.1s」（座舱按关完的先后）。 */
+    private void finishClose() {
+        rollCall.removeCallbacks(closeAllTimeout);
+        rollCall.removeCallbacks(surroundCloseTimeout);
+        closingAll = false;
+        String cabins = String.join("、", closeTrail);
+        String line = surroundTrail == null ? cabins
+                : cabins.isEmpty() ? surroundTrail : surroundTrail + " → " + cabins;
+        if (!line.isEmpty()) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("关相机：" + line);
+        }
+        surroundTrail = null;
+        closeTrail.clear();
+    }
+
+    /**
+     * 一路关完了：是环视就接着关座舱；是座舱就从还在关的里划掉，都关完了这一轮就完。
+     * 回调可能来自相机线程，也可能就在 closeCamera 里同步来，一律挪到主线程。
+     */
+    private void onCameraClosedInRound(String cameraId) {
+        rollCall.post(() -> {
+            Step surround = surroundClosing;
+            if (surround != null && surround.camera.getCameraId().equals(cameraId)) {
+                rollCall.removeCallbacks(surroundCloseTimeout);
+                surroundTrail = roleName(surround.key) + " " + String.format(java.util.Locale.US, "%.1fs",
+                        (android.os.SystemClock.uptimeMillis() - surround.startedAt) / 1000f);
+                surroundClosing = null;
+                closeTheRest();
+                return;
+            }
+            for (java.util.Iterator<Step> it = closingSteps.iterator(); it.hasNext(); ) {
+                Step step = it.next();
+                if (step.camera.getCameraId().equals(cameraId)) {
+                    noteStep(closeTrail, step);
+                    it.remove();
+                    if (closingSteps.isEmpty() && surroundClosing == null && closeAfterSurround.isEmpty()) {
+                        finishClose();
+                    }
+                    return;
+                }
+            }
+        });
     }
 
     /**
@@ -1097,24 +1608,79 @@ public class MultiCameraManager {
             AppLog.w(TAG, "Already recording");
             return false;
         }
+        if (!useCodecRecording && teardownsRunning.get() > 0) {
+            // MediaRecorder 的录制器每一路一个、一直复用：上一次停录还在收拾它们（协调器等收拾等到了点），
+            // 这时去准备只会两边一起动同一个录制器。按开录失败处理，过一会儿再试
+            AppLog.w(TAG, "上一次停录还在收拾 MediaRecorder，这次不开");
+            return false;
+        }
+        final int gen;
+        synchronized (sessionLock) {
+            gen = ++recordGeneration;
+        }
 
         // 清除缓存的分段时间戳，开始新的录制周期
         clearCachedSegmentTimestamp();
 
-        // 根据模式选择录制方式
+        // 根据模式选择录制方式。返回 false 时这里不收拾：协调器按开录失败走停录，由 stopRecording 收
         boolean started = useCodecRecording
-                ? startCodecRecording(timestamp, enabledCameras)
-                : startMediaRecorderRecording(timestamp, enabledCameras);
+                ? startCodecRecording(timestamp, enabledCameras, gen)
+                : startMediaRecorderRecording(timestamp, enabledCameras, gen);
         if (started) {
             lastStorageCheckMs = 0;
             mainHandler.removeCallbacks(storageTick);
             mainHandler.postDelayed(storageTick, STORAGE_TICK_MS);
             interruptReported = false;
             noteRecordingDir();
-            // 屏幕已经黑着才开始的录像（熄屏期间接回的那种），熄屏录制同样要拿锁
-            com.kooo.evcam.recording.ScreenOffRecording.onRecordingStarted(context);
         }
         return started;
+    }
+
+    /**
+     * 软编码录制器的回调是不是上一次录像的（之后停过录、又开过）。录制器收尾要几秒，新旧两次可能交叠：
+     * 写不进、写盘跟不上、分段、换盘、第一笔数据这些只对这一次算数 —— 上一次的混进来，会把这一次打断、
+     * 把分段计数和中转目标弄乱。上一次停录时的文件报告（删掉了哪些坏文件）不在这里拦，那本来就是停录之后才来的。
+     */
+    private boolean staleCallback(int gen, String what, String cameraId) {
+        if (gen == recordGeneration) {
+            return false;
+        }
+        AppLog.d(TAG, "Ignoring " + what + " from camera " + cameraId + " of recording gen " + gen
+                + " (now gen " + recordGeneration + ")");
+        return true;
+    }
+
+    /** 这一代至少一路录起来了：报给协调器。过时的（停过、又开过）不报。 */
+    private void reportStarted(int gen, Set<String> active, Set<String> failed) {
+        final Set<String> activeCopy = new HashSet<>(active);
+        final Set<String> failedCopy = new HashSet<>(failed);
+        mainHandler.post(() -> {
+            if (gen != recordGeneration) {
+                return;
+            }
+            if (pipelineCallback != null) {
+                pipelineCallback.onPipelineStarted(activeCopy, failedCopy);
+            }
+        });
+    }
+
+    /**
+     * 这一代一路都没起来：报给协调器，它走停录那条路收拾。没人接（没有协调器）就自己停。
+     * 过时的（停过、又开过）不报 —— 以前上一次的失败会把这一次的录像一起停掉。
+     */
+    private void reportStartFailed(int gen, String why) {
+        mainHandler.post(() -> {
+            if (gen != recordGeneration) {
+                AppLog.w(TAG, "过时的开录失败（第 " + gen + " 代，现在第 " + recordGeneration + " 代），不报: " + why);
+                return;
+            }
+            AppLog.e(TAG, "开录失败: " + why);
+            if (pipelineCallback != null) {
+                pipelineCallback.onPipelineStartFailed(why);
+            } else {
+                stopRecording();
+            }
+        });
     }
 
     /**
@@ -1168,8 +1734,9 @@ public class MultiCameraManager {
      * 使用 MediaRecorder 开始录制（标准模式）
      * @param timestamp 时间戳
      * @param enabledCameras 要录制的摄像头位置集合，为 null 时录制所有摄像头
+     * @param gen 这次开录（或重建）属于哪一代，排着的任务带着它
      */
-    private boolean startMediaRecorderRecording(String timestamp, Set<String> enabledCameras) {
+    private boolean startMediaRecorderRecording(String timestamp, Set<String> enabledCameras, int gen) {
         AppLog.d(TAG, "Starting MediaRecorder recording with timestamp: " + timestamp);
 
         // 重置首次写入通知标志（每次录制只通知一次）
@@ -1187,7 +1754,12 @@ public class MultiCameraManager {
         
         // 获取录制目录（可能是临时目录或最终目录）
         File saveDir = StorageHelper.getRecordingDir(context);
-        
+        if (saveDir == null) {
+            // 没有地方可存（没有 U 盘、开发者选项没开）：RecordingCoordinator 开录前已经拦过，走到这里是查完之后盘没了
+            AppLog.e(TAG, "没有地方存录像（没有 U 盘），不开录");
+            return false;
+        }
+
         // 如果不使用中转写入（直接写入U盘），检查U盘是否可用
         if (!useRelayWrite) {
             File sdCard = StorageHelper.getExternalSdCardRoot(context);
@@ -1298,14 +1870,8 @@ public class MultiCameraManager {
         }
 
         if (!prepareSuccess) {
+            // 准备好的那几路这里不放：协调器按开录失败走停录，stopRecording 一并收拾
             AppLog.e(TAG, "Failed to prepare recording");
-            // 清理已准备的录制器
-            for (String key : keys) {
-                VideoRecorder recorder = recorders.get(key);
-                if (recorder != null) {
-                    recorder.release();
-                }
-            }
             return false;
         }
 
@@ -1329,7 +1895,10 @@ public class MultiCameraManager {
 
         // 第三步：设置待处理的录制启动任务（将被 executeRecordingStart 替代）
         final List<String> recordingKeys = new ArrayList<>(keys);
-        pendingRecordingStart = () -> executeRecordingStart(recordingKeys, false);
+        synchronized (sessionLock) {
+            pendingStartGeneration = gen;
+            pendingRecordingStart = () -> executeRecordingStart(recordingKeys, false, 0, gen);
+        }
 
         // 设置超时机制：如果 3 秒内没有所有会话配置完成，只启动已就绪的摄像头
         sessionTimeoutRunnable = () -> {
@@ -1343,24 +1912,25 @@ public class MultiCameraManager {
                     }
                 }
                 // 执行录制启动（仅已就绪的摄像头）
-                executeRecordingStart(recordingKeys, true);
+                executeRecordingStart(recordingKeys, true, 0, gen);
             }
         };
         mainHandler.postDelayed(sessionTimeoutRunnable, 3000);
 
         return true;
     }
-    
+
     /**
      * 执行录制启动（仅启动已就绪的摄像头）
      * @param keys 要启动录制的摄像头 key 列表
      * @param fromTimeout 是否是从超时触发的
+     * @param gen 排这个任务时是哪一代；停过、又开过就作废
      */
-    private void executeRecordingStart(List<String> keys, boolean fromTimeout) {
-        executeRecordingStart(keys, fromTimeout, 0);
-    }
-
-    private void executeRecordingStart(List<String> keys, boolean fromTimeout, int stableAttempt) {
+    private void executeRecordingStart(List<String> keys, boolean fromTimeout, int stableAttempt, int gen) {
+        if (gen != recordGeneration) {
+            AppLog.w(TAG, "过时的开录任务（第 " + gen + " 代，现在第 " + recordGeneration + " 代），作废");
+            return;
+        }
         if (!fromTimeout) {
             long now = System.currentTimeMillis();
             List<String> unstable = getUnstableCameras(keys, now);
@@ -1368,7 +1938,8 @@ public class MultiCameraManager {
                 if (stableAttempt < MAX_STABLE_WAIT_ATTEMPTS) {
                     AppLog.w(TAG, "Waiting for stable frames before recording, attempt " + (stableAttempt + 1) +
                             "/" + MAX_STABLE_WAIT_ATTEMPTS + ", unstable=" + unstable);
-                    mainHandler.postDelayed(() -> executeRecordingStart(keys, false, stableAttempt + 1), STABLE_WAIT_INTERVAL_MS);
+                    mainHandler.postDelayed(() -> executeRecordingStart(keys, false, stableAttempt + 1, gen),
+                            STABLE_WAIT_INTERVAL_MS);
                     return;
                 }
                 // 等了两秒还不稳就按已就绪的那几路开：相机好不好由相机层自己的看门狗管，录制这条路不重开相机
@@ -1419,32 +1990,16 @@ public class MultiCameraManager {
             setRecording(true);
             lastNotifiedSegmentIndex = -1;
             AppLog.d(TAG, activeCameras.size() + " camera(s) started recording successfully: " + activeCameras);
-            
-            // 如果有失败的摄像头，通知上层
-            if (!failedCameras.isEmpty() && recordingStatusCallback != null) {
+            if (!failedCameras.isEmpty()) {
                 AppLog.w(TAG, failedCameras.size() + " camera(s) failed to start: " + failedCameras);
-                recordingStatusCallback.onPartialRecordingStart(activeCameras, failedCameras);
             }
+            reportStarted(gen, activeCameras, failedCameras);
         } else {
+            // 一路都没起来：录制器不在这里放，协调器走停录那条路由 stopRecording 收拾（录像输出、会话一起）
             AppLog.e(TAG, "All cameras failed to start recording");
-            setRecording(false);
-            // 清理所有录制器
-            for (String key : keys) {
-                VideoRecorder recorder = recorders.get(key);
-                if (recorder != null) {
-                    recorder.release();
-                }
-            }
-            // 通知上层完全失败
-            if (statusCallback != null) {
-                statusCallback.onCameraStatusUpdate("all", STATUS_RECORDING_FAILED);
-            }
-            // 同时通知 recordingStatusCallback（如果有设置）
-            if (recordingStatusCallback != null) {
-                recordingStatusCallback.onPartialRecordingStart(activeCameras, failedCameras);
-            }
+            reportStartFailed(gen, "MediaRecorder 一路都没启动: " + failedCameras);
         }
-        
+
         // 清理状态
         pendingRecordingStart = null;
         sessionConfiguredCount = 0;
@@ -1525,8 +2080,9 @@ public class MultiCameraManager {
         int sourceHeight = source.getHeight();
         EncodeSize encodeSize = EncodeSize.forSource(
                 camera.getCameraId(), sourceWidth, sourceHeight, spec.grid);
-        // 行驶信息条：开着就在画面下面加一条。一条规则，每一路都一样；窄的路少放几格
-        boolean infoBar = com.kooo.evcam.telemetry.InfoBar.isOnForRecording(context);
+        // 行驶信息条：开着就在环视录像的画面下面加一条（项目所有者 2026-10-09：只放环视，座舱两路不放）
+        boolean infoBar = CameraSlots.KEY_SURROUND.equals(key)
+                && com.kooo.evcam.telemetry.InfoBar.isOnForRecording(context);
         if (infoBar) {
             encodeSize = encodeSize.withInfoBar(com.kooo.evcam.telemetry.InfoBar.HEIGHT);
         }
@@ -1583,7 +2139,8 @@ public class MultiCameraManager {
         return codecRecorder;
     }
 
-    private boolean startCodecRecording(String timestamp, Set<String> enabledCameras) {
+    /** @param gen 这次开录（或重建）属于哪一代，排着的任务带着它 */
+    private boolean startCodecRecording(String timestamp, Set<String> enabledCameras, int gen) {
         AppLog.d(TAG, "Starting CODEC recording with timestamp: " + timestamp);
 
         // 重置首次写入通知标志（每次录制只通知一次）
@@ -1591,19 +2148,25 @@ public class MultiCameraManager {
         firstDataWritten = false;
         firstDataWrittenAtMs = 0;
 
-        // 行驶信息条开着：录像期间登记要用车辆信号，停录时注销（没别人在用就全停）
-        if (com.kooo.evcam.telemetry.InfoBar.isOnForRecording(context)) {
-            com.kooo.evcam.telemetry.Telemetry.get().acquire(context, "recording");
-        }
-
         // 检查是否使用中转写入模式
         AppConfig appConfig = new AppConfig(context);
         useRelayWrite = appConfig.shouldUseRelayWrite();
-        
+
         // 获取录制目录（可能是临时目录或最终目录）
         File saveDir = StorageHelper.getRecordingDir(context);
+        if (saveDir == null) {
+            // 没有地方可存（没有 U 盘、开发者选项没开）：RecordingCoordinator 开录前已经拦过，走到这里是查完之后盘没了。
+            // 放在登记车辆信号之前：不开录就不登记
+            AppLog.e(TAG, "没有地方存录像（没有 U 盘），不开录");
+            return false;
+        }
         if (!saveDir.exists()) {
             saveDir.mkdirs();
+        }
+
+        // 行驶信息条开着：录像期间登记要用车辆信号，停录时注销（没别人在用就全停）
+        if (com.kooo.evcam.telemetry.InfoBar.isOnForRecording(context)) {
+            com.kooo.evcam.telemetry.Telemetry.get().acquire(context, "recording");
         }
         
         // 如果使用中转写入，记录最终目录
@@ -1692,7 +2255,11 @@ public class MultiCameraManager {
                 @Override
                 public void onSegmentSwitch(String cameraId, int newSegmentIndex, String completedFilePath) {
                     AppLog.d(TAG, "Codec segment switch for camera " + cameraId + " to segment " + newSegmentIndex);
-                    
+                    if (staleCallback(gen, "segment switch", cameraId)) {
+                        // 停过录（又开过）：分段计数、中转目标、空间检查都是这一次的了。上一次的文件由那次停录转存
+                        return;
+                    }
+
                     // 如果使用中转写入，将上一个分段的文件传输到最终目录
                     if (useRelayWrite && finalSaveDir != null && newSegmentIndex > 0 && completedFilePath != null) {
                         // 传输已完成的文件（由回调提供确切路径，避免传输正在录制的新文件）
@@ -1736,17 +2303,36 @@ public class MultiCameraManager {
                 public void onRecordingRelocated(String cameraId, File dir, String why, long rescuedMs) {
                     AppLog.w(TAG, "Camera " + cameraId + " relocated recording to " + dir + " (" + why
                             + "), rescued " + rescuedMs + "ms from memory");
+                    if (staleCallback(gen, "relocation", cameraId)) {
+                        return;
+                    }
                     noteRelocated(dir);
                 }
 
                 @Override
                 public void onWriteStalled(String cameraId, long stalledMs, boolean everWrote) {
-                    mainHandler.post(() -> MultiCameraManager.this.onWriteStalled(stalledMs, everWrote));
+                    mainHandler.post(() -> {
+                        if (!staleCallback(gen, "write stall", cameraId)) {
+                            MultiCameraManager.this.onWriteStalled(stalledMs, everWrote);
+                        }
+                    });
+                }
+
+                @Override
+                public void onWriteBacklog(String cameraId) {
+                    mainHandler.post(() -> {
+                        if (!staleCallback(gen, "write backlog", cameraId)) {
+                            MultiCameraManager.this.onWriteBacklog(cameraId);
+                        }
+                    });
                 }
 
                 @Override
                 public void onFirstDataWritten(String cameraId) {
                     AppLog.d(TAG, "Codec first data written for camera " + cameraId);
+                    if (staleCallback(gen, "first data", cameraId)) {
+                        return;
+                    }
                     // 只在第一个摄像头首次写入时通知外部（每次录制只通知一次）
                     if (!firstDataWritten) {
                         firstDataWritten = true;
@@ -1780,12 +2366,10 @@ public class MultiCameraManager {
         }
 
         if (!prepareSuccess) {
+            // 准备好的那几路（录制器、已经挂到相机上的录像输出）这里不放：
+            // 协调器按开录失败走停录，stopRecording 一并收拾。以前这里只放了录制器，
+            // 前面几路相机上挂着的录像输出没人摘，之后的会话一直带着一个死掉的输出去配
             AppLog.e(TAG, "Failed to prepare codec recording");
-            // 清理已准备的录制器
-            for (CodecVideoRecorder recorder : codecRecorders.values()) {
-                recorder.release();
-            }
-            codecRecorders.clear();
             return false;
         }
 
@@ -1804,7 +2388,10 @@ public class MultiCameraManager {
         }
 
         final List<String> recordingKeys = new ArrayList<>(keys);
-        pendingRecordingStart = () -> executeCodecRecordingStart(recordingKeys, 0);
+        synchronized (sessionLock) {
+            pendingStartGeneration = gen;
+            pendingRecordingStart = () -> executeCodecRecordingStart(recordingKeys, 0, gen);
+        }
 
         // 设置超时机制
         sessionTimeoutRunnable = () -> {
@@ -1824,7 +2411,12 @@ public class MultiCameraManager {
         return true;
     }
 
-    private void executeCodecRecordingStart(List<String> keys, int stableAttempt) {
+    /** @param gen 排这个任务时是哪一代；停过、又开过就作废 */
+    private void executeCodecRecordingStart(List<String> keys, int stableAttempt, int gen) {
+        if (gen != recordGeneration) {
+            AppLog.w(TAG, "过时的开录任务（第 " + gen + " 代，现在第 " + recordGeneration + " 代），作废");
+            return;
+        }
         AppLog.d(TAG, "Attempting to start codec recording...");
         if (isRecording) {
             AppLog.w(TAG, "Codec recording already active, skipping duplicate start");
@@ -1847,7 +2439,8 @@ public class MultiCameraManager {
             if (stableAttempt < MAX_STABLE_WAIT_ATTEMPTS) {
                 AppLog.w(TAG, "Waiting for stable frames before codec recording, attempt " + (stableAttempt + 1) +
                         "/" + MAX_STABLE_WAIT_ATTEMPTS + ", unstable=" + unstable);
-                mainHandler.postDelayed(() -> executeCodecRecordingStart(keys, stableAttempt + 1), STABLE_WAIT_INTERVAL_MS);
+                mainHandler.postDelayed(() -> executeCodecRecordingStart(keys, stableAttempt + 1, gen),
+                        STABLE_WAIT_INTERVAL_MS);
                 return;
             }
             // 等了两秒还不稳就照样开：相机好不好由相机层自己的看门狗管，录制这条路不重开相机
@@ -1855,8 +2448,8 @@ public class MultiCameraManager {
             unstable.clear();
         }
 
-        boolean anyActive = false;
-        int activeCount = 0;
+        Set<String> activeCameras = new HashSet<>();
+        Set<String> failedCameras = new HashSet<>();
 
         AppLog.d(TAG, "executeCodecRecordingStart: keys=" + keys + ", codecRecorders=" + codecRecorders.keySet() + ", cameraSessionReady=" + cameraSessionReady);
 
@@ -1865,41 +2458,41 @@ public class MultiCameraManager {
             AppLog.d(TAG, "Checking camera " + key + ": ready=" + ready + ", codecRecorder=" + codecRecorders.get(key));
             if (ready == null || !ready) {
                 AppLog.w(TAG, "Camera " + key + " session not ready, skipping");
+                failedCameras.add(key);
                 continue;
             }
             CodecVideoRecorder codecRecorder = codecRecorders.get(key);
             if (codecRecorder == null) {
                 AppLog.e(TAG, "Camera " + key + " codecRecorder is null");
+                failedCameras.add(key);
                 continue;
             }
             if (codecRecorder.isRecording()) {
-                anyActive = true;
-                activeCount++;
+                activeCameras.add(key);
                 continue;
             }
             AppLog.d(TAG, "Starting codec recording for camera " + key);
             boolean started = codecRecorder.startRecording();
             AppLog.d(TAG, "Camera " + key + " startRecording returned: " + started + ", isRecording=" + codecRecorder.isRecording());
             if (started || codecRecorder.isRecording()) {
-                anyActive = true;
-                activeCount++;
+                activeCameras.add(key);
                 AppLog.d(TAG, "Camera " + key + " codec recording started successfully");
             } else {
+                failedCameras.add(key);
                 AppLog.e(TAG, "Failed to start codec recording for " + key);
             }
         }
 
-        if (anyActive) {
+        if (!activeCameras.isEmpty()) {
             lastNotifiedSegmentIndex = -1;
             setRecording(true);
-            AppLog.d(TAG, activeCount + " camera(s) started codec recording successfully");
+            AppLog.d(TAG, activeCameras.size() + " camera(s) started codec recording successfully");
+            reportStarted(gen, activeCameras, failedCameras);
         } else {
+            // 一路都没起来：录制器不在这里放，协调器走停录那条路由 stopRecording 收拾（录像输出、会话一起）。
+            // 以前这里放掉录制器就完了，什么都不报，协调器一直以为在录（2026-10-05）
             AppLog.e(TAG, "Failed to start codec recording on all cameras");
-            setRecording(false);
-            for (CodecVideoRecorder recorder : codecRecorders.values()) {
-                recorder.release();
-            }
-            codecRecorders.clear();
+            reportStartFailed(gen, "编码录制一路都没启动: " + failedCameras);
         }
 
         synchronized (sessionLock) {
@@ -1922,163 +2515,205 @@ public class MultiCameraManager {
     }
 
     /**
-     * 停止录制所有摄像头（异步执行，避免阻塞主线程）
+     * 停录 —— 唯一的收拾路径，开录走到哪一步都一样（2026-10-05）。
+     *
+     * <ol>
+     *   <li>代数 +1：排着的开录任务（等会话后的 300ms、等稳定画面、3 秒超时、重建前的 500ms）跑的时候对不上，
+     *       作废、什么都不报；</li>
+     *   <li>把这一次的编码器、MediaRecorder、挂着录像输出的那几路相机快照下来，编码器表这就空出来；</li>
+     *   <li>软编码录制器当场每一路都叫停（不等，{@link CodecVideoRecorder#beginStop}）；后台线程上一起等 ——
+     *       先等编码线程都排空（{@link CodecVideoRecorder#awaitDrain}），再等写入线程都收好文件
+     *       （{@link CodecVideoRecorder#finishStop}），几路共用一个期限（{@link CodecVideoRecorder#STOP_BUDGET_MS}），
+     *       再放掉。MediaRecorder 的在后台线程上停、放（停一路最长要几秒，不能卡主线程）；</li>
+     *   <li>回主线程摘掉录像输出、重建会话 —— 以前开录没起来时停录只放编码器，相机上挂着的录像输出没人摘，
+     *       之后每次建会话都带着一个死掉的输出去配；</li>
+     *   <li>报「收拾完了」（{@link PipelineCallback#onPipelineStopped}），协调器这时才开下一次 ——
+     *       以前开 → 停 → 开两秒内，上一次的收拾会把这一次刚建的编码器一起放掉。</li>
+     * </ol>
+     *
      * @param skipRelayTransfer 是否跳过自动传输（用于远程录制，上传完成后再传输）
      */
     public void stopRecording(boolean skipRelayTransfer) {
-        AppLog.d(TAG, "stopRecording called, isRecording=" + isRecording + ", useCodecRecording=" + useCodecRecording + ", skipRelayTransfer=" + skipRelayTransfer);
+        stopRecording(skipRelayTransfer, false);
+    }
 
-        // 立即标记停止状态，防止新的录制请求
-        final boolean wasRecording = isRecording;
+    /**
+     * @param forRelease 管理器要释放了：MediaRecorder 的录制器不再复用，连同分段线程一起放掉
+     *                   （两种模式都放：它们每一路一个，建管理器时就建好了）
+     */
+    private void stopRecording(boolean skipRelayTransfer, boolean forRelease) {
+        final int gen;
+        synchronized (sessionLock) {
+            gen = ++recordGeneration;
+            if (pendingRecordingStart != null) {
+                AppLog.d(TAG, "Cancelling pending recording start");
+                pendingRecordingStart = null;
+            }
+            sessionConfiguredCount = 0;
+            expectedSessionCount = 0;
+            cameraSessionReady.clear();
+            // 清理 Watchdog 回退状态（和代数同一步：重建在分段线程上读它们，见 handleRecordingRebuildRequest）
+            currentRecordingTimestamp = null;
+            currentEnabledCameras = null;
+            rebuildAttemptCount = 0;
+            isRebuildingRecording = false;  // 重置重建标志
+        }
+        if (sessionTimeoutRunnable != null) {
+            mainHandler.removeCallbacks(sessionTimeoutRunnable);
+            sessionTimeoutRunnable = null;
+        }
+        AppLog.d(TAG, "stopRecording gen=" + gen + ", isRecording=" + isRecording + ", useCodecRecording="
+                + useCodecRecording + ", skipRelayTransfer=" + skipRelayTransfer);
+
         // 车辆信号的登记（信息条、闪远光自动锁定）也只在录像期间，跟着录像状态撤（setRecording）
         setRecording(false);
         mainHandler.removeCallbacks(storageTick);
         StorageHelper.noteRecordingFallback(null, null);
-        // 熄屏录制的唤醒锁只在录像期间拿（规格 §3.1）
-        com.kooo.evcam.recording.ScreenOffRecording.release("recording-stopped");
 
-        // 在后台线程执行停止操作，避免阻塞主线程
-        new Thread(() -> {
+        // 这一次开录走到哪一步都一样收拾：在录的、准备好还没启动的、挂到相机上的录像输出
+        final List<CodecVideoRecorder> codecs = new ArrayList<>(codecRecorders.values());
+        codecRecorders.clear();
+        // 软编码录制器停录分两步。第一步就在这里，每一路都叫停（不等）：从这一刻起都不再录、不再分段、不再恢复，
+        // 各自排空编码器、把收文件排在最后。以前在后台一路一路停，后面几路在等前面的时候还在录，可能跨过分段
+        // 又开出新文件；三路各等十几秒，加起来超过协调器的收拾期限，协调器不等了、又开下一次，旧的还在写同一个盘
+        for (CodecVideoRecorder codecRecorder : codecs) {
             try {
-                // 清理待处理的录制启动任务和会话计数器（线程安全处理）
-                synchronized (sessionLock) {
-                    if (pendingRecordingStart != null) {
-                        AppLog.d(TAG, "Cancelling pending recording start");
-                        pendingRecordingStart = null;
-                    }
+                codecRecorder.beginStop();
+            } catch (Exception e) {
+                AppLog.e(TAG, "Error asking codec recorder to stop", e);
+            }
+        }
+        // 第二步（下面的后台线程上）一起等它们排空、收好文件，共用这一个期限。按开机时长（不含深睡）算：
+        // 等待用的计时、协调器的收拾期限都不算深睡
+        final long codecStopDeadline = android.os.SystemClock.uptimeMillis() + CodecVideoRecorder.STOP_BUDGET_MS;
+        // MediaRecorder 的录制器每一路一个、一直留着复用：只在 MediaRecorder 模式下收（释放时都放）
+        final List<VideoRecorder> mediaRecorders = useCodecRecording && !forRelease
+                ? new ArrayList<>() : new ArrayList<>(recorders.values());
+        // 挂着录像输出的那几路，连同挂着的是哪一个输出
+        final Map<SingleCamera, android.view.Surface> recordOutputs = new LinkedHashMap<>();
+        for (SingleCamera camera : cameras.values()) {
+            android.view.Surface output = camera.getRecordSurface();
+            if (output != null) {
+                recordOutputs.put(camera, output);
+            }
+        }
+        final File relayTarget = useRelayWrite && !skipRelayTransfer ? finalSaveDir : null;
+        useRelayWrite = false;
+        finalSaveDir = null;
 
-                    // 重置会话计数器
-                    sessionConfiguredCount = 0;
-                    expectedSessionCount = 0;
-                }
-
-                // 清理超时任务
-                if (sessionTimeoutRunnable != null) {
-                    mainHandler.removeCallbacks(sessionTimeoutRunnable);
-                    sessionTimeoutRunnable = null;
-                }
-
-                List<String> keys = getActiveCameraKeys();
-
-                if (!wasRecording) {
-                    AppLog.w(TAG, "Not recording, but cleaning up anyway");
-                    // 即使不在录制状态，也尝试清理录制器
-                    for (String key : keys) {
-                        try {
-                            VideoRecorder recorder = recorders.get(key);
-                            if (recorder != null) {
-                                recorder.release();
-                            }
-                        } catch (Exception e) {
-                            AppLog.e(TAG, "Error releasing recorder for " + key, e);
-                        }
-                        try {
-                            CodecVideoRecorder codecRecorder = codecRecorders.get(key);
-                            if (codecRecorder != null) {
-                                codecRecorder.release();
-                            }
-                        } catch (Exception e) {
-                            AppLog.e(TAG, "Error releasing codec recorder for " + key, e);
-                        }
-                    }
-                    codecRecorders.clear();
-                    return;
-                }
-
-                // 停止软编码录制（带超时保护）
-                if (!codecRecorders.isEmpty()) {
-                    AppLog.d(TAG, "Stopping codec recorders...");
-                    for (String key : keys) {
-                        try {
-                            CodecVideoRecorder codecRecorder = codecRecorders.get(key);
-                            if (codecRecorder != null && codecRecorder.isRecording()) {
-                                codecRecorder.stopRecording();
-                            }
-                        } catch (Exception e) {
-                            AppLog.e(TAG, "Error stopping codec recorder for " + key, e);
-                        }
-                    }
-                    // 释放软编码录制器
-                    for (CodecVideoRecorder recorder : new ArrayList<>(codecRecorders.values())) {
-                        try {
-                            recorder.release();
-                        } catch (Exception e) {
-                            AppLog.e(TAG, "Error releasing codec recorder", e);
-                        }
-                    }
-                    codecRecorders.clear();
-                }
-
-                // 停止 MediaRecorder 录制（带超时保护）
-                for (String key : keys) {
+        // 在后台线程执行停止操作，避免阻塞主线程。一次只收拾一份（teardown 是单线程的）：
+        // 退出时「人停的」那一次和释放那一次、连着两次停，不会同时去动同一批录制器
+        teardownsRunning.incrementAndGet();
+        teardown.execute(() -> {
+            // 停录时写入线程还没收好的文件（盘卡死了）：中转写入不转存它，半个文件转过去就坏了
+            final Set<String> heldFiles = new HashSet<>();
+            try {
+                // 软编码录制第二步：一起等，共用一个期限。先等编码线程都排空 —— 到点没排空的几路，收文件都在那一刻排上；
+                // 再等写入线程都写完收好（到点没收好的不再等，没落盘的交给抢救）；然后释放
+                for (CodecVideoRecorder codecRecorder : codecs) {
                     try {
-                        VideoRecorder recorder = recorders.get(key);
-                        if (recorder != null && recorder.isRecording()) {
-                            recorder.stopRecording();
+                        codecRecorder.awaitDrain(codecStopDeadline);
+                    } catch (Exception e) {
+                        AppLog.e(TAG, "Error draining codec recorder", e);
+                    }
+                }
+                for (CodecVideoRecorder codecRecorder : codecs) {
+                    try {
+                        codecRecorder.finishStop(codecStopDeadline);
+                    } catch (Exception e) {
+                        AppLog.e(TAG, "Error stopping codec recorder", e);
+                    }
+                }
+                for (CodecVideoRecorder codecRecorder : codecs) {
+                    try {
+                        codecRecorder.release();
+                    } catch (Exception e) {
+                        AppLog.e(TAG, "Error releasing codec recorder", e);
+                    }
+                    String held = codecRecorder.heldFile();
+                    if (held != null) {
+                        heldFiles.add(held);
+                    }
+                }
+
+                // MediaRecorder：在录的停下收文件；准备好还没启动的放掉；都回到能再开一次的样子
+                // （reset 保留分段线程。以前开录失败走的是 release，分段线程跟着没了，下一次录像不分段）
+                for (VideoRecorder recorder : mediaRecorders) {
+                    try {
+                        if (forRelease) {
+                            recorder.release();
+                        } else {
+                            if (recorder.isRecording()) {
+                                recorder.stopRecording();
+                            }
+                            recorder.reset();
                         }
                     } catch (Exception e) {
-                        AppLog.e(TAG, "Error stopping recorder for " + key, e);
+                        AppLog.e(TAG, "Error stopping recorder", e);
                     }
                 }
 
-                // 在主线程清理摄像头会话（使用短延迟确保录制器已完全停止）
-                mainHandler.postDelayed(() -> {
-                    for (String key : keys) {
-                        try {
-                            SingleCamera camera = cameras.get(key);
-                            if (camera != null) {
-                                camera.clearRecordSurface();
-                                camera.recreateSession();
-                            }
-                        } catch (Exception e) {
-                            AppLog.e(TAG, "Error clearing record surface for " + key, e);
-                        }
-                    }
-                }, 100);
-
-                // 如果使用中转写入，将临时目录中的所有文件传输到最终目录
-                if (useRelayWrite && finalSaveDir != null && !skipRelayTransfer) {
+                // 如果使用中转写入，将临时目录中的所有文件传输到最终目录（写入线程还攥着的那个除外：
+                // 它要是回过神来收好了，留在缓存里，下一次中转写入停录时一起转存）
+                if (relayTarget != null) {
                     AppLog.d(TAG, "Scheduling relay transfer for remaining files...");
-                    final File savedFinalDir = finalSaveDir;
-                    
                     File tempDir = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
-                    final File[] filesToTransfer;
-                    if (tempDir.exists()) {
-                        filesToTransfer = tempDir.listFiles((dir, name) -> name.endsWith(".mp4"));
-                    } else {
-                        filesToTransfer = null;
+                    final File[] filesToTransfer = tempDir.exists()
+                            ? tempDir.listFiles((dir, name) -> name.endsWith(".mp4")
+                                    && !heldFiles.contains(new File(dir, name).getAbsolutePath()))
+                            : null;
+                    if (!heldFiles.isEmpty()) {
+                        AppLog.w(TAG, "Relay transfer skips files still held by a stuck writer: " + heldFiles);
                     }
-                    
-                    mainHandler.postDelayed(() -> {
-                        transferSpecificTempFiles(savedFinalDir, filesToTransfer);
-                    }, 500);
+                    mainHandler.postDelayed(() -> transferSpecificTempFiles(relayTarget, filesToTransfer), 500);
                 }
-
-                useRelayWrite = false;
-                AppLog.d(TAG, "stopRecording completed successfully");
             } catch (Exception e) {
                 AppLog.e(TAG, "Error in stopRecording", e);
+            } finally {
+                teardownsRunning.decrementAndGet();
             }
-        }, "StopRecording-" + System.currentTimeMillis()).start();
-        finalSaveDir = null;
-        
-        // 清理 Watchdog 回退状态
-        currentRecordingTimestamp = null;
-        currentEnabledCameras = null;
-        rebuildAttemptCount = 0;
-        isRebuildingRecording = false;  // 重置重建标志
-        
+
+            // 录制器都停了：回主线程摘录像输出、重建会话（短延迟确保录制器已完全停止），然后报收拾完了
+            mainHandler.postDelayed(() -> {
+                for (Map.Entry<SingleCamera, android.view.Surface> entry : recordOutputs.entrySet()) {
+                    SingleCamera camera = entry.getKey();
+                    try {
+                        // 只摘停录时挂着的那一个：之后又开了录、挂上了新的输出，不动它。
+                        // 释放时（这一次是释放、或者收拾的这段时间里管线被释放了）相机正在关，只摘不重建
+                        if (camera.clearRecordSurfaceIf(entry.getValue()) && !forRelease && !isReleased()) {
+                            camera.recreateSession();
+                        }
+                    } catch (Exception e) {
+                        AppLog.e(TAG, "Error clearing record surface for " + camera.getCameraId(), e);
+                    }
+                }
+                if (gen != recordGeneration) {
+                    // 之后又停过一次（那一次会报），或者已经又开了：这一次的「收拾完了」不算数
+                    AppLog.d(TAG, "stopRecording gen=" + gen + " superseded by gen=" + recordGeneration);
+                    return;
+                }
+                AppLog.d(TAG, "stopRecording completed gen=" + gen);
+                if (pipelineCallback != null) {
+                    pipelineCallback.onPipelineStopped();
+                }
+            }, 100);
+        });
+
         AppLog.d(TAG, "All cameras stopped recording");
     }
 
     /**
      * 处理录制重建请求（Watchdog 触发）
      * 
-     * 重建策略：
+     * 重建策略（只有 MediaRecorder 的录制器发重建请求）：
      * 1. 第一次触发：尝试重建 MediaRecorder（不切换模式）
-     * 2. 第二次触发：如果录制模式为"自动"，则切换到 Codec 模式
-     * 3. 已在 Codec 模式或非自动模式：不再处理
-     * 
+     * 2. 第二次起：录制模式读出来是"自动"就切换到 Codec 模式（提示 msg_codec_fallback），否则再试 MediaRecorder
+     * 3. 已在 Codec 模式：不再处理
+     *
+     * 第 2 条的回退很少走到："自动"开录本来就走 Codec（AppConfig.shouldUseCodecRecording），
+     * 而管线只在相机管理器创建时定一次。只有按 MediaRecorder 建好之后、录制模式才读成"自动"
+     * （开发者选项里改了，管理器没有重建）时，才会在这里改用 Codec。
+     *
      * 注意：多个摄像头可能同时触发此方法，需要防重入保护
      * 
      * @param cameraId 触发重建的相机ID
@@ -2106,96 +2741,92 @@ public class MultiCameraManager {
             return;
         }
         
-        // 保存当前录制参数
-        final String savedTimestamp = currentRecordingTimestamp;
-        final Set<String> savedEnabledCameras = currentEnabledCameras;
-        
+        // 保存当前录制参数，连同这一次录像的代数一起读：和停录在同一把锁里，
+        // 读到的要么是停之前的一整套，要么是停之后的（时间戳已清，下面就不重建）。
+        // 这里在录制器的分段线程上跑，停录在主线程上 —— 分开读的话，停录插在中间，重开会带着新的一代照样开
+        final String savedTimestamp;
+        final Set<String> savedEnabledCameras;
+        final int gen;
+        synchronized (sessionLock) {
+            savedTimestamp = currentRecordingTimestamp;
+            savedEnabledCameras = currentEnabledCameras;
+            gen = recordGeneration;
+        }
+
         if (savedTimestamp == null) {
             AppLog.w(TAG, "No recording timestamp saved, cannot rebuild");
             isRebuildingRecording = false;
             return;
         }
-        
-        // 停止当前录制（不清理状态）
+        if (gen != recordGeneration) {
+            // 刚读完就停了录：停录那条路在收拾，这里不再去动录制器
+            AppLog.w(TAG, "重建前停过录，不重建");
+            isRebuildingRecording = false;
+            return;
+        }
+
+        // 停止当前录制（不清理状态）。重建属于这一次录像：同一代。等的这 500ms 里停过录，代数就变了，重开作废
         stopRecordingForRebuild();
-        
+
         // 注意：不自动清除调试标志，让用户通过 UI 手动控制
         // 调试模式作为持久开关，直到用户手动关闭
-        
-        // 检查是否需要回退到 Codec
+
+        // 检查是否需要回退到 Codec：达到阈值、录制模式是「自动」才回退，否则再试 MediaRecorder
+        final boolean toCodec;
         if (rebuildAttemptCount >= CODEC_FALLBACK_THRESHOLD) {
-            // 达到阈值，检查是否可以回退到 Codec
-            AppConfig appConfig = new AppConfig(context);
-            String recordingMode = appConfig.getRecordingMode();
-            
-            if (AppConfig.RECORDING_MODE_AUTO.equals(recordingMode)) {
-                // 自动模式：切换到 Codec 录制
-                AppLog.w(TAG, "Rebuild attempt " + rebuildAttemptCount + " failed, switching to Codec mode...");
-                
-                mainHandler.postDelayed(() -> {
-                    try {
-                        // 生成新的时间戳（避免文件名冲突）
-                        String newTimestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-                        
-                        AppLog.d(TAG, "Restarting recording with Codec mode, new timestamp: " + newTimestamp);
-                        useCodecRecording = true;  // 切换到 Codec 模式
-                        startCodecRecording(newTimestamp, savedEnabledCameras);
-                        
-                        // 通知外部时间戳已更新（用于远程录制查找文件）
-                        if (timestampUpdateCallback != null) {
-                            timestampUpdateCallback.onTimestampUpdated(newTimestamp);
-                        }
-                        
-                        // 通知外部发生了 Codec 回退
-                        if (codecFallbackCallback != null) {
-                            codecFallbackCallback.onCodecFallback();
-                        }
-                    } finally {
-                        isRebuildingRecording = false;  // 重建完成
-                    }
-                }, 500);
-            } else {
-                // 非自动模式，只能再次尝试 MediaRecorder
-                AppLog.w(TAG, "Recording mode is '" + recordingMode + "' (not auto), retrying MediaRecorder...");
-                
-                mainHandler.postDelayed(() -> {
-                    try {
-                        String newTimestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-                        AppLog.d(TAG, "Retrying MediaRecorder recording, new timestamp: " + newTimestamp);
-                        startMediaRecorderRecording(newTimestamp, savedEnabledCameras);
-                        
-                        // 通知外部时间戳已更新（用于远程录制查找文件）
-                        if (timestampUpdateCallback != null) {
-                            timestampUpdateCallback.onTimestampUpdated(newTimestamp);
-                        }
-                    } finally {
-                        isRebuildingRecording = false;  // 重建完成
-                    }
-                }, 500);
-            }
+            String recordingMode = new AppConfig(context).getRecordingMode();
+            toCodec = AppConfig.RECORDING_MODE_AUTO.equals(recordingMode);
+            AppLog.w(TAG, toCodec
+                    ? "Rebuild attempt " + rebuildAttemptCount + " failed, switching to Codec mode..."
+                    : "Recording mode is '" + recordingMode + "' (not auto), retrying MediaRecorder...");
         } else {
-            // 未达到阈值，先尝试重建 MediaRecorder
+            toCodec = false;
             AppLog.w(TAG, "Rebuild attempt " + rebuildAttemptCount + ", retrying MediaRecorder first...");
-            
-            mainHandler.postDelayed(() -> {
-                try {
-                    // 生成新的时间戳（避免文件名冲突）
-                    String newTimestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-                    
-                    AppLog.d(TAG, "Restarting recording with MediaRecorder, new timestamp: " + newTimestamp);
-                    startMediaRecorderRecording(newTimestamp, savedEnabledCameras);
-                    
-                    // 通知外部时间戳已更新（用于远程录制查找文件）
-                    if (timestampUpdateCallback != null) {
-                        timestampUpdateCallback.onTimestampUpdated(newTimestamp);
-                    }
-                } finally {
-                    isRebuildingRecording = false;  // 重建完成
-                }
-            }, 500);
+        }
+        mainHandler.postDelayed(() -> restartAfterRebuild(gen, savedEnabledCameras, toCodec), 500);
+    }
+
+    /**
+     * 重建的后一半：停了等 500ms 再开。
+     *
+     * <p>这中间停过录（人停了、被打断了）就不开 —— 以前照开，人按的停被它撤销。
+     * 开不起来报开录失败，协调器走停录那条路 —— 以前不看返回值，一路都没准备好时协调器一直以为在录。</p>
+     */
+    private void restartAfterRebuild(int gen, Set<String> enabledCameras, boolean toCodec) {
+        try {
+            if (gen != recordGeneration) {
+                AppLog.w(TAG, "重建等待期间停过录（第 " + gen + " 代，现在第 " + recordGeneration + " 代），不再重开");
+                return;
+            }
+            // 生成新的时间戳（避免文件名冲突）
+            String newTimestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+            boolean started;
+            if (toCodec) {
+                AppLog.d(TAG, "Restarting recording with Codec mode, new timestamp: " + newTimestamp);
+                useCodecRecording = true;  // 切换到 Codec 模式
+                started = startCodecRecording(newTimestamp, enabledCameras, gen);
+            } else {
+                AppLog.d(TAG, "Restarting recording with MediaRecorder, new timestamp: " + newTimestamp);
+                started = startMediaRecorderRecording(newTimestamp, enabledCameras, gen);
+            }
+            if (!started) {
+                reportStartFailed(gen, "重建录制没起来（" + (toCodec ? "改用编码录制" : "MediaRecorder") + "）");
+                return;
+            }
+
+            // 通知外部时间戳已更新（用于远程录制查找文件）
+            if (timestampUpdateCallback != null) {
+                timestampUpdateCallback.onTimestampUpdated(newTimestamp);
+            }
+            // 通知外部发生了 Codec 回退
+            if (toCodec && codecFallbackCallback != null) {
+                codecFallbackCallback.onCodecFallback();
+            }
+        } finally {
+            isRebuildingRecording = false;  // 重建完成
         }
     }
-    
+
     /**
      * 为重建停止录制（不清理 Watchdog 状态）
      * 使用 reset() 而不是 release()，以便保留 Handler/Thread 供重建时使用
@@ -2326,6 +2957,7 @@ public class MultiCameraManager {
      */
     public void release() {
         CameraNeeds.current().setListener(null);
+        com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
         mainHandler.removeCallbacks(closeWhenUnneeded);
         if (photoJob != null) {
             // 拍到一半管理器没了（退出）：这一张作罢，登记也撤掉
@@ -2353,9 +2985,11 @@ public class MultiCameraManager {
                 expectedSessionCount = 0;
             }
             
-            // 4. 停止录制
+            // 4. 停止录制：录制器（两种）由停录那条路在后台线程上一并放掉。
+            //    以前这里接着又在本线程上放一遍，和停录线程同时动同一批录制器。
+            //    收拾完了照样报给协调器：它要是还以为在录，就按「管线没了」处理
             try {
-                stopRecording();
+                stopRecording(false, true);
             } catch (Exception e) {
                 AppLog.e(TAG, "Error stopping recording during release", e);
             }
@@ -2365,24 +2999,6 @@ public class MultiCameraManager {
                 closeAllCameras("release");
             } catch (Exception e) {
                 AppLog.e(TAG, "Error closing cameras during release", e);
-            }
-            
-            // 6. 释放 VideoRecorder
-            for (VideoRecorder recorder : recorders.values()) {
-                try {
-                    recorder.release();
-                } catch (Exception e) {
-                    AppLog.e(TAG, "Error releasing VideoRecorder", e);
-                }
-            }
-            
-            // 7. 释放 CodecVideoRecorder
-            for (CodecVideoRecorder codecRecorder : codecRecorders.values()) {
-                try {
-                    codecRecorder.release();
-                } catch (Exception e) {
-                    AppLog.e(TAG, "Error releasing CodecVideoRecorder", e);
-                }
             }
             
         } catch (Exception e) {
@@ -2407,13 +3023,6 @@ public class MultiCameraManager {
         return cameras.isEmpty();
     }
 
-    /**
-     * 是否正在录制
-     */
-    public boolean isRecording() {
-        return isRecording;
-    }
-
     // ------------------------------------------------------------------ 拍照
 
     /** 拍照的结果，在主线程上回调。 */
@@ -2428,6 +3037,9 @@ public class MultiCameraManager {
          * @param expected 该拍几路
          */
         void onPhotoResult(int saved, int pressed, int expected);
+
+        /** 没有地方存照片（没有 U 盘、开发者选项没开）：一路都没拍。和 {@link #onPhotoResult} 二选一。 */
+        void onNoStorage();
     }
 
     /** 等各路出画面最多多久：冷开相机，加上看门狗第一次重建会话（8 秒）都等得到。 */
@@ -2468,6 +3080,10 @@ public class MultiCameraManager {
      * {@link #PHOTO_READY_TIMEOUT_MS}，到点只拍出了画面的），存完注销 —— 没人要了相机照常在 1.5 秒后关。
      * 结果按真的存下了几路回报；以前按了就说「已保存」，相机没开时其实什么也没拍到。</p>
      *
+     * <p>开相机之前先看有没有地方存：没有 U 盘、开发者选项没开时一路都不拍，回报 {@link PhotoCallback#onNoStorage}
+     * （项目所有者 2026-10-06：不允许存到内置存储）。和拒录是同一个判断（存储快照的 {@code available}）；
+     * 查盘在存储线程上，查完回主线程接着拍。以前不查，拍完存进内置存储。</p>
+     *
      * @return false：上一张还在拍，这一次不接
      */
     public boolean takePhoto(PhotoCallback callback) {
@@ -2483,10 +3099,22 @@ public class MultiCameraManager {
             callback.onPhotoResult(0, 0, 0);
             return false;
         }
-        photoJob = new PhotoJob(callback);
-        // 没开的相机、没有输出的会话，都由登记表的规则去补（reconcileCameras）
-        CameraNeeds.current().claim(CameraNeeds.Holder.PHOTO);
-        stepPhoto();
+        final PhotoJob job = new PhotoJob(callback);
+        photoJob = job;
+        com.kooo.evcam.storage.StorageState.refresh(context, "photo", snapshot -> {
+            if (photoJob != job) {
+                return;   // 查盘的时候管理器没了（release 已经把这一张作罢）
+            }
+            if (!snapshot.available) {
+                photoJob = null;
+                com.kooo.evcam.blackbox.BlackBox.note("拍照：没有地方存（没有 U 盘），不拍；" + snapshot.describe());
+                callback.onNoStorage();
+                return;
+            }
+            // 没开的相机、没有输出的会话，都由登记表的规则去补（reconcileCameras）
+            CameraNeeds.current().claim(CameraNeeds.Holder.PHOTO);
+            stepPhoto();
+        });
         return true;
     }
 
@@ -2642,8 +3270,7 @@ public class MultiCameraManager {
         StringBuilder which = new StringBuilder();
         for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
             SingleCamera camera = entry.getValue();
-            if (camera.isTakenByOthers() || (camera.wantsFrames() && !camera.isConnected())) {
-                camera.clearTaken();
+            if (wanted(camera) && !camera.isConnected()) {
                 camera.forceReopen();
                 which.append(which.length() > 0 ? ", " : "")
                         .append(entry.getKey()).append("(").append(camera.getCameraId()).append(")");

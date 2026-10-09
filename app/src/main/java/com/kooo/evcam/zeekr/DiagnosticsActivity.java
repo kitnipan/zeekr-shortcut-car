@@ -103,13 +103,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 发送到手机是开发者功能（项目拥有者 2026-09-26 定）。开发者模式在「关于」里开关，
-        // 回到这里时按当时的状态显示
+        // 发送到手机对所有人开放（上游 2.10.10）。U 盘和 Drive 仍只在开发者选项打开时显示。
         int developerTools = com.kooo.evcam.settings.DeveloperMode.isUnlocked()
                 ? View.VISIBLE : View.GONE;
-        if (sendPhoneButton != null) {
-            sendPhoneButton.setVisibility(developerTools);
-        }
         if (saveUsbButton != null) {
             saveUsbButton.setVisibility(developerTools);
         }
@@ -131,8 +127,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
             try {
                 result = DiagnosticsCollector.collect(getApplicationContext());
             } catch (Throwable t) {
+                // 采集失败是代码的问题，异常原文只进日志
                 AppLog.e(TAG, "采集诊断信息失败", t);
-                result = getString(R.string.diag_collect_failed, String.valueOf(t));
+                result = getString(R.string.diag_collect_failed);
             }
             final String finalResult = result;
             mainHandler.post(() -> {
@@ -258,7 +255,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
             return out;
         } catch (Exception e) {
             AppLog.e(TAG, "保存诊断报告失败", e);
-            toast(getString(R.string.diag_save_failed, String.valueOf(e.getMessage())));
+            String reason = com.kooo.evcam.ui.FailureReason.of(this, e);
+            toast(reason != null ? getString(R.string.diag_save_failed, reason)
+                    : getString(R.string.diag_cannot_save));
             return null;
         }
     }
@@ -278,7 +277,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
             toast(getString(R.string.diag_copied));
         } catch (Exception e) {
             AppLog.e(TAG, "复制失败", e);
-            toast(getString(R.string.diag_copy_failed, String.valueOf(e.getMessage())));
+            toast(getString(R.string.diag_copy_failed));
         }
     }
 

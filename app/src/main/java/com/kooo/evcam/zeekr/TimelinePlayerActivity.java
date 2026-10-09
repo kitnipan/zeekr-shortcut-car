@@ -262,7 +262,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         surround = lanes[0];
         surroundFrame = findViewById(R.id.video_surround_frame);
         if (surroundFrame != null) {
-            // 开发者选项「视频回看：GPU 逐像素鱼眼校正」开着时，解码器先画进外框的管线。
+            // 开发者选项「录像回放：GPU 逐像素鱼眼校正」开着时，解码器先画进外框的管线。
             // 必须在 TextureView 的画布好之前交给播放器 —— onCreate 里正是时候
             surround.player.setSurfaceRoute(surroundFrame.gpuRoute());
         }
@@ -599,7 +599,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             totalMs += sessions.get(i).totalDurationMs;
             totalBytes += sessionBytes[i];
         }
-        listSummaryText.setText(getString(R.string.info_clip_count, sessions.size(),
+        listSummaryText.setText(getResources().getQuantityString(R.plurals.info_clip_count,
+                sessions.size(), sessions.size(),
                 TimelineFormat.duration(totalMs) + "　·　"
                         + TimelineFormat.size(totalBytes)));
     }
@@ -1189,7 +1190,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return;
         }
         RecordingTimeline.Session session = sessions.get(index);
-        String title = getString(R.string.player_session_title,
+        String title = getResources().getQuantityString(R.plurals.player_session_title,
+                session.segmentCount(),
                 new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
                         .format(new Date(session.startEpochMs)),
                 session.segmentCount(),
@@ -1312,7 +1314,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         }
         com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.player_delete_title)
-                .setMessage(getString(R.string.player_delete_msg, files, TimelineFormat.size(bytes)))
+                .setMessage(getResources().getQuantityString(R.plurals.player_delete_msg,
+                        files, files, TimelineFormat.size(bytes)))
                 .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteChosen(indexes))
                 .setNegativeButton(R.string.action_cancel, null));
     }
@@ -1350,8 +1353,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         long bytes = bytesOf(files);
         com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.player_delete_title)
-                .setMessage(getString(R.string.player_delete_msg,
-                        files.size(), TimelineFormat.size(bytes)))
+                .setMessage(getResources().getQuantityString(R.plurals.player_delete_msg,
+                        files.size(), files.size(), TimelineFormat.size(bytes)))
                 .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteSession(index, session))
                 .setNegativeButton(R.string.action_cancel, null));
     }
@@ -1387,8 +1390,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     private String deletedText(int deleted, int kept) {
-        return getString(R.string.player_deleted, deleted)
-                + (kept > 0 ? getString(R.string.msg_kept_locked, kept) : "");
+        return getResources().getQuantityString(R.plurals.player_deleted, deleted, deleted)
+                + (kept > 0 ? getResources().getQuantityString(R.plurals.msg_kept_locked, kept, kept) : "");
     }
 
     /** 此刻各路正在放的文件：环视和座舱各一个（段与段之间那一两秒算下一段，同 {@link #place}）。 */
@@ -1451,8 +1454,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             } else {
                 lockedVideos.addAll(names);
             }
-            Toast.makeText(this, getString(unlock ? R.string.msg_footage_unlocked : R.string.msg_footage_locked,
-                    names.size()), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getResources().getQuantityString(
+                    unlock ? R.plurals.msg_footage_unlocked : R.plurals.msg_footage_locked,
+                    names.size(), names.size()), Toast.LENGTH_SHORT).show();
             sessionAdapter.setLocked(lockedFlags());
             refreshLockViews();
         });
@@ -1554,7 +1558,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private void updateSessionInfo(RecordingTimeline.Session session) {
         String started = new SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
                 .format(new Date(session.startEpochMs));
-        infoText.setText(getString(R.string.player_info,
+        infoText.setText(getResources().getQuantityString(R.plurals.player_info,
+                session.segmentCount(),
                 sessionIndex + 1, sessions.size(), started,
                 session.segmentCount(), TimelineFormat.duration(session.totalDurationMs)));
     }
