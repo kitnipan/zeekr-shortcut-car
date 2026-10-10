@@ -283,9 +283,6 @@ public final class StickerHub {
             if (PAUSED.contains(address) || !shouldHold(address)) {
                 continue;
             }
-            if (OPEN.containsKey(address)) {
-                close(address);
-            }
             reopen(address);
             break;
         }
@@ -293,16 +290,15 @@ public final class StickerHub {
     }
 
     /**
-     * Wait for a saved sticker without an 8s abort. A direct connect gives up
-     * while the coin cell is asleep, so the dot stays grey until a press wakes it.
-     * autoConnect stays armed until the sticker is connectable, then holds the link.
+     * Direct connect. autoConnect never calls back on this radio, so the dots stayed grey.
+     * Refuses to start while another sticker is up, because that connectGatt drops the live one.
      */
     private static void reopen(String address) {
         if (app == null || !shouldHold(address) || OPEN.containsKey(address) || PENDING.contains(address)
-                || UP.contains(address)) {
+                || UP.contains(address) || otherLive(address)) {
             return;
         }
-        connect(app, address, true);
+        probe(app, address);
     }
 
     private static void releaseRadio() {
