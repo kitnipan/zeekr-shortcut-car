@@ -15,6 +15,8 @@ public final class ShortcutKeys {
 
     private static Context appContext;
     private static PressClassifier classifier;
+    private static int liveKey = Integer.MIN_VALUE;
+    private static int liveScan = Integer.MIN_VALUE;
 
     private ShortcutKeys() {
     }
@@ -39,17 +41,23 @@ public final class ShortcutKeys {
                 }
             });
         }
-        if (holdToSpeak(appContext, event)) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                if (event.getRepeatCount() == 0) {
-                    MegaphoneService.start(appContext);
-                }
-                return true;
+        int action = event.getAction();
+        boolean held = liveEvent(event);
+        if (action == KeyEvent.ACTION_DOWN
+                && (holdToSpeak(appContext, event) || (held && event.getRepeatCount() > 0))) {
+            if (event.getRepeatCount() == 0) {
+                liveKey = event.getKeyCode();
+                liveScan = event.getScanCode();
+                MegaphoneService.start(appContext);
             }
-            if (event.getAction() == KeyEvent.ACTION_UP) {
-                MegaphoneService.stop(appContext);
-                return true;
-            }
+            MegaphoneService.beat();
+            return true;
+        }
+        if (held && action == KeyEvent.ACTION_UP) {
+            liveKey = Integer.MIN_VALUE;
+            liveScan = Integer.MIN_VALUE;
+            MegaphoneService.stop(appContext);
+            return true;
         }
         if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
             if (!bound(appContext, event)) {
@@ -57,6 +65,16 @@ public final class ShortcutKeys {
             }
         }
         return classifier.onKeyEvent(event);
+    }
+
+    private static boolean liveEvent(KeyEvent event) {
+        if (liveKey == Integer.MIN_VALUE) {
+            return false;
+        }
+        if (liveKey != 0) {
+            return event.getKeyCode() == liveKey;
+        }
+        return event.getScanCode() == liveScan;
     }
 
     private static boolean holdToSpeak(Context context, KeyEvent event) {

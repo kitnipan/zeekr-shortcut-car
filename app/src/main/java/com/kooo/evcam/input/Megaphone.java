@@ -19,6 +19,8 @@ import com.kooo.evcam.R;
 public final class Megaphone {
 
     static final String BUS_ADDRESS = "BUS12_OUTER_NOTIFY";
+    /** Cabin mic peaks around 1–2% of full scale. The probe tone that this bus played was about 20%. */
+    static final int GAIN = 20;
     private static final int RATE = 48_000;
     private static final int CHUNK_BYTES = 960 * 2;
     private static final long MAX_MS = 60_000L;
@@ -58,6 +60,34 @@ public final class Megaphone {
         for (int i = 0; i < n; i += 2) {
             int sample = (pcm[i] & 0xFF) | (pcm[i + 1] << 8);
             int abs = sample == Short.MIN_VALUE ? 32768 : Math.abs(sample);
+            if (abs > peak) {
+                peak = abs;
+            }
+        }
+        if (peak >= 32767) {
+            return 100;
+        }
+        return peak * 100 / 32767;
+    }
+
+    /** Amplifies in place and returns the level that will actually be written to the bus. */
+    static int boost(byte[] pcm, int length) {
+        if (pcm == null || length < 2) {
+            return 0;
+        }
+        int n = Math.min(length, pcm.length) & ~1;
+        int peak = 0;
+        for (int i = 0; i < n; i += 2) {
+            int sample = (short) ((pcm[i] & 0xFF) | (pcm[i + 1] << 8));
+            int amplified = sample * GAIN;
+            if (amplified > 32767) {
+                amplified = 32767;
+            } else if (amplified < -32768) {
+                amplified = -32768;
+            }
+            pcm[i] = (byte) amplified;
+            pcm[i + 1] = (byte) (amplified >> 8);
+            int abs = amplified == -32768 ? 32768 : Math.abs(amplified);
             if (abs > peak) {
                 peak = abs;
             }
@@ -173,17 +203,24 @@ public final class Megaphone {
             mic = record;
             record.startRecording();
             track.play();
+            track.setVolume(1f);
             byte[] buf = new byte[CHUNK_BYTES];
             long deadline = SystemClock.elapsedRealtime() + MAX_MS;
             long lastLevel = 0L;
             while (go && SystemClock.elapsedRealtime() < deadline) {
-                int read = record.read(buf, 0, buf.length);
+                int read = record.read(buf, 0, buf.length, AudioRecord.READ_NON_BLOCKING);
                 if (read < 0) {
                     return R.string.megaphone_open;
                 }
                 if (read == 0) {
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        return ENDED;
+                    }
                     continue;
                 }
+                int heard = boost(buf, read);
                 int wrote = track.write(buf, 0, read);
                 if (wrote < 0) {
                     return R.string.megaphone_open;
@@ -191,7 +228,6 @@ public final class Megaphone {
                 long now = SystemClock.uptimeMillis();
                 if (level != null && now - lastLevel >= 50L) {
                     lastLevel = now;
-                    int heard = percent(buf, read);
                     MAIN.post(() -> {
                         if (go) {
                             level.onPercent(heard);

@@ -10,7 +10,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.widget.Toast;
 
 import androidx.core.app.NotificationCompat;
@@ -18,6 +21,8 @@ import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Foreground only while the mic is open, so a held shortcut still works off the main screen. */
 public class MegaphoneService extends Service {
@@ -27,11 +32,25 @@ public class MegaphoneService extends Service {
 
     private static final String CHANNEL_ID = "megaphone";
     private static final int NOTIFICATION_ID = 7102;
+    /** No key-up (the meter window can swallow it) still drops the card shortly after repeats stop. */
+    private static final long RELEASE_GAP_MS = 2000L;
 
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static final AtomicBoolean armed = new AtomicBoolean(false);
+    private static volatile long holdUntil;
     private static volatile boolean up;
+    private static MegaphoneService live;
 
     private final Megaphone pump = new Megaphone();
+    private final Runnable leash = () -> {
+        if (SystemClock.uptimeMillis() >= holdUntil) {
+            halt();
+        } else {
+            scheduleLeash();
+        }
+    };
     private MegaphoneMeter meter;
+    private boolean closed;
 
     public static void start(Context context) {
         if (context == null) {
@@ -42,21 +61,42 @@ public class MegaphoneService extends Service {
             Toast.makeText(context, R.string.megaphone_need_mic, Toast.LENGTH_SHORT).show();
             return;
         }
+        armed.set(true);
+        beat();
         Intent intent = new Intent(context, MegaphoneService.class);
         intent.setAction(ACTION_START);
         ContextCompat.startForegroundService(context, intent);
     }
 
+    /** Call on every key-down while the button is held, including repeats. */
+    public static void beat() {
+        holdUntil = SystemClock.uptimeMillis() + RELEASE_GAP_MS;
+        MAIN.post(() -> {
+            MegaphoneService current = live;
+            if (current != null) {
+                current.scheduleLeash();
+            }
+        });
+    }
+
     public static void stop(Context context) {
-        if (context == null || !up) {
+        armed.set(false);
+        holdUntil = 0L;
+        if (context == null) {
             return;
         }
+        MAIN.post(() -> {
+            MegaphoneService current = live;
+            if (current != null) {
+                current.halt();
+            }
+        });
         Intent intent = new Intent(context, MegaphoneService.class);
         intent.setAction(ACTION_STOP);
         try {
             context.startService(intent);
         } catch (IllegalStateException ignored) {
-            // process is background and the pump is already gone
+            // not running yet; the pending start sees armed == false and closes
         }
     }
 
@@ -77,28 +117,56 @@ public class MegaphoneService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         show();
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+        if (!armed.get() || (intent != null && ACTION_STOP.equals(intent.getAction()))) {
             halt();
             return START_NOT_STICKY;
         }
+        closed = false;
         up = true;
+        live = this;
         if (meter == null) {
             meter = new MegaphoneMeter(this);
         }
         meter.show();
         pump.begin(this, this::halt, meter::onPercent);
+        scheduleLeash();
         return START_NOT_STICKY;
     }
 
     @Override
     public void onDestroy() {
         up = false;
+        if (live == this) {
+            live = null;
+        }
+        MAIN.removeCallbacks(leash);
         pump.end();
+        if (meter != null) {
+            meter.hide();
+        }
         super.onDestroy();
     }
 
+    private void scheduleLeash() {
+        MAIN.removeCallbacks(leash);
+        long delay = holdUntil - SystemClock.uptimeMillis();
+        if (delay < 0L) {
+            delay = 0L;
+        }
+        MAIN.postDelayed(leash, delay);
+    }
+
     private void halt() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        armed.set(false);
         up = false;
+        if (live == this) {
+            live = null;
+        }
+        MAIN.removeCallbacks(leash);
         pump.end();
         if (meter != null) {
             meter.hide();

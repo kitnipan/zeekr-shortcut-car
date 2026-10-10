@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta13] - 2026-10-10
+
+### Fixed
+
+- Hold to speak turns the quiet cabin mic up so the outside speaker can be heard. The meter shows that louder level. Releasing the button closes the meter even when the key-up never arrives.
+
 ## [2.10.14-beta12] - 2026-10-10
 
 ### New and improved

@@ -26,4 +26,14 @@ public class MegaphoneTest {
         assertEquals(100, Megaphone.percent(new byte[] {(byte) 0xFF, 0x7F}, 2));
         assertEquals(100, Megaphone.percent(new byte[] {0x00, (byte) 0x80}, 2));
     }
+
+    @Test
+    public void boostLiftsAQuietCabinMicAndClipsFullScale() {
+        byte[] quiet = new byte[] {0x00, 0x02};
+        assertEquals(31, Megaphone.boost(quiet, 2));
+        assertEquals(31, Megaphone.percent(quiet, 2));
+        byte[] hot = new byte[] {(byte) 0xFF, 0x7F};
+        assertEquals(100, Megaphone.boost(hot, 2));
+        assertEquals(0, Megaphone.boost(new byte[] {0, 0}, 2));
+    }
 }
