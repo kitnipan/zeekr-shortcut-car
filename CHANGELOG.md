@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta21] - 2026-10-10
+
+### Fixed
+
+- Smart sticker connects again. A sticker that is already connected is still left alone, so the 15-second drop stays fixed.
+- Cabin passenger shows the picture. The floating window was staying black.
+
 ## [2.10.14-beta20] - 2026-10-10
 
 ### Fixed
