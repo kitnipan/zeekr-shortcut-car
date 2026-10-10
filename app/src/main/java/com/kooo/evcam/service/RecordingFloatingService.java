@@ -412,6 +412,7 @@ public class RecordingFloatingService extends Service {
             timeTextView = null;
         }
         stopTimeUpdate();
+        com.kooo.evcam.input.StickerHub.setFloatingShown(this, false);
     }
 
     /**
@@ -615,6 +616,7 @@ public class RecordingFloatingService extends Service {
         // 添加到窗口
         try {
             windowManager.addView(floatingContainer, layoutParams);
+            com.kooo.evcam.input.StickerHub.setFloatingShown(this, true);
             // 在不在录只问协调器（和录制服务、前台通知同一个答案），之后的变化它会广播过来。
             // 以前靠主界面隔 500 ms 推它自己记的状态：主界面刚重建、还没对上时推的是「没在录」，
             // 录着像按钮却是灰的

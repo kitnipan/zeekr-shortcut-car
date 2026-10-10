@@ -111,6 +111,8 @@ public final class StickerHub {
     private static boolean capture;
     /** Any screen of this app is in front. Saved stickers stay up and a lost link comes back. */
     private static boolean inFront;
+    /** The recording float is on screen, so retry keeps going after the app is hidden. */
+    private static boolean floating;
     private static boolean bondsRegistered;
 
     private StickerHub() {
@@ -150,6 +152,26 @@ public final class StickerHub {
             }
             syncOnMain(application);
             if (entered) {
+                keep();
+            }
+        });
+    }
+
+    /** Recording float shown or hidden. Retry keeps running while that button is on screen. */
+    public static void setFloatingShown(Context context, boolean on) {
+        if (context == null) {
+            return;
+        }
+        Context application = context.getApplicationContext();
+        MAIN.post(() -> {
+            boolean shown = on && !floating;
+            floating = on;
+            app = application;
+            if (shown) {
+                NEXT.clear();
+            }
+            syncOnMain(application);
+            if (shown) {
                 keep();
             }
         });
@@ -232,14 +254,6 @@ public final class StickerHub {
         if (!canConnect(application)) {
             return;
         }
-        if (UP.isEmpty()) {
-            for (String address : wanted) {
-                if (!OPEN.containsKey(address) && !PENDING.contains(address) && !PAUSED.contains(address)) {
-                    connect(application, address, false);
-                    break;
-                }
-            }
-        }
         armKeep();
     }
 
@@ -263,9 +277,12 @@ public final class StickerHub {
             if (UP.contains(address)) {
                 continue;
             }
+            if (OPEN.containsKey(address) && !PENDING.contains(address)) {
+                close(address);
+            }
             if (!OPEN.containsKey(address)) {
                 Long next = NEXT.get(address);
-                if (!inFront && next != null && now < next) {
+                if (!awake() && next != null && now < next) {
                     continue;
                 }
                 reopen(address);
@@ -275,23 +292,12 @@ public final class StickerHub {
         armKeep();
     }
 
-    /** One sticker at a time. If another link is up, pause it the same way a manual connect does. */
+    /** Same retry as the Connect button. A direct connectGatt is what this radio ignores. */
     private static void reopen(String address) {
         if (app == null || !shouldHold(address) || OPEN.containsKey(address) || PENDING.contains(address)) {
             return;
         }
-        boolean otherUp = false;
-        for (String up : UP) {
-            if (!up.equals(address)) {
-                otherUp = true;
-                break;
-            }
-        }
-        if (otherUp) {
-            probe(app, address);
-        } else {
-            connect(app, address, false);
-        }
+        probe(app, address);
     }
 
     private static void armKeep() {
@@ -804,9 +810,13 @@ public final class StickerHub {
         }
     }
 
-    /** Saved stickers stay up while the app is in front, the switch is on, or a shortcut needs them. */
+    /** Saved stickers stay up while a screen or the float is up, the switch is on, or a shortcut needs them. */
     private static boolean holding(Context context) {
-        return inFront || linkWanted(context) || !WATCHES.isEmpty();
+        return awake() || linkWanted(context) || !WATCHES.isEmpty();
+    }
+
+    private static boolean awake() {
+        return inFront || floating;
     }
 
     /** Switch on, or a sticker shortcut already saved. */
@@ -858,6 +868,9 @@ public final class StickerHub {
     private static void ready(String address) {
         TRIES.remove(address);
         NEXT.remove(address);
+        if (app != null) {
+            StickerArrived.show(app, address);
+        }
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onReady(address);
         }
@@ -878,8 +891,8 @@ public final class StickerHub {
             log("retry " + (tries + 1) + " " + address);
             phase(address, PHASE_CONNECTING);
             MAIN.postDelayed(() -> {
-                if (app != null) {
-                    connect(app, address, false);
+                if (app != null && !UP.contains(address)) {
+                    probe(app, address);
                 }
             }, 800);
             return;

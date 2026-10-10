@@ -380,6 +380,7 @@
     <string name="sticker_discovering">Connected. Reading services…</string>
     <string name="sticker_forget">Forget</string>
     <string name="sticker_connected">Connected</string>
+    <string name="sticker_arrived_named">%1$s · %2$s</string>
     <string name="sticker_link_off">Not connected</string>
     <string name="sticker_waiting">Press the sticker</string>
     <string name="sticker_press_line">%1$s  ·  %2$s</string>
