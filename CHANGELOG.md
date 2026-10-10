@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta6] - 2026-10-10
+
+### Fixed
+
+- One flash-to-pass saves one instant capture. The neighboring segment is no longer copied as a second clip of the same moment.
+
 ## [2.10.15-beta5] - 2026-10-10
 
 ### Fixed

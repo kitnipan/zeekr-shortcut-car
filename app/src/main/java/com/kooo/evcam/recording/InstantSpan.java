@@ -34,6 +34,38 @@ public final class InstantSpan {
     }
 
     /**
+     * Which segment contains {@code momentMs}. A 20-second window often touches
+     * the file before and the file after, and saving both stores the same flash
+     * twice. The latest start that is still at or before the moment wins. When
+     * the moment is before every start, the earliest file. {@code -1} when none
+     * of the starts are usable.
+     */
+    public static int containing(long[] starts, long momentMs) {
+        int before = -1;
+        long beforeStart = Long.MIN_VALUE;
+        int earliest = -1;
+        long earliestStart = Long.MAX_VALUE;
+        if (starts == null) {
+            return -1;
+        }
+        for (int i = 0; i < starts.length; i++) {
+            long start = starts[i];
+            if (start < 0) {
+                continue;
+            }
+            if (start < earliestStart) {
+                earliestStart = start;
+                earliest = i;
+            }
+            if (start <= momentMs && start >= beforeStart) {
+                beforeStart = start;
+                before = i;
+            }
+        }
+        return before >= 0 ? before : earliest;
+    }
+
+    /**
      * Video samples a flash excerpt may contain. A cut whose timestamps never
      * reach the end of the window stops here instead of copying the whole segment.
      */

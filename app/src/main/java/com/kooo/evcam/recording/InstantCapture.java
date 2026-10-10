@@ -90,6 +90,7 @@ public final class InstantCapture {
                 return;
             }
         }
+        sources = oneClip(sources, momentMs);
         if (sources.isEmpty()) {
             toast(app, app.getString(R.string.instant_capture_failed));
             return;
@@ -205,6 +206,19 @@ public final class InstantCapture {
             }
         }
         return out;
+    }
+
+    /** One flash, one file: the segment that contains the flash, not its neighbor. */
+    private static List<File> oneClip(List<File> sources, long momentMs) {
+        long[] starts = new long[sources.size()];
+        for (int i = 0; i < sources.size(); i++) {
+            starts[i] = RecordingTimeline.parseStartEpochMs(sources.get(i).getName());
+        }
+        int index = InstantSpan.containing(starts, momentMs);
+        if (index < 0 || index >= sources.size()) {
+            return new ArrayList<>();
+        }
+        return java.util.Collections.singletonList(sources.get(index));
     }
 
     private static List<File> cut(Context app, File cache, List<File> sources,

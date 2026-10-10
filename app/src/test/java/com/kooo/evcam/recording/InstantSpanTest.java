@@ -34,4 +34,12 @@ public class InstantSpanTest {
         assertEquals(440, InstantSpan.videoSampleBudget(20));
         assertEquals(440, InstantSpan.videoSampleBudget(0));
     }
+
+    @Test
+    public void oneFlashKeepsTheSegmentThatContainsIt() {
+        long[] starts = {0L, 60_000L};
+        assertEquals(1, InstantSpan.containing(starts, 65_000L));
+        assertEquals(0, InstantSpan.containing(starts, 5_000L));
+        assertEquals(0, InstantSpan.containing(starts, -1L));
+    }
 }
