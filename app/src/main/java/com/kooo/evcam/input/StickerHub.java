@@ -38,11 +38,10 @@ import java.util.UUID;
  * Keeps a GATT link to saved smart stickers and turns a press into a shortcut.
  *
  * <p>The head unit firmware that pairs this sticker is not on every car. This
- * talks to it directly. The link stays up while {@link AppConfig#isStickerEnabled()}
+ * talks to it directly. Every saved sticker stays connected at the same time. A sticker
+ * that is already up is left open. A stuck bond is cancelled before connect. The link stays up while {@link AppConfig#isStickerEnabled()}
  * is on, or while an experimental screen is open. The radio sleeps between
- * presses; a click is a notification, so dropping the link loses it. Pairing a second sticker
- * pauses the other links first, because this head unit will not bond while a
- * GATT connection is already up.</p>
+ * presses; a click is a notification, so dropping the link loses it.</p>
  */
 public final class StickerHub {
 
@@ -241,7 +240,6 @@ public final class StickerHub {
             close(mac);
             TRIES.remove(mac);
             holding++;
-            pauseOthers(mac);
             MAIN.postDelayed(() -> {
                 holding = Math.max(0, holding - 1);
                 pairThenConnect(application, mac);
@@ -292,6 +290,7 @@ public final class StickerHub {
         if (!canConnect(application)) {
             return;
         }
+        connectMissing();
         armKeep();
     }
 
@@ -303,35 +302,52 @@ public final class StickerHub {
         if (!holding(app)) {
             return;
         }
-        // A connectGatt while one sticker is up makes this radio drop that sticker.
-        // The keep tick is 15s, which is the lifetime that was being measured.
-        if (holding > 0 || !BONDING.isEmpty() || !PENDING.isEmpty() || !UP.isEmpty()) {
+        if (holding > 0 || !BONDING.isEmpty()) {
             armKeep();
             return;
         }
-        for (String address : StickerDevices.parse(new AppConfig(app).getStickerDevices())) {
-            if (PAUSED.contains(address) || !shouldHold(address)) {
-                continue;
-            }
-            reopen(address);
-            break;
-        }
+        connectMissing();
         armKeep();
     }
 
     /**
      * Direct connect. autoConnect never calls back on this radio, so the dots stayed grey.
-     * Does not call {@link #probe}, because that closes every other sticker first.
+     * Leaves any sticker that is already up alone.
      */
     private static void reopen(String address) {
         boolean busy = OPEN.containsKey(address) || PENDING.contains(address) || UP.contains(address);
-        if (StickerRecover.allowConnect(scanHold, otherLive(address), busy) != StickerRecover.CONNECT) {
+        if (StickerRecover.allowConnect(scanHold, busy) != StickerRecover.CONNECT) {
             return;
         }
         if (app == null || !shouldHold(address)) {
             return;
         }
         connect(app, address, false);
+    }
+
+    /** Connect every saved sticker that is down. Ones that are up stay up. */
+    private static void connectMissing() {
+        if (app == null || UserExit.isExited(app) || scanHold || !holding(app)) {
+            return;
+        }
+        if (holding > 0 || !BONDING.isEmpty()) {
+            return;
+        }
+        List<String> saved = StickerDevices.parse(new AppConfig(app).getStickerDevices());
+        Set<String> skip = new HashSet<>(UP);
+        skip.addAll(OPEN.keySet());
+        skip.addAll(PENDING);
+        skip.addAll(PAUSED);
+        List<String> missing = StickerRecover.missing(saved, skip);
+        for (int i = 0; i < missing.size(); i++) {
+            String address = missing.get(i);
+            long wait = i * StickerRecover.GAP_MS;
+            if (wait == 0L) {
+                reopen(address);
+            } else {
+                MAIN.postDelayed(() -> reopen(address), wait);
+            }
+        }
     }
 
     private static void releaseRadio() {
@@ -540,8 +556,7 @@ public final class StickerHub {
                         }
                         UP.remove(address);
                         drop(address, gatt);
-                        for (int action : StickerRecover.onDisconnect(
-                                false, wasUp, status, scanHold, otherLive(address))) {
+                        for (int action : StickerRecover.onDisconnect(false, wasUp, status, scanHold)) {
                             if (action == StickerRecover.CONNECT) {
                                 scheduleReconnect(address);
                             }
@@ -708,21 +723,11 @@ public final class StickerHub {
                     || PAUSED.contains(address)) {
                 return;
             }
-            if (!shouldHold(address) || otherLive(address)) {
+            if (!shouldHold(address)) {
                 return;
             }
             reopen(address);
         }, StickerRecover.RECONNECT_MS);
-    }
-
-    /** True when some other sticker is already connected. A new connectGatt would drop it. */
-    private static boolean otherLive(String address) {
-        for (String up : UP) {
-            if (!up.equals(address)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean shouldHold(String address) {
@@ -932,7 +937,10 @@ public final class StickerHub {
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onReady(address);
         }
-        MAIN.postDelayed(StickerHub::afterAttempt, 1200);
+        MAIN.postDelayed(() -> {
+            afterAttempt();
+            connectMissing();
+        }, 1200);
     }
 
     private static void phase(String address, int which) {
@@ -948,11 +956,7 @@ public final class StickerHub {
             AppLog.w(TAG, "再连一次 " + address + " try=" + (tries + 1) + " status=" + status);
             log("retry " + (tries + 1) + " " + address);
             phase(address, PHASE_CONNECTING);
-            MAIN.postDelayed(() -> {
-                if (app != null && !UP.contains(address)) {
-                    reopen(address);
-                }
-            }, 800);
+            MAIN.postDelayed(StickerHub::connectMissing, 800);
             return;
         }
         fail(address, reason, status);
@@ -969,7 +973,7 @@ public final class StickerHub {
     private static void fail(String address, int reason, int status) {
         NEXT.put(address, android.os.SystemClock.elapsedRealtime() + 60000L);
         if ((reason == FAIL_TIMEOUT || reason == FAIL_GATT) && shouldHold(address)) {
-            MAIN.postDelayed(() -> reopen(address), StickerRecover.AGAIN_MS);
+            MAIN.postDelayed(StickerHub::connectMissing, StickerRecover.AGAIN_MS);
         }
         AppLog.w(TAG, "智能贴失败 " + address + " reason=" + reason + " status=" + status);
         log("fail " + reason + " status=" + status);
