@@ -56,11 +56,11 @@ android {
         // 每次发布 tag 前同步更新这两个值：versionCode 决定能否覆盖安装，
         // versionName 会成为 Release 名称与 APK 文件名
         //
-        // 这一版是 fork：上游 2.10.14-alpha（279）为底，加上 dim、远程、侧视、快捷键和保存瞬间。
-        // versionCode 必须高于已经发出的 2.10.14-beta21（300）。
-        versionCode = 301
-        // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "2.10.14-beta22"
+        // 这一版是 fork：上游 2.10.15-beta（281）为底，加上 dim、远程、侧视、快捷键和保存瞬间。
+        // 上游 versionCode 是 281。本 fork 已经发出 301，装不上更小的号，所以号继续往上。
+        versionCode = 302
+        // 版本名与上游 2.10.15-beta 对齐。
+        versionName = "2.10.15-beta"
 
         buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
         buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))

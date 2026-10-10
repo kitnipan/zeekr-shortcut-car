@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta] - 2026-10-10
+
+### New and improved
+
+- Version name matches upstream 2.10.15-beta. Version code is 302, so this fork still installs over the previous builds.
+
 ## [2.10.14-beta22] - 2026-10-10
 
 ### New and improved
