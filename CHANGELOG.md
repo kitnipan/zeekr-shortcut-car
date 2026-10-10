@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta12] - 2026-10-10
+
+### New and improved
+
+- A saved smart-sticker shortcut stays saved. The link stays up after you leave the page, and each button shows an orange dot while it is connected.
+
 ## [2.10.14-beta11] - 2026-10-10
 
 ### New and improved
