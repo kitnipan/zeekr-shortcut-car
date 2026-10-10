@@ -102,6 +102,7 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
         bind(R.id.controller_action_save, ShortcutAction.SAVE);
         bind(R.id.controller_action_lock_save, ShortcutAction.LOCK_SAVE);
         bind(R.id.controller_action_hold_speak, ShortcutAction.HOLD_SPEAK);
+        bind(R.id.controller_action_cabin, ShortcutAction.CABIN_PASSENGER);
         highlightPress();
         inputs = (InputManager) getSystemService(INPUT_SERVICE);
         if (Build.VERSION.SDK_INT >= 31

@@ -81,6 +81,11 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
+    private static final String KEY_CABIN_ENABLED = "cabin_passenger_enabled";
+    private static final String KEY_CABIN_WIDTH = "cabin_passenger_width";
+    private static final String KEY_CABIN_HEIGHT = "cabin_passenger_height";
+    private static final String KEY_CABIN_X = "cabin_passenger_x";
+    private static final String KEY_CABIN_Y = "cabin_passenger_y";
     private static final String KEY_REARVIEW_PAN = "rearview_pan";                // 上下平移，0..1
     private static final String KEY_REARVIEW_LANE = "rearview_lane";              // 当前显示哪一路
     private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
@@ -822,6 +827,46 @@ public class AppConfig {
                 .putInt(KEY_REARVIEW_WIDTH, clampRearViewSize(widthPx, screenWidth))
                 .putInt(KEY_REARVIEW_HEIGHT, clampRearViewSize(heightPx, screenHeight))
                 .apply();
+    }
+
+    public boolean isCabinPassengerEnabled() {
+        return prefs.getBoolean(KEY_CABIN_ENABLED, false);
+    }
+
+    public void setCabinPassengerEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_CABIN_ENABLED, enabled).apply();
+    }
+
+    public int getCabinPassengerWidth(int screenWidth) {
+        return com.kooo.evcam.zeekr.CabinWindow.clamp(
+                prefs.getInt(KEY_CABIN_WIDTH, com.kooo.evcam.zeekr.CabinWindow.DEFAULT_WIDTH),
+                screenWidth);
+    }
+
+    public int getCabinPassengerHeight(int screenHeight) {
+        return com.kooo.evcam.zeekr.CabinWindow.clamp(
+                prefs.getInt(KEY_CABIN_HEIGHT, com.kooo.evcam.zeekr.CabinWindow.DEFAULT_HEIGHT),
+                screenHeight);
+    }
+
+    public void setCabinPassengerSize(int widthPx, int heightPx, int screenWidth, int screenHeight) {
+        prefs.edit()
+                .putInt(KEY_CABIN_WIDTH, com.kooo.evcam.zeekr.CabinWindow.clamp(widthPx, screenWidth))
+                .putInt(KEY_CABIN_HEIGHT, com.kooo.evcam.zeekr.CabinWindow.clamp(heightPx, screenHeight))
+                .apply();
+    }
+
+    /** Saved window origin. Negative means "not placed yet". */
+    public int getCabinPassengerX() {
+        return prefs.getInt(KEY_CABIN_X, -1);
+    }
+
+    public int getCabinPassengerY() {
+        return prefs.getInt(KEY_CABIN_Y, -1);
+    }
+
+    public void setCabinPassengerOrigin(int x, int y) {
+        prefs.edit().putInt(KEY_CABIN_X, x).putInt(KEY_CABIN_Y, y).apply();
     }
 
     /** 是否对后视镜画面做鱼眼校正。只影响显示，录制的原始画面不动。 */

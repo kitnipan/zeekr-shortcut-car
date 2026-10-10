@@ -297,6 +297,12 @@
     <string name="tap_speak_volume_value">%1$d%%</string>
     <string name="tap_speak_speaker">Speaker</string>
     <string name="tap_speak_speaker_default">Outside speaker</string>
+    <string name="shortcut_action_cabin">Open/Close cabin passenger</string>
+    <string name="set_cabin_title">Cabin passenger</string>
+    <string name="set_cabin_width_title">Window width</string>
+    <string name="set_cabin_height_title">Window height</string>
+    <string name="set_cabin_height_summary">The picture keeps its shape. A wider or taller window shows more of the front cabin.</string>
+    <string name="msg_cabin_on">Cabin passenger on. Drag it to move it. Pinch to resize.</string>
     <string name="shortcut_add">Add shortcut</string>
     <string name="shortcut_empty">No shortcuts yet. Add one, press the button, then pick an action.</string>
     <string name="shortcut_press">Press the external button</string>

@@ -61,6 +61,12 @@ public final class ShortcutPerformer {
             case HOLD_SPEAK:
                 MegaphoneService.toggle(context);
                 return;
+            case CABIN_PASSENGER:
+                AppConfig cabin = new AppConfig(context);
+                if (!OverlayCoordinator.setCabinPassengerEnabled(context, !cabin.isCabinPassengerEnabled())) {
+                    toast(context);
+                }
+                return;
             default:
                 return;
         }

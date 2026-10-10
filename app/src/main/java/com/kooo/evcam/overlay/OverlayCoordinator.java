@@ -88,6 +88,13 @@ public final class OverlayCoordinator {
             }, REAR_VIEW_DELAY_MS);
         }
 
+        if (config.isCabinPassengerEnabled() && allowed) {
+            main().postDelayed(() -> {
+                com.kooo.evcam.zeekr.CabinPassengerService.start(context);
+                AppLog.d(TAG, "座舱乘客窗口已按设置自动开启");
+            }, REAR_VIEW_DELAY_MS);
+        }
+
         if (config.isRecordingFloatingEnabled() && allowed) {
             sendToRecordingFloating(context, RecordingFloatingService.ACTION_SHOW);
             AppLog.d(TAG, "悬浮按钮已启动");
@@ -183,6 +190,24 @@ public final class OverlayCoordinator {
             BothMirrorsService.stop(context);
         }
         SideViewPopupService.refresh();
+        return true;
+    }
+
+    /**
+     * 开 / 关座舱乘客悬浮窗。返回值含义同 {@link #setRecordButtonEnabled}。
+     *
+     * <p>画面是前座舱，窗口和超级后视镜同一类：可拖、可改大小。用的是前座舱自己的附加输出。</p>
+     */
+    public static boolean setCabinPassengerEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setCabinPassengerEnabled(enabled);
+        if (enabled) {
+            com.kooo.evcam.zeekr.CabinPassengerService.start(context);
+        } else {
+            com.kooo.evcam.zeekr.CabinPassengerService.stop(context);
+        }
         return true;
     }
 

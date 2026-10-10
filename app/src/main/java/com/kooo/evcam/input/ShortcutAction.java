@@ -12,7 +12,8 @@ public enum ShortcutAction {
     DIM("toggle_dim", R.string.shortcut_action_dim),
     SAVE("save_moment", R.string.shortcut_action_save),
     LOCK_SAVE("lock_and_save", R.string.shortcut_action_lock_save),
-    HOLD_SPEAK("hold_to_speak", R.string.shortcut_action_hold_speak);
+    HOLD_SPEAK("hold_to_speak", R.string.shortcut_action_hold_speak),
+    CABIN_PASSENGER("cabin_passenger", R.string.shortcut_action_cabin);
 
     public final String key;
     public final int labelRes;

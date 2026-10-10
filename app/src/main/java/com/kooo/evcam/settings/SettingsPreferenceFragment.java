@@ -1166,6 +1166,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 startActivity(new Intent(getContext(), com.kooo.evcam.input.ShortcutListActivity.class)));
         onClick("pref_tap_to_speak", pref ->
                 openFragment(new TapToSpeakFragment(), R.string.set_tap_speak_title));
+        int cabinScreenWidth = getResources().getDisplayMetrics().widthPixels;
+        int cabinScreenHeight = getResources().getDisplayMetrics().heightPixels;
+        bindSlider("pref_cabin_width", com.kooo.evcam.zeekr.CabinWindow.MIN_PX, cabinScreenWidth,
+                appConfig.getCabinPassengerWidth(cabinScreenWidth), " px", value -> {
+                    appConfig.setCabinPassengerSize(value,
+                            appConfig.getCabinPassengerHeight(cabinScreenHeight),
+                            cabinScreenWidth, cabinScreenHeight);
+                    com.kooo.evcam.zeekr.CabinPassengerService.applySize(getContext());
+                });
+        bindSlider("pref_cabin_height", com.kooo.evcam.zeekr.CabinWindow.MIN_PX, cabinScreenHeight,
+                appConfig.getCabinPassengerHeight(cabinScreenHeight), " px", value -> {
+                    appConfig.setCabinPassengerSize(appConfig.getCabinPassengerWidth(cabinScreenWidth),
+                            value, cabinScreenWidth, cabinScreenHeight);
+                    com.kooo.evcam.zeekr.CabinPassengerService.applySize(getContext());
+                });
         bindSwitch("pref_save_moment_usb", appConfig.isSaveMomentUsb(),
                 value -> appConfig.setSaveMomentUsb(value));
         bindSwitch("pref_save_moment_drive", appConfig.isSaveMomentDrive(),

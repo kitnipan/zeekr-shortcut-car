@@ -129,6 +129,10 @@
             android:exported="false" />
 
         <service
+            android:name=".zeekr.CabinPassengerService"
+            android:exported="false" />
+
+        <service
             android:name=".zeekr.SideViewPopupService"
             android:exported="false" />
 

@@ -160,6 +160,12 @@
     <string name="tap_speak_volume_value">%1$d%%</string>
     <string name="tap_speak_speaker">喇叭</string>
     <string name="tap_speak_speaker_default">车外喇叭</string>
+    <string name="shortcut_action_cabin">打开/关闭座舱乘客</string>
+    <string name="set_cabin_title">座舱乘客</string>
+    <string name="set_cabin_width_title">窗口宽度</string>
+    <string name="set_cabin_height_title">窗口高度</string>
+    <string name="set_cabin_height_summary">画面比例不变。窗口更宽或更高，能看到更多前座舱。</string>
+    <string name="msg_cabin_on">座舱乘客已打开。拖动可移动，双指可改大小。</string>
     <string name="shortcut_add">添加快捷键</string>
     <string name="shortcut_empty">还没有快捷键。点添加，按下实体键，再选动作。</string>
     <string name="shortcut_press">按下实体键</string>

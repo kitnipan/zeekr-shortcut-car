@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta19] - 2026-10-10
+
+### New and improved
+
+- Cabin passenger, a shortcut. Opens the front cabin in a floating window, the same kind of window as Super mirror. Drag it to move it. Pinch it, or use Settings, System, Cabin passenger, to change the size. The picture keeps its shape.
+
 ## [2.10.14-beta18] - 2026-10-10
 
 ### New and improved

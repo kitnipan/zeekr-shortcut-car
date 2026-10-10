@@ -47,7 +47,9 @@ public final class CameraNeeds {
         /** 打转向灯弹出的侧视窗，只在弹着的时候登记。 */
         SIDE_POPUP,
         /** 快捷键同时打开的左右侧视，和侧视弹窗、超级后视镜共用那一路附加输出。 */
-        BOTH_MIRRORS
+        BOTH_MIRRORS,
+        /** 座舱乘客悬浮窗。用的是前座舱那一路自己的附加输出，不占后视镜的槽。 */
+        CABIN
     }
 
     private static final CameraNeeds CURRENT = new CameraNeeds();

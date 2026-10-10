@@ -512,6 +512,22 @@
             android:title="@string/set_tap_speak_title"
             android:summary="@string/set_tap_speak_summary" />
 
+        <PreferenceCategory
+            android:key="cat_cabin_passenger"
+            android:title="@string/set_cabin_title">
+
+            <SeekBarPreference
+                android:key="pref_cabin_width"
+                android:title="@string/set_cabin_width_title"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_cabin_height"
+                android:title="@string/set_cabin_height_title"
+                android:summary="@string/set_cabin_height_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
+
         <SwitchPreferenceCompat
             android:key="pref_save_moment_usb"
             android:title="@string/set_save_moment_usb_title"

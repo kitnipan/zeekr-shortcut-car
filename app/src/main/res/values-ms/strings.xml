@@ -184,6 +184,12 @@
     <string name="tap_speak_volume_value">%1$d%%</string>
     <string name="tap_speak_speaker">Pembesar suara</string>
     <string name="tap_speak_speaker_default">Pembesar suara luar</string>
+    <string name="shortcut_action_cabin">Buka/Tutup penumpang kabin</string>
+    <string name="set_cabin_title">Penumpang kabin</string>
+    <string name="set_cabin_width_title">Lebar tetingkap</string>
+    <string name="set_cabin_height_title">Tinggi tetingkap</string>
+    <string name="set_cabin_height_summary">Gambar kekal bentuknya. Tetingkap lebih lebar atau tinggi menunjukkan lebih banyak kabin hadapan.</string>
+    <string name="msg_cabin_on">Penumpang kabin dibuka. Seret untuk alih. Cubit untuk ubah saiz.</string>
     <string name="shortcut_add">Tambah pintasan</string>
     <string name="shortcut_empty">Belum ada pintasan. Tambah, tekan butang, kemudian pilih tindakan.</string>
     <string name="shortcut_press">Tekan butang luar</string>
