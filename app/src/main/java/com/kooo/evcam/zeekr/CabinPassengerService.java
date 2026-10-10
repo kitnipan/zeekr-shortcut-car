@@ -41,6 +41,7 @@ public class CabinPassengerService extends Service {
     private CabinPassengerView window;
     private SingleCamera boundCamera;
     private int retryCount;
+    private long lastRebuildMs;
     private Runnable retryRunnable;
     private Runnable watchdog;
 
@@ -152,8 +153,9 @@ public class CabinPassengerService extends Service {
             window.setBufferSize(buffer.getWidth(), buffer.getHeight());
         }
         camera.setMainFloatingSurface(new Surface(surfaceTexture), surfaceTexture);
+        lastRebuildMs = android.os.SystemClock.uptimeMillis();
         if (camera.isCameraOpened()) {
-            camera.recreateSession(false);
+            camera.recreateSession(true);
         } else {
             CameraForegroundService.whenReady(this, camera::openCamera);
         }
@@ -223,8 +225,18 @@ public class CabinPassengerService extends Service {
         watchdog = new Runnable() {
             @Override
             public void run() {
-                if (!ScreenState.dark() && (boundCamera == null || !boundCamera.isCameraOpened())) {
+                if (ScreenState.dark()) {
+                    handler.postDelayed(this, WATCHDOG_INTERVAL_MS);
+                    return;
+                }
+                if (boundCamera == null || !boundCamera.isCameraOpened()) {
                     rebind();
+                } else if (window != null && !window.hasFrame()) {
+                    long now = android.os.SystemClock.uptimeMillis();
+                    if (now - lastRebuildMs >= 8000L) {
+                        lastRebuildMs = now;
+                        boundCamera.recreateSession(true);
+                    }
                 }
                 handler.postDelayed(this, WATCHDOG_INTERVAL_MS);
             }

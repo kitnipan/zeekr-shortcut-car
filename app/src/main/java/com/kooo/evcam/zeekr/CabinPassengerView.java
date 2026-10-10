@@ -1,7 +1,7 @@
 package com.kooo.evcam.zeekr;
 
 import android.content.Context;
-import android.graphics.Matrix;
+import android.graphics.Canvas;
 import android.graphics.PixelFormat;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
@@ -13,7 +13,6 @@ import android.view.WindowManager;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.camera.LaneSurfaceMatrix;
 import com.kooo.evcam.profile.CameraProfile;
 import com.kooo.evcam.profile.LaneLayout;
 import com.kooo.evcam.profile.ProfileSizes;
@@ -35,7 +34,7 @@ public class CabinPassengerView extends ViewGroup {
     private final WindowManager windowManager;
     private final AppConfig appConfig;
     private final TextureView textureView;
-    private final Matrix frame = new Matrix();
+    private boolean sawFrame;
 
     private WindowManager.LayoutParams params;
     private boolean attached;
@@ -79,7 +78,8 @@ public class CabinPassengerView extends ViewGroup {
 
             @Override
             public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-                applyFrame();
+                sawFrame = true;
+                invalidate();
             }
         });
         addView(textureView);
@@ -92,13 +92,17 @@ public class CabinPassengerView extends ViewGroup {
     public void setBufferSize(int width, int height) {
         bufferWidth = width;
         bufferHeight = height;
-        applyFrame();
+        invalidate();
     }
 
     /** Front-facing cameras are flipped once by Android. Undo that before the saved mirror. */
     public void setSystemMirrored(boolean mirrored) {
         systemMirrored = mirrored;
-        applyFrame();
+        invalidate();
+    }
+
+    public boolean hasFrame() {
+        return sawFrame;
     }
 
     public TextureView getTextureView() {
@@ -144,7 +148,7 @@ public class CabinPassengerView extends ViewGroup {
         params.x = CabinWindow.clampOrigin(params.x, params.width, screenWidth());
         params.y = CabinWindow.clampOrigin(params.y, params.height, screenHeight());
         applyLayout();
-        applyFrame();
+        invalidate();
     }
 
     public void hide() {
@@ -161,8 +165,34 @@ public class CabinPassengerView extends ViewGroup {
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        textureView.layout(0, 0, getWidth(), getHeight());
-        applyFrame();
+        textureView.layout(0, 0, r - l, b - t);
+    }
+
+    /**
+     * The camera writes into the child. This head unit does not show that child on its own.
+     * Super mirror paints it here, once per frame. A transform on the child was leaving this
+     * window on its black background.
+     */
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int save = canvas.save();
+        if (mirror()) {
+            canvas.scale(-1f, 1f, width / 2f, height / 2f);
+        }
+        if (bufferWidth > 0 && bufferHeight > 0) {
+            float scale = Math.max(width / (float) bufferWidth, height / (float) bufferHeight);
+            float drawnW = bufferWidth * scale;
+            float drawnH = bufferHeight * scale;
+            canvas.translate((width - drawnW) / 2f, (height - drawnH) / 2f);
+            canvas.scale(drawnW / width, drawnH / height);
+        }
+        drawChild(canvas, textureView, getDrawingTime());
+        canvas.restoreToCount(save);
     }
 
     @Override
@@ -236,7 +266,7 @@ public class CabinPassengerView extends ViewGroup {
         params.x = CabinWindow.clampOrigin(params.x, params.width, screenWidth());
         params.y = CabinWindow.clampOrigin(params.y, params.height, screenHeight());
         applyLayout();
-        applyFrame();
+        invalidate();
     }
 
     private static float span(MotionEvent event) {
@@ -245,26 +275,11 @@ public class CabinPassengerView extends ViewGroup {
         return (float) Math.hypot(dx, dy);
     }
 
-    private void applyFrame() {
-        int width = textureView.getWidth();
-        int height = textureView.getHeight();
-        if (width <= 0 || height <= 0) {
-            return;
-        }
+    /** Saved mirror, after undoing the flip Android already applied to a front-facing camera. */
+    private boolean mirror() {
         LaneLayout lane = lane();
-        if (lane == null) {
-            textureView.setTransform(null);
-            return;
-        }
-        LaneSurfaceMatrix.build(frame, width, height, bufferWidth, bufferHeight,
-                lane.rotation, lane.mirrored,
-                lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
-                lane.scaleX, lane.scaleY, lane.translateX, lane.translateY,
-                LaneLayout.FILL);
-        if (systemMirrored) {
-            frame.preScale(-1f, 1f, width / 2f, height / 2f);
-        }
-        textureView.setTransform(frame);
+        boolean saved = lane != null && lane.mirrored;
+        return saved != systemMirrored;
     }
 
     private LaneLayout lane() {
