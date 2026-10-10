@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta17] - 2026-10-10
+
+### Fixed
+
+- A connected smart sticker stays connected. The connected card no longer comes back every few seconds, and the sticker screen no longer sits on Connecting after the button is already paired.
+
 ## [2.10.14-beta16] - 2026-10-10
 
 ### New and improved
