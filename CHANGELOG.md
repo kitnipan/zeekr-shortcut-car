@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta3] - 2026-10-10
+
+### Fixed
+
+- Smart sticker scan finds the button. Discovery runs first, and a name with ZEEKR counts as a sticker.
+- A dropped sticker connects again. Press it while the dot is grey and the link can come back. A sticker that is already connected is left alone.
+
 ## [2.10.15-beta2] - 2026-10-10
 
 ### New and improved
