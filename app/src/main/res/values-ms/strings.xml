@@ -252,6 +252,7 @@
     <string name="sticker_discovering">Bersambung. Membaca perkhidmatan…</string>
     <string name="sticker_forget">Lupakan</string>
     <string name="sticker_connected">Bersambung</string>
+    <string name="sticker_link_off">Tidak bersambung</string>
     <string name="sticker_waiting">Tekan pelekat</string>
     <string name="sticker_press_line">%1$s  ·  %2$s</string>
     <string name="sticker_saved_action">Disimpan. %1$s menjalankan %2$s.</string>

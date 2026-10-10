@@ -89,6 +89,13 @@ public final class StickerHub {
     private static final Set<String> PENDING = new HashSet<>();
     /** Reached STATE_CONNECTED for this address. A status-0 disconnect before that is noise. */
     private static final Set<String> UP = new HashSet<>();
+    /** Last packet or signal reading. A quiet link gets connected again. */
+    private static final Map<String, Long> HEARD = new HashMap<>();
+    /** Earliest time to try a sticker again after the retries are used up. */
+    private static final Map<String, Long> NEXT = new HashMap<>();
+    private static final long KEEP_MS = 15000L;
+    private static final long QUIET_MS = 30000L;
+    private static final Runnable KEEP = StickerHub::keep;
     /** Closed on purpose. The disconnect callback must not reconnect. */
     private static final Set<String> CLOSING = new HashSet<>();
     private static final List<Watch> WATCHES = new ArrayList<>();
@@ -126,6 +133,11 @@ public final class StickerHub {
 
     public static void setCapture(boolean on) {
         capture = on;
+    }
+
+    /** Live GATT link, not merely a saved address. */
+    public static boolean isUp(String address) {
+        return UP.contains(StickerDevices.normalize(address));
     }
 
     /** Connect saved stickers, or drop them when the experiment is off and the screen is closed. */
@@ -186,6 +198,7 @@ public final class StickerHub {
         }
         boolean hold = linkWanted(application) || !WATCHES.isEmpty();
         if (!hold) {
+            MAIN.removeCallbacks(KEEP);
             closeAll();
             return;
         }
@@ -199,11 +212,94 @@ public final class StickerHub {
         if (!canConnect(application)) {
             return;
         }
-        for (String address : wanted) {
-            if (!OPEN.containsKey(address) && !PENDING.contains(address) && !PAUSED.contains(address)) {
-                connect(application, address, true);
+        if (UP.isEmpty()) {
+            for (String address : wanted) {
+                if (!OPEN.containsKey(address) && !PENDING.contains(address) && !PAUSED.contains(address)) {
+                    connect(application, address, false);
+                    break;
+                }
             }
         }
+        armKeep();
+    }
+
+    /** Bring a saved sticker back without opening the connect page. */
+    private static void keep() {
+        if (app == null || UserExit.isExited(app)) {
+            return;
+        }
+        if (!linkWanted(app) && WATCHES.isEmpty()) {
+            return;
+        }
+        if (holding > 0 || !BONDING.isEmpty()) {
+            armKeep();
+            return;
+        }
+        long now = android.os.SystemClock.elapsedRealtime();
+        for (String address : StickerDevices.parse(new AppConfig(app).getStickerDevices())) {
+            if (PAUSED.contains(address) || PENDING.contains(address) || !shouldHold(address)) {
+                continue;
+            }
+            if (UP.contains(address)) {
+                Long heard = HEARD.get(address);
+                if (heard != null && now - heard > QUIET_MS) {
+                    log("link quiet " + address);
+                    close(address);
+                    String again = address;
+                    MAIN.postDelayed(() -> reopen(again), 700);
+                    break;
+                }
+                if (heard == null) {
+                    HEARD.put(address, now);
+                }
+                BluetoothGatt gatt = OPEN.get(address);
+                if (gatt != null) {
+                    try {
+                        gatt.readRemoteRssi();
+                    } catch (SecurityException ignored) {
+                        // permission dropped
+                    }
+                }
+            } else if (!OPEN.containsKey(address)) {
+                Long next = NEXT.get(address);
+                if (next != null && now < next) {
+                    continue;
+                }
+                reopen(address);
+                break;
+            }
+        }
+        armKeep();
+    }
+
+    /** One sticker at a time. If another link is up, pause it the same way a manual connect does. */
+    private static void reopen(String address) {
+        if (app == null || !shouldHold(address) || OPEN.containsKey(address) || PENDING.contains(address)) {
+            return;
+        }
+        boolean otherUp = false;
+        for (String up : UP) {
+            if (!up.equals(address)) {
+                otherUp = true;
+                break;
+            }
+        }
+        if (otherUp) {
+            probe(app, address);
+        } else {
+            connect(app, address, false);
+        }
+    }
+
+    private static void armKeep() {
+        MAIN.removeCallbacks(KEEP);
+        if (app == null) {
+            return;
+        }
+        if (!linkWanted(app) && WATCHES.isEmpty()) {
+            return;
+        }
+        MAIN.postDelayed(KEEP, KEEP_MS);
     }
 
     private static void pairThenConnect(Context application, String address) {
@@ -359,6 +455,7 @@ public final class StickerHub {
                             return;
                         }
                         UP.add(address);
+                        HEARD.put(address, android.os.SystemClock.elapsedRealtime());
                         OPEN.put(address, gatt);
                         state(address, true);
                         phase(address, PHASE_DISCOVERING);
@@ -434,6 +531,7 @@ public final class StickerHub {
                     return;
                 }
                 MAIN.post(() -> {
+                    HEARD.put(address, android.os.SystemClock.elapsedRealtime());
                     for (Watch watch : new ArrayList<>(WATCHES)) {
                         watch.onRssi(address, rssi);
                     }
@@ -523,6 +621,7 @@ public final class StickerHub {
         }
         lastPacket = key;
         lastPacketAt = now;
+        HEARD.put(address, now);
         AppLog.d(TAG, key);
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onPacket(address, raw);
@@ -577,6 +676,8 @@ public final class StickerHub {
         }
         PENDING.remove(address);
         OPEN.remove(address);
+        UP.remove(address);
+        HEARD.remove(address);
         BluetoothGatt dying = current != null ? current : gatt;
         if (dying != null) {
             try {
@@ -592,6 +693,7 @@ public final class StickerHub {
         cancelBond(address);
         CLOSING.add(address);
         UP.remove(address);
+        HEARD.remove(address);
         PENDING.remove(address);
         BluetoothGatt gatt = OPEN.remove(address);
         state(address, false);
@@ -610,6 +712,8 @@ public final class StickerHub {
     private static void closeAll() {
         PAUSED.clear();
         UP.clear();
+        HEARD.clear();
+        NEXT.clear();
         queuedAddress = null;
         holding = 0;
         for (String address : new ArrayList<>(OPEN.keySet())) {
@@ -741,6 +845,7 @@ public final class StickerHub {
 
     private static void ready(String address) {
         TRIES.remove(address);
+        NEXT.remove(address);
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onReady(address);
         }
@@ -779,6 +884,7 @@ public final class StickerHub {
     }
 
     private static void fail(String address, int reason, int status) {
+        NEXT.put(address, android.os.SystemClock.elapsedRealtime() + 60000L);
         AppLog.w(TAG, "智能贴失败 " + address + " reason=" + reason + " status=" + status);
         log("fail " + reason + " status=" + status);
         for (Watch watch : new ArrayList<>(WATCHES)) {

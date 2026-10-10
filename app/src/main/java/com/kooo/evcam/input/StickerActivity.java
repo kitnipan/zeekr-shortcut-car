@@ -11,6 +11,7 @@ import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -52,7 +53,6 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     private final Runnable scanDone = this::stopScan;
     private final Map<String, Seen> seen = new LinkedHashMap<>();
     private final ArrayDeque<String> logLines = new ArrayDeque<>();
-    private final Map<String, Boolean> connected = new LinkedHashMap<>();
 
     private AppConfig config;
     private LinearLayout devices;
@@ -393,11 +393,20 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         TextView title = line.findViewById(R.id.sticker_name);
         TextView meta = line.findViewById(R.id.sticker_meta);
         TextView action = line.findViewById(R.id.sticker_action);
+        View dot = line.findViewById(R.id.sticker_dot);
         title.setText(name == null || name.isEmpty() ? getString(R.string.sticker_unnamed) : name);
         String detail = rssi == null ? address : getString(R.string.sticker_device_meta, address, rssi);
-        if (Boolean.TRUE.equals(connected.get(address))) {
-            detail = detail + "  " + getString(R.string.sticker_connected);
+        boolean up = saved && StickerHub.isUp(address);
+        if (saved) {
+            String mapped = mapped(address);
+            if (mapped != null) {
+                detail = detail + "  " + mapped;
+            }
+            detail = detail + "  " + getString(up ? R.string.sticker_connected : R.string.sticker_link_off);
         }
+        dot.setVisibility(saved ? View.VISIBLE : View.GONE);
+        dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this,
+                up ? R.color.energy : R.color.text_tertiary)));
         meta.setText(detail);
         action.setText(saved ? R.string.sticker_forget : R.string.sticker_connect);
         action.setOnClickListener(v -> {
@@ -423,7 +432,6 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         config.setButtonShortcuts(ShortcutBook.write(kept));
         config.setStickerDevices(StickerDevices.write(
                 StickerDevices.remove(StickerDevices.parse(config.getStickerDevices()), address)));
-        connected.remove(address);
         StickerHub.disconnect(address);
         render();
     }
@@ -435,6 +443,28 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     private BluetoothAdapter adapter() {
         BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         return manager == null ? null : manager.getAdapter();
+    }
+
+    /** Saved shortcut for this sticker, so the row shows the mapping is still stored. */
+    private String mapped(String address) {
+        String device = StickerFrame.deviceName(address);
+        StringBuilder out = new StringBuilder();
+        for (Shortcut item : ShortcutBook.parse(config.getButtonShortcuts())) {
+            if (item == null || !device.equals(item.deviceName)) {
+                continue;
+            }
+            ShortcutAction action = ShortcutAction.fromKey(item.action);
+            if (action == null) {
+                continue;
+            }
+            if (out.length() > 0) {
+                out.append(" · ");
+            }
+            out.append(getString(item.pressKind().labelRes));
+            out.append(' ');
+            out.append(getString(action.labelRes));
+        }
+        return out.length() == 0 ? null : out.toString();
     }
 
     private void append(String line) {
@@ -457,7 +487,6 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
 
     @Override
     public void onState(String address, boolean up) {
-        connected.put(StickerDevices.normalize(address), up);
         render();
     }
 
@@ -482,7 +511,6 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         String mac = StickerDevices.normalize(address);
         config.setStickerDevices(StickerDevices.write(
                 StickerDevices.put(StickerDevices.parse(config.getStickerDevices()), mac)));
-        connected.put(mac, true);
         status.setText(R.string.sticker_waiting);
         render();
     }

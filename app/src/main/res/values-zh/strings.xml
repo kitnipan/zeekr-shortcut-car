@@ -228,6 +228,7 @@
     <string name="sticker_discovering">已连接。正在读取服务…</string>
     <string name="sticker_forget">忘记</string>
     <string name="sticker_connected">已连接</string>
+    <string name="sticker_link_off">未连接</string>
     <string name="sticker_waiting">按下贴纸</string>
     <string name="sticker_press_line">%1$s  ·  %2$s</string>
     <string name="sticker_saved_action">已保存。%1$s执行%2$s。</string>
