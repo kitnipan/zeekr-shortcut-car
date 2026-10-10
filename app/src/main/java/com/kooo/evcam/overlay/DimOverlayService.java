@@ -34,10 +34,18 @@ public class DimOverlayService extends Service {
     public static final String ACTION_HIDE = "com.kooo.evcam.action.HIDE_DIM_OVERLAY";
     public static final String ACTION_APPLY = "com.kooo.evcam.action.APPLY_DIM_OVERLAY";
 
+    private static volatile DimOverlayService instance;
+
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WindowManager windowManager;
     private View shade;
     private WindowManager.LayoutParams layoutParams;
+
+    /** The shade window is in the window manager. Later overlays must be re-added to sit above it. */
+    public static boolean isShowing() {
+        DimOverlayService svc = instance;
+        return svc != null && svc.shade != null;
+    }
 
     public static void show(Context context) {
         start(context, ACTION_SHOW);
@@ -60,6 +68,7 @@ public class DimOverlayService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
     }
 
@@ -229,6 +238,9 @@ public class DimOverlayService extends Service {
     @Override
     public void onDestroy() {
         detach();
+        if (instance == this) {
+            instance = null;
+        }
         super.onDestroy();
     }
 

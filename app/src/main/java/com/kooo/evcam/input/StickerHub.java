@@ -86,6 +86,8 @@ public final class StickerHub {
     /** GATT from the moment connectGatt returns, including while still connecting. */
     private static final Map<String, BluetoothGatt> OPEN = new HashMap<>();
     private static final Set<String> PENDING = new HashSet<>();
+    /** Connected, service discovery not finished. The timeout must not close this link. */
+    private static final Set<String> DISCOVERING = new HashSet<>();
     /** Reached STATE_CONNECTED for this address. A status-0 disconnect before that is noise. */
     private static final Set<String> UP = new HashSet<>();
     /** Earliest time to try a sticker again after the retries are used up. */
@@ -100,6 +102,8 @@ public final class StickerHub {
     private static final Set<String> PAUSED = new HashSet<>();
     private static final Map<String, Runnable> BOND_TIMEOUT = new HashMap<>();
     private static String queuedAddress;
+    /** Address that just timed out. The next dial is the other sticker. */
+    private static String yield = "";
     /** Pause delay is still running. Do not bring the other stickers back yet. */
     private static int holding;
     private static final Map<String, ArrayDeque<BluetoothGattCharacteristic>> SUBSCRIBE = new HashMap<>();
@@ -325,29 +329,26 @@ public final class StickerHub {
         connect(app, address, false);
     }
 
-    /** Connect every saved sticker that is down. Ones that are up stay up. */
+    /** Connect one saved sticker that is down. A second connectGatt while one is in flight never calls back. */
     private static void connectMissing() {
         if (app == null || UserExit.isExited(app) || scanHold || !holding(app)) {
             return;
         }
-        if (holding > 0 || !BONDING.isEmpty()) {
+        if (holding > 0 || !BONDING.isEmpty() || !PENDING.isEmpty() || !DISCOVERING.isEmpty()) {
             return;
         }
         List<String> saved = StickerDevices.parse(new AppConfig(app).getStickerDevices());
         Set<String> skip = new HashSet<>(UP);
         skip.addAll(OPEN.keySet());
         skip.addAll(PENDING);
+        skip.addAll(DISCOVERING);
         skip.addAll(PAUSED);
-        List<String> missing = StickerRecover.missing(saved, skip);
-        for (int i = 0; i < missing.size(); i++) {
-            String address = missing.get(i);
-            long wait = i * StickerRecover.GAP_MS;
-            if (wait == 0L) {
-                reopen(address);
-            } else {
-                MAIN.postDelayed(() -> reopen(address), wait);
-            }
+        String address = StickerRecover.due(StickerRecover.missing(saved, skip), false, yield);
+        yield = "";
+        if (address.isEmpty() || !shouldHold(address)) {
+            return;
         }
+        reopen(address);
     }
 
     private static void releaseRadio() {
@@ -533,8 +534,16 @@ public final class StickerHub {
                         }
                         UP.add(address);
                         OPEN.put(address, gatt);
+                        PENDING.remove(address);
+                        DISCOVERING.add(address);
                         state(address, true);
                         phase(address, PHASE_DISCOVERING);
+                        MAIN.postDelayed(() -> {
+                            if (!DISCOVERING.remove(address)) {
+                                return;
+                            }
+                            connectMissing();
+                        }, CONNECT_TIMEOUT_MS);
                         try {
                             gatt.discoverServices();
                         } catch (SecurityException e) {
@@ -569,6 +578,7 @@ public final class StickerHub {
             public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                 MAIN.post(() -> {
                     if (status != BluetoothGatt.GATT_SUCCESS) {
+                        DISCOVERING.remove(address);
                         failOrRetry(address, FAIL_GATT, status);
                         return;
                     }
@@ -581,6 +591,7 @@ public final class StickerHub {
                     }
                     SUBSCRIBE.put(address, new ArrayDeque<>(notifies));
                     PENDING.remove(address);
+                    DISCOVERING.remove(address);
                     ready(address);
                     writeNext(gatt, address);
                 });
@@ -751,6 +762,7 @@ public final class StickerHub {
             return;
         }
         PENDING.remove(address);
+        DISCOVERING.remove(address);
         OPEN.remove(address);
         UP.remove(address);
         BluetoothGatt dying = current != null ? current : gatt;
@@ -769,6 +781,7 @@ public final class StickerHub {
         CLOSING.add(address);
         UP.remove(address);
         PENDING.remove(address);
+        DISCOVERING.remove(address);
         BluetoothGatt gatt = OPEN.remove(address);
         state(address, false);
         if (gatt == null) {
@@ -789,6 +802,8 @@ public final class StickerHub {
         NEXT.clear();
         queuedAddress = null;
         holding = 0;
+        yield = "";
+        DISCOVERING.clear();
         for (String address : new ArrayList<>(OPEN.keySet())) {
             close(address);
         }
@@ -973,6 +988,7 @@ public final class StickerHub {
     private static void fail(String address, int reason, int status) {
         NEXT.put(address, android.os.SystemClock.elapsedRealtime() + 60000L);
         if ((reason == FAIL_TIMEOUT || reason == FAIL_GATT) && shouldHold(address)) {
+            yield = address;
             MAIN.postDelayed(StickerHub::connectMissing, StickerRecover.AGAIN_MS);
         }
         AppLog.w(TAG, "智能贴失败 " + address + " reason=" + reason + " status=" + status);

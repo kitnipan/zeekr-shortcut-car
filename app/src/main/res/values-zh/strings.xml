@@ -246,6 +246,13 @@
     <string name="ctrl_paired">已配对的外设</string>
     <string name="set_sticker_title">智能贴（试验）</string>
     <string name="set_sticker_summary">搜索车机尚未配对的蓝牙贴纸。按下后执行已保存的快捷键</string>
+    <string name="ble_signal_title">蓝牙信号</string>
+    <string name="ble_signal_summary">收音机听到的每一条低功耗蓝牙广播，带信号强度</string>
+    <string name="ble_signal_open">信号</string>
+    <string name="ble_signal_empty">还没有信号。先扫描，长按贴纸把它唤醒。</string>
+    <string name="ble_signal_count">%1$d 个信号</string>
+    <string name="ble_signal_stop">停止</string>
+    <string name="ble_signal_meta">%1$s    %2$d dBm</string>
     <string name="sticker_subtitle">长按贴纸直到指示灯亮起，然后扫描。在此页按下用于保存，离开此页后执行</string>
     <string name="sticker_scan">扫描</string>
     <string name="sticker_scanning">正在扫描…</string>

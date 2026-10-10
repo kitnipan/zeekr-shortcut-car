@@ -25,9 +25,22 @@ public class StickerRecoverTest {
     }
 
     @Test
-    public void bothDownStickersAreConnected() {
+    public void bothDownStickersNeedALink() {
         List<String> saved = Arrays.asList("AA:AA:AA:AA:AA:01", "AA:AA:AA:AA:AA:02");
         assertEquals(saved, StickerRecover.missing(saved, Collections.emptySet()));
+    }
+
+    @Test
+    public void onlyOneConnectWhileTheRadioIsBusy() {
+        List<String> missing = Arrays.asList("AA:AA:AA:AA:AA:01", "AA:AA:AA:AA:AA:02");
+        assertEquals("", StickerRecover.due(missing, true, ""));
+        assertEquals("AA:AA:AA:AA:AA:01", StickerRecover.due(missing, false, ""));
+    }
+
+    @Test
+    public void timeoutYieldsTheRadioToTheOtherSticker() {
+        List<String> missing = Arrays.asList("AA:AA:AA:AA:AA:01", "AA:AA:AA:AA:AA:02");
+        assertEquals("AA:AA:AA:AA:AA:02", StickerRecover.due(missing, false, "AA:AA:AA:AA:AA:01"));
     }
 
     @Test

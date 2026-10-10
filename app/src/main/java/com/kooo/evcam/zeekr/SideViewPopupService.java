@@ -121,6 +121,7 @@ public class SideViewPopupService extends Service {
     /**
      * 遮罩窗口后加，会盖住侧视。同类悬浮窗按添加先后叠，只能摘下重挂；
      * 重挂会重新接相机，所以只在遮罩刚打开时做一次。
+     * 遮罩先开、转向灯后弹的窗口在显示时再摘下重挂。
      */
     public static void raiseAboveShade() {
         SideViewPopupService svc = instance;

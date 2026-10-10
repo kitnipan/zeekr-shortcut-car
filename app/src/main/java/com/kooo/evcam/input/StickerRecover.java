@@ -17,7 +17,7 @@ public final class StickerRecover {
     public static final long AGAIN_MS = 500L;
     /** After an unexpected drop, connect while the sticker is still advertising. */
     public static final long RECONNECT_MS = 400L;
-    /** Gap between starting two connectGatt calls, so the stack is not hit in the same moment. */
+    /** Gap is unused while a connect is in flight. A second connectGatt then never calls back. */
     public static final long GAP_MS = 400L;
 
     private StickerRecover() {
@@ -34,7 +34,7 @@ public final class StickerRecover {
         return CONNECT;
     }
 
-    /** Saved stickers that are not already up or connecting. Both come back, not one. */
+    /** Saved stickers that are not already up or connecting. */
     public static List<String> missing(List<String> saved, Set<String> skip) {
         List<String> out = new ArrayList<>();
         if (saved == null) {
@@ -46,6 +46,24 @@ public final class StickerRecover {
             }
         }
         return out;
+    }
+
+    /**
+     * The one sticker to dial now. Empty while a connectGatt is already in flight.
+     * {@code yield} is the address that just timed out, so the other sticker gets the radio.
+     */
+    public static String due(List<String> missing, boolean inFlight, String yield) {
+        if (inFlight || missing == null || missing.isEmpty()) {
+            return "";
+        }
+        if (yield != null && !yield.isEmpty()) {
+            for (String address : missing) {
+                if (!address.equals(yield)) {
+                    return address;
+                }
+            }
+        }
+        return missing.get(0);
     }
 
     /**

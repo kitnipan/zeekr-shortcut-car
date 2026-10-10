@@ -43,6 +43,14 @@
             android:textColor="@color/text_tertiary" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/sticker_signals"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
+            android:text="@string/ble_signal_open" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/sticker_scan"
             style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"

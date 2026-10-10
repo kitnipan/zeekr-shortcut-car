@@ -206,6 +206,13 @@
             android:exported="false" />
 
         <activity
+            android:name=".input.BleSignalActivity"
+            android:label="@string/ble_signal_title"
+            android:theme="@style/Theme.Cam"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
+        <activity
             android:name=".input.ShortcutListActivity"
             android:label="@string/set_shortcuts_title"
             android:theme="@style/Theme.Cam"

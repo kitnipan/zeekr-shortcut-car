@@ -145,6 +145,8 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         actions = findViewById(R.id.sticker_actions);
         scanButton = findViewById(R.id.sticker_scan);
         findViewById(R.id.sticker_close).setOnClickListener(v -> finish());
+        findViewById(R.id.sticker_signals).setOnClickListener(v ->
+                startActivity(new Intent(this, BleSignalActivity.class)));
         scanButton.setOnClickListener(v -> {
             if (scanning) {
                 stopScan();
@@ -661,9 +663,15 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         render();
     }
 
+    private String lastPacketLine = "";
+
     @Override
     public void onPacket(String address, byte[] raw) {
-        append(StickerFrame.hex(raw));
+        String hex = StickerFrame.hex(raw);
+        if (!hex.equals(lastPacketLine)) {
+            lastPacketLine = hex;
+            append(hex);
+        }
         StickerFrame frame = StickerFrame.parse(raw);
         if (frame == null) {
             return;

@@ -14,6 +14,7 @@ import android.view.WindowManager;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.AutoFitTextureView;
+import com.kooo.evcam.overlay.DimOverlayService;
 
 /**
  * 打转向灯弹出的侧视窗：只显示左或右那一路，不能拖、不能点。
@@ -188,6 +189,9 @@ public class SideViewPopupView extends ViewGroup {
             if (sideChanged) {
                 invalidate();
             }
+            if (show) {
+                liftAboveShade();
+            }
             return;
         }
         params = new WindowManager.LayoutParams(
@@ -204,8 +208,29 @@ public class SideViewPopupView extends ViewGroup {
             windowManager.addView(this, params);
             attached = true;
             visible = show;
+            if (show) {
+                liftAboveShade();
+            }
         } catch (Exception e) {
             AppLog.e(TAG, "侧视窗添加失败", e);
+        }
+    }
+
+    /**
+     * 遮罩是全屏、先挂上的。后加的侧视小窗在这台车机上仍会被盖住，转向灯弹出的就是一块黑的。
+     * 摘下再挂，窗口变成最后添加的，相机会重新接上。超级后视镜能修好，是因为它自己后加了一层。
+     */
+    void liftAboveShade() {
+        if (!attached || !visible || !DimOverlayService.isShowing()) {
+            return;
+        }
+        try {
+            windowManager.removeView(this);
+            windowManager.addView(this, params);
+            AppLog.i(TAG, "侧视窗：提到遮罩上面");
+        } catch (Exception e) {
+            attached = false;
+            AppLog.w(TAG, "侧视窗置顶失败: " + e);
         }
     }
 

@@ -270,6 +270,13 @@
     <string name="ctrl_paired">Peranti berpasangan</string>
     <string name="set_sticker_title">Pelekat pintar (percubaan)</string>
     <string name="set_sticker_summary">Mencari pelekat Bluetooth yang unit kepala belum pasangkan. Tekanan menjalankan pintasan yang disimpan</string>
+    <string name="ble_signal_title">Isyarat BLE</string>
+    <string name="ble_signal_summary">Setiap iklan Bluetooth LE yang radio dengar, dengan kekuatan isyarat</string>
+    <string name="ble_signal_open">Isyarat</string>
+    <string name="ble_signal_empty">Belum ada isyarat. Imbas, dan tekan lama pelekat untuk mengejutkannya.</string>
+    <string name="ble_signal_count">%1$d isyarat</string>
+    <string name="ble_signal_stop">Berhenti</string>
+    <string name="ble_signal_meta">%1$s    %2$d dBm</string>
     <string name="sticker_subtitle">Tekan lama pelekat sehingga ia bangun, kemudian imbas. Tekanan di skrin ini disimpan. Ia berjalan selepas keluar</string>
     <string name="sticker_scan">Imbas</string>
     <string name="sticker_scanning">Mengimbas…</string>

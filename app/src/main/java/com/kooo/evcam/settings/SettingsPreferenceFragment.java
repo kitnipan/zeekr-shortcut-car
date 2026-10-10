@@ -1169,6 +1169,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 startActivity(new Intent(getContext(), ControllerProbeActivity.class)));
         onClick("pref_sticker", pref ->
                 startActivity(new Intent(getContext(), StickerActivity.class)));
+        onClick("pref_ble_signal", pref ->
+                startActivity(new Intent(getContext(), com.kooo.evcam.input.BleSignalActivity.class)));
         onClick("pref_shortcuts", pref ->
                 startActivity(new Intent(getContext(), com.kooo.evcam.input.ShortcutListActivity.class)));
         onClick("pref_tap_to_speak", pref ->
