@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta15] - 2026-10-10
+
+### New and improved
+
+- Tap to speak, under Settings, System. Pick the button, the volume, and the speaker. Press and hold is the default. Press once can keep the microphone open for 5, 10, 20, or 30 seconds.
+
 ## [2.10.14-beta14] - 2026-10-10
 
 ### New and improved

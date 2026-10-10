@@ -38,12 +38,12 @@ public final class Megaphone {
         return type == AudioDeviceInfo.TYPE_BUS && BUS_ADDRESS.equals(address);
     }
 
-    static AudioDeviceInfo find(AudioDeviceInfo[] devices) {
-        if (devices == null) {
+    static AudioDeviceInfo find(AudioDeviceInfo[] devices, String address) {
+        if (devices == null || address == null || address.isEmpty()) {
             return null;
         }
         for (AudioDeviceInfo device : devices) {
-            if (device != null && device.isSink() && isOuterNotify(device.getType(), device.getAddress())) {
+            if (device != null && device.isSink() && address.equals(device.getAddress())) {
                 return device;
             }
         }
@@ -71,15 +71,22 @@ public final class Megaphone {
     }
 
     /** Amplifies in place and returns the level that will actually be written to the bus. */
-    static int boost(byte[] pcm, int length) {
+    static int boost(byte[] pcm, int length, int gain) {
         if (pcm == null || length < 2) {
+            return 0;
+        }
+        if (gain <= 0) {
+            int silent = Math.min(length, pcm.length);
+            for (int i = 0; i < silent; i++) {
+                pcm[i] = 0;
+            }
             return 0;
         }
         int n = Math.min(length, pcm.length) & ~1;
         int peak = 0;
         for (int i = 0; i < n; i += 2) {
             int sample = (short) ((pcm[i] & 0xFF) | (pcm[i + 1] << 8));
-            int amplified = sample * GAIN;
+            int amplified = sample * gain;
             if (amplified > 32767) {
                 amplified = 32767;
             } else if (amplified < -32768) {
@@ -106,8 +113,11 @@ public final class Megaphone {
             }
             go = true;
             android.content.Context app = context.getApplicationContext();
+            com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(app);
+            String speaker = config.getSpeakSpeaker();
+            int gain = SpeakPlan.gain(config.getSpeakVolume());
             worker = new Thread(() -> {
-                int failure = run(app, level);
+                int failure = run(app, level, speaker, gain);
                 synchronized (lock) {
                     go = false;
                     worker = null;
@@ -159,12 +169,12 @@ public final class Megaphone {
         return go;
     }
 
-    private int run(android.content.Context context, Level level) {
+    private int run(android.content.Context context, Level level, String speaker, int gain) {
         AudioManager manager = context.getSystemService(AudioManager.class);
         if (manager == null) {
             return R.string.megaphone_no_speaker;
         }
-        AudioDeviceInfo device = find(manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS));
+        AudioDeviceInfo device = find(manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS), speaker);
         if (device == null) {
             return R.string.megaphone_no_speaker;
         }
@@ -220,7 +230,7 @@ public final class Megaphone {
                     }
                     continue;
                 }
-                int heard = boost(buf, read);
+                int heard = boost(buf, read, gain);
                 int wrote = track.write(buf, 0, read);
                 if (wrote < 0) {
                     return R.string.megaphone_open;

@@ -47,6 +47,22 @@ public final class ShortcutBook {
         return out.toString();
     }
 
+    /** Drops every saved row with the same action, then adds {@code next}. */
+    public static List<Shortcut> replaceAction(List<Shortcut> items, Shortcut next) {
+        List<Shortcut> out = new ArrayList<>();
+        if (items != null && next != null) {
+            for (Shortcut item : items) {
+                if (item != null && !next.action.equals(item.action)) {
+                    out.add(item);
+                }
+            }
+        }
+        if (next != null && ShortcutAction.fromKey(next.action) != null) {
+            out.add(next);
+        }
+        return out;
+    }
+
     /** Same button + same press kind replaces the old binding. */
     public static List<Shortcut> put(List<Shortcut> items, Shortcut next) {
         List<Shortcut> out = new ArrayList<>();

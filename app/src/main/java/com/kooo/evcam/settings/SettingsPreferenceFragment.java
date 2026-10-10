@@ -1164,6 +1164,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 startActivity(new Intent(getContext(), StickerActivity.class)));
         onClick("pref_shortcuts", pref ->
                 startActivity(new Intent(getContext(), com.kooo.evcam.input.ShortcutListActivity.class)));
+        onClick("pref_tap_to_speak", pref ->
+                openFragment(new TapToSpeakFragment(), R.string.set_tap_speak_title));
         bindSwitch("pref_save_moment_usb", appConfig.isSaveMomentUsb(),
                 value -> appConfig.setSaveMomentUsb(value));
         bindSwitch("pref_save_moment_drive", appConfig.isSaveMomentDrive(),

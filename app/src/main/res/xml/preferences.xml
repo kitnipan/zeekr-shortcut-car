@@ -507,6 +507,11 @@
             android:title="@string/set_shortcuts_title"
             android:summary="@string/set_shortcuts_summary" />
 
+        <Preference
+            android:key="pref_tap_to_speak"
+            android:title="@string/set_tap_speak_title"
+            android:summary="@string/set_tap_speak_summary" />
+
         <SwitchPreferenceCompat
             android:key="pref_save_moment_usb"
             android:title="@string/set_save_moment_usb_title"

@@ -27,6 +27,9 @@ public final class ShortcutKeys {
             return false;
         }
         appContext = context.getApplicationContext();
+        if (SpeakCapture.take(appContext, event)) {
+            return true;
+        }
         if (classifier == null) {
             classifier = new PressClassifier((keyCode, scanCode, deviceName, kind) -> {
                 Context ctx = appContext;
@@ -43,20 +46,31 @@ public final class ShortcutKeys {
         }
         int action = event.getAction();
         boolean held = liveEvent(event);
-        if (action == KeyEvent.ACTION_DOWN
-                && (holdToSpeak(appContext, event) || (held && event.getRepeatCount() > 0))) {
+        boolean speak = holdToSpeak(appContext, event);
+        if (action == KeyEvent.ACTION_DOWN && (speak || (held && event.getRepeatCount() > 0))) {
+            AppConfig config = new AppConfig(appContext);
+            boolean once = SpeakPlan.isOnce(config.getSpeakMode());
             if (event.getRepeatCount() == 0) {
                 liveKey = event.getKeyCode();
                 liveScan = event.getScanCode();
-                MegaphoneService.start(appContext);
+                if (once && MegaphoneService.isOpen()) {
+                    MegaphoneService.stop(appContext);
+                } else if (once) {
+                    MegaphoneService.start(appContext, config.getSpeakSeconds() * 1000L);
+                } else {
+                    MegaphoneService.start(appContext);
+                }
+            } else if (!once) {
+                MegaphoneService.beat();
             }
-            MegaphoneService.beat();
             return true;
         }
         if (held && action == KeyEvent.ACTION_UP) {
             liveKey = Integer.MIN_VALUE;
             liveScan = Integer.MIN_VALUE;
-            MegaphoneService.stop(appContext);
+            if (!SpeakPlan.isOnce(new AppConfig(appContext).getSpeakMode())) {
+                MegaphoneService.stop(appContext);
+            }
             return true;
         }
         if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {

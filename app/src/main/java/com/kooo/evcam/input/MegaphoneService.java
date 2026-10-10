@@ -38,6 +38,7 @@ public class MegaphoneService extends Service {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final AtomicBoolean armed = new AtomicBoolean(false);
     private static volatile long holdUntil;
+    private static volatile boolean fixedWindow;
     private static volatile boolean up;
     private static MegaphoneService live;
 
@@ -61,15 +62,40 @@ public class MegaphoneService extends Service {
             Toast.makeText(context, R.string.megaphone_need_mic, Toast.LENGTH_SHORT).show();
             return;
         }
+        start(context, 0L);
+    }
+
+    /** {@code windowMs} 0 keeps the hold leash. A positive window closes on its own. */
+    public static void start(Context context, long windowMs) {
+        if (context == null) {
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(context, R.string.megaphone_need_mic, Toast.LENGTH_SHORT).show();
+            return;
+        }
         armed.set(true);
-        beat();
+        fixedWindow = windowMs > 0L;
+        if (fixedWindow) {
+            holdUntil = SystemClock.uptimeMillis() + windowMs;
+        } else {
+            beat();
+        }
         Intent intent = new Intent(context, MegaphoneService.class);
         intent.setAction(ACTION_START);
         ContextCompat.startForegroundService(context, intent);
     }
 
+    public static boolean isOpen() {
+        return armed.get() || up;
+    }
+
     /** Call on every key-down while the button is held, including repeats. */
     public static void beat() {
+        if (fixedWindow) {
+            return;
+        }
         holdUntil = SystemClock.uptimeMillis() + RELEASE_GAP_MS;
         MAIN.post(() -> {
             MegaphoneService current = live;
@@ -81,6 +107,7 @@ public class MegaphoneService extends Service {
 
     public static void stop(Context context) {
         armed.set(false);
+        fixedWindow = false;
         holdUntil = 0L;
         if (context == null) {
             return;
@@ -162,6 +189,7 @@ public class MegaphoneService extends Service {
         }
         closed = true;
         armed.set(false);
+        fixedWindow = false;
         up = false;
         if (live == this) {
             live = null;

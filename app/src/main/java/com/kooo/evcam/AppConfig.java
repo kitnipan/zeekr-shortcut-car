@@ -2174,6 +2174,48 @@ public class AppConfig {
         prefs.edit().putString(KEY_BUTTON_SHORTCUTS, raw == null ? "" : raw).apply();
     }
 
+    private static final String KEY_SPEAK_MODE = "speak_mode";
+    private static final String KEY_SPEAK_SECONDS = "speak_seconds";
+    private static final String KEY_SPEAK_VOLUME = "speak_volume";
+    private static final String KEY_SPEAK_SPEAKER = "speak_speaker";
+
+    /** {@code hold} or {@code once}. Missing value is press-and-hold. */
+    public String getSpeakMode() {
+        return prefs.getString(KEY_SPEAK_MODE, com.kooo.evcam.input.SpeakPlan.MODE_HOLD);
+    }
+
+    public void setSpeakMode(String mode) {
+        prefs.edit().putString(KEY_SPEAK_MODE,
+                com.kooo.evcam.input.SpeakPlan.isOnce(mode)
+                        ? com.kooo.evcam.input.SpeakPlan.MODE_ONCE
+                        : com.kooo.evcam.input.SpeakPlan.MODE_HOLD).apply();
+    }
+
+    public int getSpeakSeconds() {
+        return com.kooo.evcam.input.SpeakPlan.seconds(prefs.getInt(KEY_SPEAK_SECONDS, 10));
+    }
+
+    public void setSpeakSeconds(int seconds) {
+        prefs.edit().putInt(KEY_SPEAK_SECONDS, com.kooo.evcam.input.SpeakPlan.seconds(seconds)).apply();
+    }
+
+    /** 100 is the level the outside speaker was tuned at. */
+    public int getSpeakVolume() {
+        return com.kooo.evcam.input.SpeakPlan.volume(prefs.getInt(KEY_SPEAK_VOLUME, 100));
+    }
+
+    public void setSpeakVolume(int volume) {
+        prefs.edit().putInt(KEY_SPEAK_VOLUME, com.kooo.evcam.input.SpeakPlan.volume(volume)).apply();
+    }
+
+    public String getSpeakSpeaker() {
+        return com.kooo.evcam.input.SpeakPlan.speaker(prefs.getString(KEY_SPEAK_SPEAKER, ""));
+    }
+
+    public void setSpeakSpeaker(String address) {
+        prefs.edit().putString(KEY_SPEAK_SPEAKER, address == null ? "" : address).apply();
+    }
+
     private static final String KEY_SHORTCUT_CATCH_EVERYWHERE = "shortcut_catch_everywhere";
 
     /** 没有无障碍服务时，用按键捕捉窗让快捷键在任何界面生效（试验）。 */
