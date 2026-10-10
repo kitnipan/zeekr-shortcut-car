@@ -54,7 +54,6 @@ public final class StickerHub {
     private static final String TAG = "StickerHub";
     private static final long CONNECT_TIMEOUT_MS = 8000L;
     private static final int CONNECT_TRIES = 3;
-    private static final long RECONNECT_MS = 2000L;
 
     /** Open while the experimental screen is visible. Presses are shown there instead of run. */
     public interface Watch {
@@ -111,6 +110,8 @@ public final class StickerHub {
     private static boolean capture;
     /** Any screen of this app is in front. Saved stickers stay up and a lost link comes back. */
     private static boolean inFront;
+    /** True while the sticker screen is scanning. A connectGatt during that scan returns nothing. */
+    private static boolean scanHold;
     /** The recording float is on screen, so retry keeps going after the app is hidden. */
     private static boolean floating;
     /** Sticker screen scan. connectGatt while that scan is running never answers on this radio. */
@@ -142,6 +143,35 @@ public final class StickerHub {
     /** The sticker screen registers this so a connect can stop the scan first. */
     public static void setScanStop(Runnable stop) {
         stopScan = stop;
+    }
+
+    /**
+     * Free the radio for discovery. This head unit answers neither classic discovery nor an LE
+     * scan while a sticker link is up. {@code on} drops those links; {@code off} brings them back.
+     */
+    public static void holdForScan(Context context, boolean on) {
+        if (context == null) {
+            return;
+        }
+        Context application = context.getApplicationContext();
+        MAIN.post(() -> {
+            app = application;
+            if (on) {
+                scanHold = true;
+                MAIN.removeCallbacks(KEEP);
+                for (String address : new ArrayList<>(OPEN.keySet())) {
+                    PAUSED.add(address);
+                    close(address);
+                }
+                return;
+            }
+            if (!scanHold) {
+                return;
+            }
+            scanHold = false;
+            PAUSED.clear();
+            syncOnMain(application);
+        });
     }
 
     /** App came to the front, or left. A lost sticker is connected again while a screen is open. */
@@ -267,7 +297,7 @@ public final class StickerHub {
 
     /** Bring a saved sticker back without opening the connect page. */
     private static void keep() {
-        if (app == null || UserExit.isExited(app)) {
+        if (app == null || UserExit.isExited(app) || scanHold) {
             return;
         }
         if (!holding(app)) {
@@ -291,14 +321,17 @@ public final class StickerHub {
 
     /**
      * Direct connect. autoConnect never calls back on this radio, so the dots stayed grey.
-     * Refuses to start while another sticker is up, because that connectGatt drops the live one.
+     * Does not call {@link #probe}, because that closes every other sticker first.
      */
     private static void reopen(String address) {
-        if (app == null || !shouldHold(address) || OPEN.containsKey(address) || PENDING.contains(address)
-                || UP.contains(address) || otherLive(address)) {
+        boolean busy = OPEN.containsKey(address) || PENDING.contains(address) || UP.contains(address);
+        if (StickerRecover.allowConnect(scanHold, otherLive(address), busy) != StickerRecover.CONNECT) {
             return;
         }
-        probe(app, address);
+        if (app == null || !shouldHold(address)) {
+            return;
+        }
+        connect(app, address, false);
     }
 
     private static void releaseRadio() {
@@ -496,19 +529,22 @@ public final class StickerHub {
                     }
                     if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                         boolean intentional = CLOSING.remove(address);
+                        boolean wasUp = UP.contains(address);
                         if (intentional) {
                             UP.remove(address);
                             drop(address, gatt);
                             return;
                         }
-                        if (!UP.contains(address) && status == 0) {
+                        if (!wasUp && status == 0) {
                             return;
                         }
                         UP.remove(address);
                         drop(address, gatt);
-                        scheduleReconnect(address);
-                        if (status != BluetoothGatt.GATT_SUCCESS && status != 0) {
-                            failOrRetry(address, FAIL_GATT, status);
+                        for (int action : StickerRecover.onDisconnect(
+                                false, wasUp, status, scanHold, otherLive(address))) {
+                            if (action == StickerRecover.CONNECT) {
+                                scheduleReconnect(address);
+                            }
                         }
                     }
                 });
@@ -668,7 +704,7 @@ public final class StickerHub {
 
     private static void scheduleReconnect(String address) {
         MAIN.postDelayed(() -> {
-            if (app == null || OPEN.containsKey(address) || PENDING.contains(address)
+            if (scanHold || app == null || OPEN.containsKey(address) || PENDING.contains(address)
                     || PAUSED.contains(address)) {
                 return;
             }
@@ -676,7 +712,7 @@ public final class StickerHub {
                 return;
             }
             reopen(address);
-        }, RECONNECT_MS);
+        }, StickerRecover.RECONNECT_MS);
     }
 
     /** True when some other sticker is already connected. A new connectGatt would drop it. */
@@ -932,6 +968,9 @@ public final class StickerHub {
 
     private static void fail(String address, int reason, int status) {
         NEXT.put(address, android.os.SystemClock.elapsedRealtime() + 60000L);
+        if ((reason == FAIL_TIMEOUT || reason == FAIL_GATT) && shouldHold(address)) {
+            MAIN.postDelayed(() -> reopen(address), StickerRecover.AGAIN_MS);
+        }
         AppLog.w(TAG, "智能贴失败 " + address + " reason=" + reason + " status=" + status);
         log("fail " + reason + " status=" + status);
         for (Watch watch : new ArrayList<>(WATCHES)) {

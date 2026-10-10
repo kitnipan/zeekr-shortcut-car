@@ -9,7 +9,10 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.os.Build;
@@ -37,6 +40,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Experimental screen: find a smart sticker the head unit will not pair, connect it,
@@ -46,11 +50,31 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
 
     private static final int ASK = 47;
     private static final long SCAN_MS = 10_000L;
+    /** Classic inquiry first. This radio often returns an empty LE scan until discovery has run. */
+    private static final long DISCOVERY_MS = 2_000L;
     private static final int LOG_LIMIT = 30;
     private static final int OTHER_LIMIT = 12;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable scanDone = this::stopScan;
+    private final Runnable settleDone = this::beginDiscovery;
+    private final Runnable discoveryDone = this::startLeScan;
+    private final BroadcastReceiver discoveryReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null) {
+                return;
+            }
+            if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(intent.getAction())) {
+                startLeScan();
+                return;
+            }
+            BluetoothDevice device = deviceExtra(intent);
+            short rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
+            Integer value = rssi == Short.MIN_VALUE ? null : (int) rssi;
+            runOnUiThread(() -> hear(device, value, false));
+        }
+    };
     private final Map<String, Seen> seen = new LinkedHashMap<>();
     private final ArrayDeque<String> logLines = new ArrayDeque<>();
 
@@ -76,6 +100,9 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     private TextView scanButton;
     private BluetoothLeScanner scanner;
     private boolean scanning;
+    private boolean discovering;
+    private boolean leStarted;
+    private boolean discoveryListening;
     private String pendingAddress;
     private StickerFrame pending;
 
@@ -97,8 +124,8 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         @Override
         public void onScanFailed(int errorCode) {
             runOnUiThread(() -> {
-                scanning = false;
-                scanButton.setText(R.string.sticker_scan);
+                haltScan();
+                StickerHub.holdForScan(StickerActivity.this, false);
                 status.setText(getString(R.string.sticker_fail, errorCode));
             });
         }
@@ -235,32 +262,91 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
             status.setText(R.string.sticker_bluetooth_off);
             return;
         }
-        BluetoothLeScanner next = adapter.getBluetoothLeScanner();
-        if (next == null) {
+        if (adapter.getBluetoothLeScanner() == null) {
             status.setText(R.string.sticker_bluetooth_off);
             return;
         }
-        stopScan();
-        scanner = next;
+        haltScan();
         scanning = true;
         scanButton.setText(R.string.sticker_scanning);
         status.setText(R.string.sticker_scanning);
+        StickerHub.holdForScan(this, true);
+        handler.postDelayed(settleDone, 700);
+    }
+
+    /** Classic inquiry, then the LE scan. Links stay down until {@link #stopScan()}. */
+    private void beginDiscovery() {
+        if (!scanning || discovering || leStarted) {
+            return;
+        }
+        BluetoothAdapter adapter = adapter();
+        if (adapter == null || !adapter.isEnabled()) {
+            status.setText(R.string.sticker_bluetooth_off);
+            stopScan();
+            return;
+        }
+        seedBonded(adapter);
+        listenDiscovery();
+        discovering = true;
+        boolean started = false;
+        try {
+            adapter.cancelDiscovery();
+            started = adapter.startDiscovery();
+        } catch (SecurityException e) {
+            status.setText(R.string.sticker_need_permission);
+        }
+        if (!started) {
+            startLeScan();
+            return;
+        }
+        handler.postDelayed(discoveryDone, DISCOVERY_MS);
+    }
+
+    private void startLeScan() {
+        if (!scanning || leStarted) {
+            return;
+        }
+        leStarted = true;
+        discovering = false;
+        handler.removeCallbacks(discoveryDone);
+        cancelClassic();
+        BluetoothAdapter adapter = adapter();
+        BluetoothLeScanner next = adapter == null ? null : adapter.getBluetoothLeScanner();
+        if (next == null) {
+            status.setText(R.string.sticker_bluetooth_off);
+            stopScan();
+            return;
+        }
+        scanner = next;
         try {
             scanner.startScan(null, new ScanSettings.Builder()
                     .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                    .setReportDelay(0)
                     .build(), scanCallback);
         } catch (SecurityException e) {
-            scanning = false;
-            scanButton.setText(R.string.sticker_scan);
             status.setText(R.string.sticker_need_permission);
+            stopScan();
             return;
         }
         handler.postDelayed(scanDone, SCAN_MS);
     }
 
     private void stopScan() {
+        boolean live = scanning || discovering || leStarted;
+        haltScan();
+        if (live) {
+            StickerHub.holdForScan(this, false);
+        }
+    }
+
+    private void haltScan() {
+        handler.removeCallbacks(settleDone);
+        handler.removeCallbacks(discoveryDone);
         handler.removeCallbacks(scanDone);
-        if (scanner != null && scanning) {
+        cancelClassic();
+        unlistenDiscovery();
+        if (scanner != null && leStarted) {
             try {
                 scanner.stopScan(scanCallback);
             } catch (SecurityException ignored) {
@@ -268,16 +354,97 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
             }
         }
         scanning = false;
+        discovering = false;
+        leStarted = false;
         if (scanButton != null) {
             scanButton.setText(R.string.sticker_scan);
         }
     }
 
-    private void addResult(ScanResult result) {
-        if (result == null || result.getDevice() == null) {
+    private void seedBonded(BluetoothAdapter adapter) {
+        Set<BluetoothDevice> bonded;
+        try {
+            bonded = adapter.getBondedDevices();
+        } catch (SecurityException e) {
+            status.setText(R.string.sticker_need_permission);
             return;
         }
-        BluetoothDevice device = result.getDevice();
+        if (bonded == null) {
+            return;
+        }
+        for (BluetoothDevice device : bonded) {
+            int type;
+            try {
+                type = device.getType();
+            } catch (SecurityException e) {
+                continue;
+            }
+            if (type != BluetoothDevice.DEVICE_TYPE_LE && type != BluetoothDevice.DEVICE_TYPE_DUAL) {
+                continue;
+            }
+            hear(device, null, false);
+        }
+    }
+
+    private void listenDiscovery() {
+        if (discoveryListening) {
+            return;
+        }
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_FOUND);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(discoveryReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(discoveryReceiver, filter);
+        }
+        discoveryListening = true;
+    }
+
+    private void unlistenDiscovery() {
+        if (!discoveryListening) {
+            return;
+        }
+        try {
+            unregisterReceiver(discoveryReceiver);
+        } catch (IllegalArgumentException ignored) {
+            // already gone
+        }
+        discoveryListening = false;
+    }
+
+    private void cancelClassic() {
+        BluetoothAdapter adapter = adapter();
+        if (adapter == null) {
+            return;
+        }
+        try {
+            if (adapter.isDiscovering()) {
+                adapter.cancelDiscovery();
+            }
+        } catch (SecurityException ignored) {
+            // scan permission gone
+        }
+    }
+
+    private static BluetoothDevice deviceExtra(Intent intent) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            return intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
+        }
+        return intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+    }
+
+    private void addResult(ScanResult result) {
+        if (result == null) {
+            return;
+        }
+        hear(result.getDevice(), result.getRssi(), advertises(result.getScanRecord()));
+    }
+
+    private void hear(BluetoothDevice device, Integer rssi, boolean service) {
+        if (device == null) {
+            return;
+        }
         String address;
         String name;
         try {
@@ -290,7 +457,6 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         if (address.isEmpty()) {
             return;
         }
-        boolean service = advertises(result.getScanRecord());
         Seen row = seen.get(address);
         boolean fresh = row == null;
         if (row == null) {
@@ -302,13 +468,15 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         int previousRank = row.rank;
         int nextRank = Math.min(previousRank, StickerMatch.rank(name, service));
         boolean nameChanged = name != null && !name.isEmpty() && !name.equals(row.name);
-        boolean rssiChanged = row.rssi == null || Math.abs(row.rssi - result.getRssi()) >= 8;
+        boolean rssiChanged = rssi != null && (row.rssi == null || Math.abs(row.rssi - rssi) >= 8);
         if (name != null && !name.isEmpty()) {
             row.name = name;
         }
         row.rank = nextRank;
-        row.rssi = result.getRssi();
-        if (address.equals(signalAddress)) {
+        if (rssi != null) {
+            row.rssi = rssi;
+        }
+        if (address.equals(signalAddress) && row.rssi != null) {
             showSignal(row.rssi);
         }
         if (fresh || nameChanged || rssiChanged || nextRank != previousRank) {

@@ -74,6 +74,7 @@ public class StickerFrameTest {
         assertTrue(StickerMatch.nameHint("LingDong-2"));
         assertTrue(StickerMatch.nameHint("CSB10"));
         assertTrue(StickerMatch.nameHint("灵动贴"));
+        assertTrue(StickerMatch.nameHint("ZEEKR"));
         assertFalse(StickerMatch.nameHint("Pixel"));
         assertEquals(StickerMatch.RANK_SERVICE, StickerMatch.rank("Pixel", true));
         assertEquals(StickerMatch.RANK_NAME, StickerMatch.rank("smart button", false));

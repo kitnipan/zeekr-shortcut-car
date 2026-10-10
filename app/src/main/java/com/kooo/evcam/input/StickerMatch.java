@@ -43,6 +43,7 @@ public final class StickerMatch {
                 || folded.contains("sticker")
                 || folded.contains("csb")
                 || folded.contains("smart button")
+                || folded.contains("zeekr")
                 || name.contains("灵动")
                 || name.contains("智能贴");
     }
