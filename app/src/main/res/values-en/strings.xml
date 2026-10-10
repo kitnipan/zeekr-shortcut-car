@@ -508,7 +508,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">Turn off</string>
     <string name="set_footage_lock_flash_title">Lock footage on flash-to-pass</string>
-    <string name="set_footage_lock_flash_summary">While recording, flash the high beams to lock the clips covering 10 seconds before and after, on every camera. If locked footage fills the space, recording stops.</string>
+    <string name="set_footage_lock_flash_summary">While recording, flash the high beams to lock the clips covering 10 seconds before and after, on every camera, and save those clips to the instant captures folder. If locked footage fills the space, recording stops.</string>
     <string name="set_footage_lock_horn_title">Lock footage on horn</string>
     <string name="set_footage_lock_horn_summary">The head unit can\'t read the horn signal yet, so this is unavailable</string>
     <string name="msg_flash_locked">Flash-to-pass: locked the clips covering 10 seconds before and after</string>

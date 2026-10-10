@@ -520,7 +520,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">关闭</string>
     <string name="set_footage_lock_flash_title">闪远光时自动锁定当前录像</string>
-    <string name="set_footage_lock_flash_summary">录制时闪远光，自动锁定此刻前后 10 秒所在的录像片段（每一路画面）。锁定的录像占满空间时停止录制。</string>
+    <string name="set_footage_lock_flash_summary">录制时闪远光，自动锁定此刻前后 10 秒所在的录像片段（每一路画面），并保存到 instant captures 文件夹。锁定的录像占满空间时停止录制。</string>
     <string name="set_footage_lock_horn_title">鸣笛时自动锁定当前录像</string>
     <string name="set_footage_lock_horn_summary">车机暂无法读取喇叭信号，此项暂不可用</string>
     <string name="msg_flash_locked">闪远光：已锁定前后 10 秒所在的录像片段</string>

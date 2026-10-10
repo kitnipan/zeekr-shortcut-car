@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta2] - 2026-10-10
+
+### New and improved
+
+- Flash-to-pass, while recording and with lock-on-flash on, also saves the 10 seconds before and the 10 seconds after into the instant captures folder.
+
 ## [2.10.15-beta] - 2026-10-10
 
 ### New and improved
