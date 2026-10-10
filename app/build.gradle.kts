@@ -57,10 +57,10 @@ android {
         // versionName 会成为 Release 名称与 APK 文件名
         //
         // 这一版是 fork：上游 2.10.15-beta（281）为底，加上 dim、远程、侧视、快捷键和保存瞬间。
-        // 上游 versionCode 是 281。本 fork 已经发出 2.10.15-beta5（306），装不上更小的号，所以号继续往上。
-        versionCode = 307
-        // 版本名继续用上游 2.10.15，fork 的下一号是 beta6。
-        versionName = "2.10.15-beta6"
+        // 上游 versionCode 是 281。本 fork 已经发出 2.10.15-beta6（307），装不上更小的号，所以号继续往上。
+        versionCode = 308
+        // 版本名继续用上游 2.10.15，fork 的下一号是 beta7。
+        versionName = "2.10.15-beta7"
 
         buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
         buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))

@@ -11,6 +11,17 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta7] - 2026-10-10
+
+### Added
+
+- BLE signals page lists every Bluetooth LE advert the head unit hears.
+
+### Fixed
+
+- Both smart stickers can finish connecting. A link that is already up stays up while the other one connects.
+- Turn-signal side view sits above the dim shade, so the popup is no longer blank.
+
 ## [2.10.15-beta6] - 2026-10-10
 
 ### Fixed
