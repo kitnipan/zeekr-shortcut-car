@@ -113,6 +113,8 @@ public final class StickerHub {
     private static boolean inFront;
     /** The recording float is on screen, so retry keeps going after the app is hidden. */
     private static boolean floating;
+    /** Sticker screen scan. connectGatt while that scan is running never answers on this radio. */
+    private static Runnable stopScan;
     private static boolean bondsRegistered;
 
     private StickerHub() {
@@ -135,6 +137,11 @@ public final class StickerHub {
 
     public static void setCapture(boolean on) {
         capture = on;
+    }
+
+    /** The sticker screen registers this so a connect can stop the scan first. */
+    public static void setScanStop(Runnable stop) {
+        stopScan = stop;
     }
 
     /** App came to the front, or left. A lost sticker is connected again while a screen is open. */
@@ -200,6 +207,7 @@ public final class StickerHub {
         String mac = StickerDevices.normalize(address);
         MAIN.post(() -> {
             app = application;
+            releaseRadio();
             close(mac);
             TRIES.remove(mac);
             holding++;
@@ -282,7 +290,7 @@ public final class StickerHub {
             }
             if (!OPEN.containsKey(address)) {
                 Long next = NEXT.get(address);
-                if (!awake() && next != null && now < next) {
+                if (next != null && now < next) {
                     continue;
                 }
                 reopen(address);
@@ -292,12 +300,40 @@ public final class StickerHub {
         armKeep();
     }
 
-    /** Same retry as the Connect button. A direct connectGatt is what this radio ignores. */
+    /**
+     * Bring one sticker back. If another link is already up, connect beside it.
+     * Pausing the live one is only for a tap on Connect. Doing it on a timer
+     * drops the working button and leaves the radio on Connecting.
+     */
     private static void reopen(String address) {
-        if (app == null || !shouldHold(address) || OPEN.containsKey(address) || PENDING.contains(address)) {
+        if (app == null || !shouldHold(address) || OPEN.containsKey(address) || PENDING.contains(address)
+                || UP.contains(address)) {
             return;
         }
+        for (String up : UP) {
+            if (!up.equals(address)) {
+                connect(app, address, false);
+                return;
+            }
+        }
         probe(app, address);
+    }
+
+    private static void releaseRadio() {
+        Runnable stop = stopScan;
+        if (stop != null) {
+            stop.run();
+        }
+        BluetoothAdapter adapter = app == null ? null : adapter(app);
+        if (adapter != null) {
+            try {
+                if (adapter.isDiscovering()) {
+                    adapter.cancelDiscovery();
+                }
+            } catch (SecurityException ignored) {
+                // permission dropped
+            }
+        }
     }
 
     private static void armKeep() {
@@ -423,6 +459,7 @@ public final class StickerHub {
             return;
         }
         CLOSING.remove(address);
+        releaseRadio();
         PENDING.add(address);
         phase(address, PHASE_CONNECTING);
         state(address, false);
@@ -582,21 +619,11 @@ public final class StickerHub {
             BluetoothGattCharacteristic next = queue.poll();
             if (next == null) {
                 SUBSCRIBE.remove(address);
-                sleep(gatt);
                 return;
             }
             if (subscribe(gatt, next)) {
                 return;
             }
-        }
-    }
-
-    /** Long connection interval. The link stays; the sticker radio sleeps until a press. */
-    private static void sleep(BluetoothGatt gatt) {
-        try {
-            gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER);
-        } catch (SecurityException ignored) {
-            // permission dropped
         }
     }
 
@@ -892,7 +919,7 @@ public final class StickerHub {
             phase(address, PHASE_CONNECTING);
             MAIN.postDelayed(() -> {
                 if (app != null && !UP.contains(address)) {
-                    probe(app, address);
+                    reopen(address);
                 }
             }, 800);
             return;

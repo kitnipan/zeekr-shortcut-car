@@ -145,6 +145,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     protected void onResume() {
         super.onResume();
         StickerHub.setCapture(true);
+        StickerHub.setScanStop(this::stopScan);
         StickerHub.addWatch(this);
         StickerHub.sync(this);
         render();
@@ -156,6 +157,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         handler.removeCallbacks(rssiPoll);
         stopScan();
         StickerHub.setCapture(false);
+        StickerHub.setScanStop(null);
         StickerHub.removeWatch(this);
         StickerHub.sync(this);
         super.onPause();

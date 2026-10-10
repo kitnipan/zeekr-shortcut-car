@@ -25,7 +25,7 @@ import java.util.Map;
 /** Card over whatever is on screen, naming the sticker that just connected. */
 final class StickerArrived {
 
-    private static final long AGAIN_MS = 8000L;
+    private static final long AGAIN_MS = 60000L;
     private static final long SHOW_MS = 4000L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final Map<String, Long> LAST = new HashMap<>();
