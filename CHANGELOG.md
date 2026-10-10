@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta11] - 2026-10-10
+
+### New and improved
+
+- Hold to speak shows a meter while the microphone is open. The bar moves with your voice, so a flat line means the mic is not picking you up.
+
 ## [2.10.14-beta10] - 2026-10-10
 
 ### New and improved

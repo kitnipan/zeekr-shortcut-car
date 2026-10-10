@@ -186,6 +186,8 @@
     <string name="megaphone_channel">Tahan untuk bercakap</string>
     <string name="megaphone_speaking">Bercakap ke luar</string>
     <string name="megaphone_release">Lepaskan butang untuk berhenti</string>
+    <string name="megaphone_level">%1$d%%</string>
+    <string name="megaphone_level_idle">0%</string>
     <string name="megaphone_need_mic">Kebenaran mikrofon dimatikan</string>
     <string name="megaphone_no_speaker">Pembesar suara luar tiada pada peranti ini</string>
     <string name="megaphone_route">Tidak dapat hala ke pembesar suara luar</string>

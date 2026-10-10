@@ -185,6 +185,8 @@
     <string name="megaphone_channel">Hold to speak</string>
     <string name="megaphone_speaking">Speaking outside</string>
     <string name="megaphone_release">Release the button to stop</string>
+    <string name="megaphone_level">%1$d%%</string>
+    <string name="megaphone_level_idle">0%</string>
     <string name="megaphone_need_mic">Microphone permission is off</string>
     <string name="megaphone_no_speaker">Outside speaker is not on this device</string>
     <string name="megaphone_route">Could not route to the outside speaker</string>

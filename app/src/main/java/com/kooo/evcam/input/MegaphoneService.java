@@ -31,6 +31,7 @@ public class MegaphoneService extends Service {
     private static volatile boolean up;
 
     private final Megaphone pump = new Megaphone();
+    private MegaphoneMeter meter;
 
     public static void start(Context context) {
         if (context == null) {
@@ -81,7 +82,11 @@ public class MegaphoneService extends Service {
             return START_NOT_STICKY;
         }
         up = true;
-        pump.begin(this, this::halt);
+        if (meter == null) {
+            meter = new MegaphoneMeter(this);
+        }
+        meter.show();
+        pump.begin(this, this::halt, meter::onPercent);
         return START_NOT_STICKY;
     }
 
@@ -95,6 +100,9 @@ public class MegaphoneService extends Service {
     private void halt() {
         up = false;
         pump.end();
+        if (meter != null) {
+            meter.hide();
+        }
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }

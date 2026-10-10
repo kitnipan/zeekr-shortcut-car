@@ -48,8 +48,28 @@ public final class Megaphone {
         return null;
     }
 
+    /** Peak of a 16-bit little-endian chunk, 0 when silent and 100 at full scale. */
+    static int percent(byte[] pcm, int length) {
+        if (pcm == null || length < 2) {
+            return 0;
+        }
+        int n = Math.min(length, pcm.length) & ~1;
+        int peak = 0;
+        for (int i = 0; i < n; i += 2) {
+            int sample = (pcm[i] & 0xFF) | (pcm[i + 1] << 8);
+            int abs = sample == Short.MIN_VALUE ? 32768 : Math.abs(sample);
+            if (abs > peak) {
+                peak = abs;
+            }
+        }
+        if (peak >= 32767) {
+            return 100;
+        }
+        return peak * 100 / 32767;
+    }
+
     /** Starts the pump. {@code onEnded} runs on the main thread after a failure, or not at all on success. */
-    void begin(android.content.Context context, Runnable onEnded) {
+    void begin(android.content.Context context, Runnable onEnded, Level level) {
         synchronized (lock) {
             if (go) {
                 return;
@@ -57,7 +77,7 @@ public final class Megaphone {
             go = true;
             android.content.Context app = context.getApplicationContext();
             worker = new Thread(() -> {
-                int failure = run(app);
+                int failure = run(app, level);
                 synchronized (lock) {
                     go = false;
                     worker = null;
@@ -109,7 +129,7 @@ public final class Megaphone {
         return go;
     }
 
-    private int run(android.content.Context context) {
+    private int run(android.content.Context context, Level level) {
         AudioManager manager = context.getSystemService(AudioManager.class);
         if (manager == null) {
             return R.string.megaphone_no_speaker;
@@ -155,6 +175,7 @@ public final class Megaphone {
             track.play();
             byte[] buf = new byte[CHUNK_BYTES];
             long deadline = SystemClock.elapsedRealtime() + MAX_MS;
+            long lastLevel = 0L;
             while (go && SystemClock.elapsedRealtime() < deadline) {
                 int read = record.read(buf, 0, buf.length);
                 if (read < 0) {
@@ -166,6 +187,16 @@ public final class Megaphone {
                 int wrote = track.write(buf, 0, read);
                 if (wrote < 0) {
                     return R.string.megaphone_open;
+                }
+                long now = SystemClock.uptimeMillis();
+                if (level != null && now - lastLevel >= 50L) {
+                    lastLevel = now;
+                    int heard = percent(buf, read);
+                    MAIN.post(() -> {
+                        if (go) {
+                            level.onPercent(heard);
+                        }
+                    });
                 }
             }
             return go ? TIMED_OUT : ENDED;
@@ -197,5 +228,9 @@ public final class Megaphone {
             }
             track.release();
         }
+    }
+
+    interface Level {
+        void onPercent(int percent);
     }
 }
