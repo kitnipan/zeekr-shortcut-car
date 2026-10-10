@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta14] - 2026-10-10
+
+### New and improved
+
+- While the app is open, each saved smart sticker stays connected. A dropped link connects again. The sticker sleeps between presses.
+
 ## [2.10.14-beta13] - 2026-10-10
 
 ### Fixed
