@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta5] - 2026-10-10
+
+### Fixed
+
+- Both smart stickers stay connected. Connecting one leaves the other up.
+
 ## [2.10.15-beta4] - 2026-10-10
 
 ### New and improved
