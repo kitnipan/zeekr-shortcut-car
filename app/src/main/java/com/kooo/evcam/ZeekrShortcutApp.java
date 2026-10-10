@@ -68,6 +68,9 @@ public class ZeekrShortcutApp extends Application {
             public void onActivityResumed(@NonNull android.app.Activity activity) {
                 resumed++;
                 com.kooo.evcam.input.KeyCatcher.setAppInFront(ZeekrShortcutApp.this, true);
+                if (resumed == 1) {
+                    com.kooo.evcam.input.StickerHub.setAppInFront(ZeekrShortcutApp.this, true);
+                }
             }
 
             @Override
@@ -75,6 +78,7 @@ public class ZeekrShortcutApp extends Application {
                 resumed = Math.max(0, resumed - 1);
                 if (resumed == 0) {
                     com.kooo.evcam.input.KeyCatcher.setAppInFront(ZeekrShortcutApp.this, false);
+                    com.kooo.evcam.input.StickerHub.setAppInFront(ZeekrShortcutApp.this, false);
                 }
             }
 

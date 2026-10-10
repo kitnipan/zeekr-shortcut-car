@@ -39,7 +39,8 @@ import java.util.UUID;
  *
  * <p>The head unit firmware that pairs this sticker is not on every car. This
  * talks to it directly. The link stays up while {@link AppConfig#isStickerEnabled()}
- * is on, or while an experimental screen is open. Pairing a second sticker
+ * is on, or while an experimental screen is open. The radio sleeps between
+ * presses; a click is a notification, so dropping the link loses it. Pairing a second sticker
  * pauses the other links first, because this head unit will not bond while a
  * GATT connection is already up.</p>
  */
@@ -89,12 +90,9 @@ public final class StickerHub {
     private static final Set<String> PENDING = new HashSet<>();
     /** Reached STATE_CONNECTED for this address. A status-0 disconnect before that is noise. */
     private static final Set<String> UP = new HashSet<>();
-    /** Last packet or signal reading. A quiet link gets connected again. */
-    private static final Map<String, Long> HEARD = new HashMap<>();
     /** Earliest time to try a sticker again after the retries are used up. */
     private static final Map<String, Long> NEXT = new HashMap<>();
     private static final long KEEP_MS = 15000L;
-    private static final long QUIET_MS = 30000L;
     private static final Runnable KEEP = StickerHub::keep;
     /** Closed on purpose. The disconnect callback must not reconnect. */
     private static final Set<String> CLOSING = new HashSet<>();
@@ -111,6 +109,8 @@ public final class StickerHub {
     private static Context app;
     /** Sticker screen is open, so a press is for saving, not for running the shortcut. */
     private static boolean capture;
+    /** Any screen of this app is in front. Saved stickers stay up and a lost link comes back. */
+    private static boolean inFront;
     private static boolean bondsRegistered;
 
     private StickerHub() {
@@ -133,6 +133,26 @@ public final class StickerHub {
 
     public static void setCapture(boolean on) {
         capture = on;
+    }
+
+    /** App came to the front, or left. A lost sticker is connected again while a screen is open. */
+    public static void setAppInFront(Context context, boolean on) {
+        if (context == null) {
+            return;
+        }
+        Context application = context.getApplicationContext();
+        MAIN.post(() -> {
+            boolean entered = on && !inFront;
+            inFront = on;
+            app = application;
+            if (entered) {
+                NEXT.clear();
+            }
+            syncOnMain(application);
+            if (entered) {
+                keep();
+            }
+        });
     }
 
     /** Live GATT link, not merely a saved address. */
@@ -196,7 +216,7 @@ public final class StickerHub {
             closeAll();
             return;
         }
-        boolean hold = linkWanted(application) || !WATCHES.isEmpty();
+        boolean hold = holding(application);
         if (!hold) {
             MAIN.removeCallbacks(KEEP);
             closeAll();
@@ -228,10 +248,10 @@ public final class StickerHub {
         if (app == null || UserExit.isExited(app)) {
             return;
         }
-        if (!linkWanted(app) && WATCHES.isEmpty()) {
+        if (!holding(app)) {
             return;
         }
-        if (holding > 0 || !BONDING.isEmpty()) {
+        if (holding > 0 || !BONDING.isEmpty() || !PENDING.isEmpty()) {
             armKeep();
             return;
         }
@@ -241,28 +261,11 @@ public final class StickerHub {
                 continue;
             }
             if (UP.contains(address)) {
-                Long heard = HEARD.get(address);
-                if (heard != null && now - heard > QUIET_MS) {
-                    log("link quiet " + address);
-                    close(address);
-                    String again = address;
-                    MAIN.postDelayed(() -> reopen(again), 700);
-                    break;
-                }
-                if (heard == null) {
-                    HEARD.put(address, now);
-                }
-                BluetoothGatt gatt = OPEN.get(address);
-                if (gatt != null) {
-                    try {
-                        gatt.readRemoteRssi();
-                    } catch (SecurityException ignored) {
-                        // permission dropped
-                    }
-                }
-            } else if (!OPEN.containsKey(address)) {
+                continue;
+            }
+            if (!OPEN.containsKey(address)) {
                 Long next = NEXT.get(address);
-                if (next != null && now < next) {
+                if (!inFront && next != null && now < next) {
                     continue;
                 }
                 reopen(address);
@@ -296,7 +299,7 @@ public final class StickerHub {
         if (app == null) {
             return;
         }
-        if (!linkWanted(app) && WATCHES.isEmpty()) {
+        if (!holding(app)) {
             return;
         }
         MAIN.postDelayed(KEEP, KEEP_MS);
@@ -455,7 +458,6 @@ public final class StickerHub {
                             return;
                         }
                         UP.add(address);
-                        HEARD.put(address, android.os.SystemClock.elapsedRealtime());
                         OPEN.put(address, gatt);
                         state(address, true);
                         phase(address, PHASE_DISCOVERING);
@@ -531,7 +533,6 @@ public final class StickerHub {
                     return;
                 }
                 MAIN.post(() -> {
-                    HEARD.put(address, android.os.SystemClock.elapsedRealtime());
                     for (Watch watch : new ArrayList<>(WATCHES)) {
                         watch.onRssi(address, rssi);
                     }
@@ -575,11 +576,21 @@ public final class StickerHub {
             BluetoothGattCharacteristic next = queue.poll();
             if (next == null) {
                 SUBSCRIBE.remove(address);
+                sleep(gatt);
                 return;
             }
             if (subscribe(gatt, next)) {
                 return;
             }
+        }
+    }
+
+    /** Long connection interval. The link stays; the sticker radio sleeps until a press. */
+    private static void sleep(BluetoothGatt gatt) {
+        try {
+            gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER);
+        } catch (SecurityException ignored) {
+            // permission dropped
         }
     }
 
@@ -621,7 +632,6 @@ public final class StickerHub {
         }
         lastPacket = key;
         lastPacketAt = now;
-        HEARD.put(address, now);
         AppLog.d(TAG, key);
         for (Watch watch : new ArrayList<>(WATCHES)) {
             watch.onPacket(address, raw);
@@ -650,7 +660,7 @@ public final class StickerHub {
             if (!shouldHold(address)) {
                 return;
             }
-            connect(app, address, false);
+            reopen(address);
         }, RECONNECT_MS);
     }
 
@@ -658,7 +668,7 @@ public final class StickerHub {
         if (app == null || UserExit.isExited(app)) {
             return false;
         }
-        if (!linkWanted(app) && WATCHES.isEmpty()) {
+        if (!holding(app)) {
             return false;
         }
         return StickerDevices.parse(new AppConfig(app).getStickerDevices()).contains(address);
@@ -677,7 +687,6 @@ public final class StickerHub {
         PENDING.remove(address);
         OPEN.remove(address);
         UP.remove(address);
-        HEARD.remove(address);
         BluetoothGatt dying = current != null ? current : gatt;
         if (dying != null) {
             try {
@@ -693,7 +702,6 @@ public final class StickerHub {
         cancelBond(address);
         CLOSING.add(address);
         UP.remove(address);
-        HEARD.remove(address);
         PENDING.remove(address);
         BluetoothGatt gatt = OPEN.remove(address);
         state(address, false);
@@ -712,7 +720,6 @@ public final class StickerHub {
     private static void closeAll() {
         PAUSED.clear();
         UP.clear();
-        HEARD.clear();
         NEXT.clear();
         queuedAddress = null;
         holding = 0;
@@ -795,6 +802,11 @@ public final class StickerHub {
         } catch (Exception ignored) {
             // hidden API missing
         }
+    }
+
+    /** Saved stickers stay up while the app is in front, the switch is on, or a shortcut needs them. */
+    private static boolean holding(Context context) {
+        return inFront || linkWanted(context) || !WATCHES.isEmpty();
     }
 
     /** Switch on, or a sticker shortcut already saved. */
