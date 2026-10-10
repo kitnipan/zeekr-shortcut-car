@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta20] - 2026-10-10
+
+### Fixed
+
+- A connected smart sticker stays connected. The 15-second retry was opening another link and this radio dropped the one that was already up. The connect chime is gone.
+
 ## [2.10.14-beta19] - 2026-10-10
 
 ### New and improved
