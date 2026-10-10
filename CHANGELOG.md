@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta18] - 2026-10-10
+
+### New and improved
+
+- Saved smart stickers stay connected while the app is running. A dot above the floating button is orange while that sticker is connected, and grey while it is connecting again.
+
 ## [2.10.14-beta17] - 2026-10-10
 
 ### Fixed
