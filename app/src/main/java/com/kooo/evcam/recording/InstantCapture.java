@@ -32,10 +32,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Lock and save writes the 10 seconds before the press and the 10 seconds after
- * into {@code <usb>/instant captures}. Drive upload follows the save-moment
- * Drive switch. A toast shows at the start, when the USB copy finishes, and
- * when the upload finishes.
+ * Flash-to-pass writes the surround view, 10 seconds before the flash and 10
+ * seconds after, into {@code <usb>/instant captures}. Other cameras and the
+ * rest of the trip stay in the video folder. Drive upload follows the
+ * save-moment Drive switch.
  */
 public final class InstantCapture {
 
@@ -185,7 +185,7 @@ public final class InstantCapture {
                 continue;
             }
             for (File file : listed) {
-                if (!file.isFile() || !StoragePlan.isOwnClip(file.getName())) {
+                if (!file.isFile() || !StoragePlan.isOwnClip(file.getName()) || !surround(file)) {
                     continue;
                 }
                 names.add(file.getName());
@@ -292,6 +292,16 @@ public final class InstantCapture {
             n++;
         } while (!used.add(next));
         return next;
+    }
+
+    /** 闪远光要的是车外那一路。座舱录像留在录像目录里。 */
+    private static boolean surround(File file) {
+        String slot = RecordingTimeline.parseCameraSlot(file.getName());
+        if (slot == null) {
+            return false;
+        }
+        return CameraSlots.SURROUND.equals(
+                CameraSlots.canonical(slot.toLowerCase(Locale.US)));
     }
 
     private static Map<String, Long> segmentLengths(Context context) {

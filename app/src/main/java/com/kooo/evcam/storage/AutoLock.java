@@ -46,7 +46,8 @@ import java.util.TreeSet;
  *   <li><b>信号</b>：要看的时候自己在 {@link Telemetry} 登记（信息条关着也得读），不看了就注销。
  *       闪远光读数从「没拨 / 没数据」变成「拨着」的那一下算一次（上升沿），那一刻 t = 系统时间 ——
  *       和文件名里的时刻是同一个钟。连着闪几下各算各的，锁过的再锁一遍没影响。
- *       同一次还把前后 10 秒拷进 U 盘 {@code instant captures}。</li>
+ *       同一次把环视那一路前后 10 秒切出来，拷进 U 盘 {@code instant captures}。
+ *       一轮闪完之前不再拷第二份，普通录像和其他相机不进那个文件夹。</li>
  *   <li><b>锁哪些</b>：{@link LockWindow}（纯函数）—— [t − 10 秒, t + 10 秒] 碰到的录像文件，每一路都算。</li>
  *   <li><b>锁两遍</b>，都在 {@link #worker} 这一个线程上：t 那一刻锁盘上已经有的；t + 10 秒再过
  *       {@link LockWindow#SECOND_PASS_DELAY_MS} 再锁一遍，接住 t 之后才开始的那一段（几路共用一个文件名时间戳，
@@ -86,6 +87,8 @@ public final class AutoLock implements Telemetry.Listener {
     private File relayTarget;
     private boolean watching;
     private Boolean lastFlash;
+    /** 上一份即时片段的时刻。一轮闪远光只拷一份，不把整段行程都拷进文件夹。 */
+    private long lastInstantAt;
     private long lastToastAt;
 
     /** 这次录像每一路的分段时长：对外的槽位名 → 毫秒。开录时取；只在 {@link #worker} 上读写。 */
@@ -168,6 +171,7 @@ public final class AutoLock implements Telemetry.Listener {
             telemetry.removeListener(this);
             telemetry.release(USER);
             lastFlash = null;
+            lastInstantAt = 0L;
             BlackBox.note("闪远光自动锁定：不再看闪远光信号（" + (recording ? "开关关了" : "录像停了") + "）");
         }
     }
@@ -182,14 +186,18 @@ public final class AutoLock implements Telemetry.Listener {
         boolean rising = Boolean.TRUE.equals(flash) && !Boolean.TRUE.equals(lastFlash);
         lastFlash = flash;
         if (rising) {
-            lockAround(app, System.currentTimeMillis(), false);
-            com.kooo.evcam.recording.InstantCapture.perform(app);
+            long now = System.currentTimeMillis();
+            lockAround(app, now, false);
+            if (now - lastInstantAt >= LockWindow.BEFORE_MS + LockWindow.AFTER_MS) {
+                lastInstantAt = now;
+                com.kooo.evcam.recording.InstantCapture.perform(app);
+            }
         }
     }
 
     /**
      * 快捷键：锁这一刻前后 10 秒（每一路），不看「闪远光时自动锁定」开没开。
-     * 保存到 U 盘由调用方接着做（和保存这一刻同一条路）。
+     * 不往 {@code instant captures} 拷文件，那个文件夹只收闪远光的环视片段。
      */
     public void lockFromShortcut(Context context) {
         if (context == null) {

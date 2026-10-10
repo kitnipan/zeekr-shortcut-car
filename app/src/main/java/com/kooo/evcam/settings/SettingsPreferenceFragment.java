@@ -299,6 +299,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setFlashLockEnabled(value);
             com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
         });
+        onClick("pref_instant_captures", pref -> {
+            android.content.Context context = getContext();
+            if (context != null) {
+                startActivity(new android.content.Intent(context,
+                        com.kooo.evcam.recording.InstantCapturesActivity.class));
+            }
+        });
         SwitchPreferenceCompat horn = findPreference("pref_footage_lock_horn");
         if (horn != null) {
             horn.setPersistent(false);

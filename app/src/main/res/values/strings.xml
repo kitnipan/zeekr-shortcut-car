@@ -344,6 +344,15 @@
     <string name="instant_capture_uploaded">Uploaded %1$d clip(s) to Drive</string>
     <string name="instant_capture_failed">Could not save the instant capture</string>
     <string name="instant_capture_upload_failed">Could not upload the instant capture</string>
+    <string name="instant_captures_title">即时片段</string>
+    <string name="instant_captures_summary">查看闪远光存下的环视片段，可以播放或删除</string>
+    <string name="instant_captures_empty">还没有即时片段</string>
+    <string name="instant_captures_no_usb">没有 U 盘</string>
+    <string name="instant_captures_delete_all">全部删除</string>
+    <string name="instant_captures_delete_title">删除这个片段？</string>
+    <string name="instant_captures_delete_all_title">删除全部即时片段？</string>
+    <string name="instant_captures_delete_all_msg">将删除 %1$d 个片段，删掉的找不回来。</string>
+    <string name="instant_captures_play_failed">这个片段打不开</string>
     <string name="set_save_moment_usb_title">Save moment to USB</string>
     <string name="set_save_moment_usb_summary">On by default. Copies finished clips into the moments folder on the USB stick</string>
     <string name="set_save_moment_drive_title">Upload moment to Google Drive</string>
@@ -520,7 +529,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">关闭</string>
     <string name="set_footage_lock_flash_title">闪远光时自动锁定当前录像</string>
-    <string name="set_footage_lock_flash_summary">录制时闪远光，自动锁定此刻前后 10 秒所在的录像片段（每一路画面），并保存到 instant captures 文件夹。锁定的录像占满空间时停止录制。</string>
+    <string name="set_footage_lock_flash_summary">录制时闪远光，自动锁定此刻前后 10 秒所在的录像片段（每一路画面）。只把环视那一路的这 20 秒存进 instant captures，其他录像留在录像目录。锁定的录像占满空间时停止录制。</string>
     <string name="set_footage_lock_horn_title">鸣笛时自动锁定当前录像</string>
     <string name="set_footage_lock_horn_summary">车机暂无法读取喇叭信号，此项暂不可用</string>
     <string name="msg_flash_locked">闪远光：已锁定前后 10 秒所在的录像片段</string>

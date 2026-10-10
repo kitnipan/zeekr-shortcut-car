@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta4] - 2026-10-10
+
+### New and improved
+
+- Instant captures opens from the main screen and from settings. A clip can be played, deleted, or cleared with Delete all.
+
+### Fixed
+
+- Instant captures keeps the surround view from a flash-to-pass, the 10 seconds before and the 10 seconds after. Other recordings stay in the video folder.
+
 ## [2.10.15-beta3] - 2026-10-10
 
 ### Fixed

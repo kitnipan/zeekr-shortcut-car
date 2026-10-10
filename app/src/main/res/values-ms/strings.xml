@@ -231,6 +231,15 @@
     <string name="instant_capture_uploaded">%1$d klip dimuat naik ke Drive</string>
     <string name="instant_capture_failed">Tidak dapat menyimpan rakaman segera</string>
     <string name="instant_capture_upload_failed">Tidak dapat memuat naik rakaman segera</string>
+    <string name="instant_captures_title">Rakaman segera</string>
+    <string name="instant_captures_summary">Lihat klip sekeliling yang disimpan oleh kelip lampu tinggi. Main atau padam di sini</string>
+    <string name="instant_captures_empty">Belum ada rakaman segera</string>
+    <string name="instant_captures_no_usb">Tiada pemacu USB</string>
+    <string name="instant_captures_delete_all">Padam semua</string>
+    <string name="instant_captures_delete_title">Padam klip ini?</string>
+    <string name="instant_captures_delete_all_title">Padam semua rakaman segera?</string>
+    <string name="instant_captures_delete_all_msg">Ini memadam %1$d klip. Klip yang dipadam tidak dapat dipulihkan.</string>
+    <string name="instant_captures_play_failed">Klip ini tidak dapat dimainkan</string>
     <string name="set_save_moment_usb_title">Simpan saat ke USB</string>
     <string name="set_save_moment_usb_summary">Hidup secara lalai. Salin klip siap ke folder moments pada pemacu USB</string>
     <string name="set_save_moment_drive_title">Muat naik saat ke Google Drive</string>
@@ -507,7 +516,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">Matikan</string>
     <string name="set_footage_lock_flash_title">Kunci rakaman semasa kelip lampu tinggi</string>
-    <string name="set_footage_lock_flash_summary">Semasa merakam, kelipkan lampu tinggi untuk mengunci klip yang meliputi 10 saat sebelum hingga 10 saat selepas, pada setiap kamera, dan simpan klip itu ke folder instant captures. Jika rakaman yang dikunci memenuhi ruang, rakaman berhenti.</string>
+    <string name="set_footage_lock_flash_summary">Semasa merakam, kelipkan lampu tinggi untuk mengunci klip yang meliputi 10 saat sebelum hingga 10 saat selepas, pada setiap kamera. Hanya paparan sekeliling bagi 20 saat itu disimpan ke folder instant captures. Rakaman lain kekal dalam folder video. Jika rakaman yang dikunci memenuhi ruang, rakaman berhenti.</string>
     <string name="set_footage_lock_horn_title">Kunci rakaman semasa hon dibunyikan</string>
     <string name="set_footage_lock_horn_summary">Unit kepala belum dapat membaca isyarat hon, jadi pilihan ini belum tersedia</string>
     <string name="msg_flash_locked">Kelip lampu tinggi: klip yang meliputi 10 saat sebelum dan selepas telah dikunci</string>

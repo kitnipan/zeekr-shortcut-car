@@ -46,7 +46,7 @@ public final class UsbExport {
     /** 保存这一刻另存的文件夹，也在 U 盘根目录。 */
     public static final String MOMENTS_DIR = "moments";
 
-    /** 锁定并保存切出来的前后各 10 秒，也在 U 盘根目录。 */
+    /** 闪远光切出来的环视前后各 10 秒，也在 U 盘根目录。 */
     public static final String INSTANT_DIR = "instant captures";
 
     private static final AtomicBoolean BUSY = new AtomicBoolean(false);

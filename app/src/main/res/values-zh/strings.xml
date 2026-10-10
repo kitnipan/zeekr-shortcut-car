@@ -207,6 +207,15 @@
     <string name="instant_capture_uploaded">已上传 %1$d 个片段到云端</string>
     <string name="instant_capture_failed">即时片段保存失败</string>
     <string name="instant_capture_upload_failed">即时片段上传失败</string>
+    <string name="instant_captures_title">即时片段</string>
+    <string name="instant_captures_summary">查看闪远光存下的环视片段，可以播放或删除</string>
+    <string name="instant_captures_empty">还没有即时片段</string>
+    <string name="instant_captures_no_usb">没有 U 盘</string>
+    <string name="instant_captures_delete_all">全部删除</string>
+    <string name="instant_captures_delete_title">删除这个片段？</string>
+    <string name="instant_captures_delete_all_title">删除全部即时片段？</string>
+    <string name="instant_captures_delete_all_msg">将删除 %1$d 个片段，删掉的找不回来。</string>
+    <string name="instant_captures_play_failed">这个片段打不开</string>
     <string name="set_save_moment_usb_title">瞬间保存到 U 盘</string>
     <string name="set_save_moment_usb_summary">默认开。把已完成的录像拷到 U 盘的 moments 文件夹</string>
     <string name="set_save_moment_drive_title">瞬间上传到 Google Drive</string>

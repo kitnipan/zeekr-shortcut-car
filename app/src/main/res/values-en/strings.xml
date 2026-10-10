@@ -230,6 +230,15 @@
     <string name="instant_capture_uploaded">Uploaded %1$d clip(s) to Drive</string>
     <string name="instant_capture_failed">Could not save the instant capture</string>
     <string name="instant_capture_upload_failed">Could not upload the instant capture</string>
+    <string name="instant_captures_title">Instant captures</string>
+    <string name="instant_captures_summary">View the surround clips saved by flash-to-pass. Play or delete them here</string>
+    <string name="instant_captures_empty">No instant captures yet</string>
+    <string name="instant_captures_no_usb">No USB stick</string>
+    <string name="instant_captures_delete_all">Delete all</string>
+    <string name="instant_captures_delete_title">Delete this clip?</string>
+    <string name="instant_captures_delete_all_title">Delete all instant captures?</string>
+    <string name="instant_captures_delete_all_msg">This deletes %1$d clips. Deleted clips cannot be recovered.</string>
+    <string name="instant_captures_play_failed">This clip will not play</string>
     <string name="set_save_moment_usb_title">Save moment to USB</string>
     <string name="set_save_moment_usb_summary">On by default. Copies finished clips into the moments folder on the USB stick</string>
     <string name="set_save_moment_drive_title">Upload moment to Google Drive</string>
@@ -508,7 +517,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">Turn off</string>
     <string name="set_footage_lock_flash_title">Lock footage on flash-to-pass</string>
-    <string name="set_footage_lock_flash_summary">While recording, flash the high beams to lock the clips covering 10 seconds before and after, on every camera, and save those clips to the instant captures folder. If locked footage fills the space, recording stops.</string>
+    <string name="set_footage_lock_flash_summary">While recording, flash the high beams to lock the clips covering 10 seconds before and after, on every camera. Only the surround view of those 20 seconds is saved to the instant captures folder. Other recordings stay in the video folder. If locked footage fills the space, recording stops.</string>
     <string name="set_footage_lock_horn_title">Lock footage on horn</string>
     <string name="set_footage_lock_horn_summary">The head unit can\'t read the horn signal yet, so this is unavailable</string>
     <string name="msg_flash_locked">Flash-to-pass: locked the clips covering 10 seconds before and after</string>

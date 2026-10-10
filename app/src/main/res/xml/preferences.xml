@@ -135,6 +135,11 @@
             android:title="@string/set_footage_lock_flash_title"
             android:summary="@string/set_footage_lock_flash_summary" />
 
+        <Preference
+            android:key="pref_instant_captures"
+            android:title="@string/instant_captures_title"
+            android:summary="@string/instant_captures_summary" />
+
         <!-- 鸣笛：车上还读不到喇叭信号，一直置灰、打不开（只在 SettingsPreferenceFragment.bindAutoLock 里设，和水印品牌那一行一样） -->
         <SwitchPreferenceCompat
             android:key="pref_footage_lock_horn"

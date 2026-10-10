@@ -42,6 +42,9 @@ public final class InstantClip {
             int tracks = extractor.getTrackCount();
             int[] outIndex = new int[tracks];
             boolean[] use = new boolean[tracks];
+            boolean[] video = new boolean[tracks];
+            int[] budget = new int[tracks];
+            int[] seen = new int[tracks];
             int selected = 0;
             for (int i = 0; i < tracks; i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
@@ -55,6 +58,14 @@ public final class InstantClip {
                 extractor.selectTrack(i);
                 outIndex[i] = muxer.addTrack(format);
                 use[i] = true;
+                if (mime.startsWith("video/")) {
+                    video[i] = true;
+                    int fps = 20;
+                    if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+                        fps = format.getInteger(MediaFormat.KEY_FRAME_RATE);
+                    }
+                    budget[i] = InstantSpan.videoSampleBudget(fps);
+                }
                 selected++;
             }
             if (selected == 0) {
@@ -102,6 +113,12 @@ public final class InstantClip {
                 info.flags = extractor.getSampleFlags();
                 muxer.writeSampleData(outIndex[track], buffer, info);
                 wrote++;
+                if (video[track]) {
+                    seen[track]++;
+                    if (seen[track] > budget[track]) {
+                        break;
+                    }
+                }
                 extractor.advance();
             }
             if (wrote == 0) {

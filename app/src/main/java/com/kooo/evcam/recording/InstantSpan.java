@@ -1,7 +1,9 @@
 package com.kooo.evcam.recording;
 
+import com.kooo.evcam.storage.LockWindow;
+
 /**
- * Where the 10 seconds before a press and the 10 seconds after sit inside one
+ * Where the 10 seconds before a flash and the 10 seconds after sit inside one
  * segment file. Times are microseconds from the start of that file.
  */
 public final class InstantSpan {
@@ -29,5 +31,15 @@ public final class InstantSpan {
             return null;
         }
         return new InstantSpan(startMs * 1000L, endMs * 1000L);
+    }
+
+    /**
+     * Video samples a flash excerpt may contain. A cut whose timestamps never
+     * reach the end of the window stops here instead of copying the whole segment.
+     */
+    public static int videoSampleBudget(int frameRate) {
+        int fps = frameRate > 0 ? frameRate : 20;
+        long ms = LockWindow.BEFORE_MS + LockWindow.AFTER_MS + 2_000L;
+        return (int) ((ms * fps) / 1000L);
     }
 }

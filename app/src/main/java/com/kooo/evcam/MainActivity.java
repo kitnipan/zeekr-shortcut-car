@@ -573,6 +573,12 @@ public class MainActivity extends AppCompatActivity {
             btnPhotoPlayback.setOnClickListener(v -> showPhotoPlaybackInterface());
         }
 
+        View btnInstant = findViewById(R.id.btn_instant_captures);
+        if (btnInstant != null) {
+            btnInstant.setOnClickListener(v -> startActivity(new Intent(this,
+                    com.kooo.evcam.recording.InstantCapturesActivity.class)));
+        }
+
         View btnRemote = findViewById(R.id.btn_remote);
         if (btnRemote != null) {
             btnRemote.setOnClickListener(v -> {

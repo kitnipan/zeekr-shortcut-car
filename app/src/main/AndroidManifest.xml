@@ -177,6 +177,13 @@
             android:screenOrientation="landscape"
             android:exported="false" />
 
+        <activity
+            android:name=".recording.InstantCapturesActivity"
+            android:label="@string/instant_captures_title"
+            android:theme="@style/Theme.Cam"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
         <!-- 诊断信息：相机/屏幕/车辆信号/存储/日志，可导出 -->
         <activity
             android:name=".zeekr.DiagnosticsActivity"

@@ -28,4 +28,10 @@ public class InstantSpanTest {
     public void fileThatStartsAtTheWindowEndIsSkipped() {
         assertNull(InstantSpan.inFile(70_000L, 50_000L, 70_000L));
     }
+
+    @Test
+    public void sampleBudgetStopsAtTheFlashExcerpt() {
+        assertEquals(440, InstantSpan.videoSampleBudget(20));
+        assertEquals(440, InstantSpan.videoSampleBudget(0));
+    }
 }
