@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.15-beta8] - 2026-10-11
+
+### New and improved
+
+- Instant captures plays the clip large beside the list. The one on screen is marked. Delete is an icon on that row, and Delete all is in the title bar.
+
 ## [2.10.15-beta7] - 2026-10-10
 
 ### Added

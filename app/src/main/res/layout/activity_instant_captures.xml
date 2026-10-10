@@ -34,10 +34,11 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/instant_delete_all"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="52dp"
-            android:text="@string/instant_captures_delete_all" />
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:contentDescription="@string/instant_captures_delete_all"
+            app:icon="@drawable/ic_delete" />
     </LinearLayout>
 
     <View
@@ -45,33 +46,87 @@
         android:layout_height="1dp"
         android:background="@color/line" />
 
-    <VideoView
-        android:id="@+id/instant_player"
-        android:layout_width="match_parent"
-        android:layout_height="280dp"
-        android:visibility="gone" />
-
     <TextView
         android:id="@+id/instant_empty"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
         android:padding="24dp"
         android:text="@string/instant_captures_empty"
         android:textAppearance="@style/TextAppearance.Cam.Body"
         android:textColor="@color/text_secondary"
         android:visibility="gone" />
 
-    <ScrollView
+    <LinearLayout
+        android:id="@+id/instant_body"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:orientation="horizontal">
 
-        <LinearLayout
-            android:id="@+id/instant_rows"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="8dp" />
-    </ScrollView>
+        <ScrollView
+            android:layout_width="@dimen/list_width"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/instant_rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp" />
+        </ScrollView>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/line" />
+
+        <FrameLayout
+            android:id="@+id/instant_stage"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@color/black">
+
+            <VideoView
+                android:id="@+id/instant_player"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/bg_status_scrim" />
+
+            <TextView
+                android:id="@+id/instant_now"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:fontFeatureSettings="tnum"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="16dp"
+                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textColor="@color/status_overlay_text" />
+
+            <ImageView
+                android:id="@+id/instant_play"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_play"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/instant_touch"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </FrameLayout>
+    </LinearLayout>
 </LinearLayout>
