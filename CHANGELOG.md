@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-beta16] - 2026-10-10
+
+### New and improved
+
+- Opening the app retries a saved smart sticker. You do not have to open the smart sticker screen.
+- When a sticker connects, a short chime plays and a card names that button.
+- The retry keeps going while the floating button is on screen, even if the app is hidden.
+
 ## [2.10.14-beta15] - 2026-10-10
 
 ### New and improved
