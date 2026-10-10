@@ -273,45 +273,36 @@ public final class StickerHub {
         if (!holding(app)) {
             return;
         }
-        if (holding > 0 || !BONDING.isEmpty() || !PENDING.isEmpty()) {
+        // A connectGatt while one sticker is up makes this radio drop that sticker.
+        // The keep tick is 15s, which is the lifetime that was being measured.
+        if (holding > 0 || !BONDING.isEmpty() || !PENDING.isEmpty() || !UP.isEmpty()) {
             armKeep();
             return;
         }
         for (String address : StickerDevices.parse(new AppConfig(app).getStickerDevices())) {
-            if (PAUSED.contains(address) || PENDING.contains(address) || !shouldHold(address)) {
+            if (PAUSED.contains(address) || !shouldHold(address)) {
                 continue;
             }
-            if (UP.contains(address)) {
-                continue;
-            }
-            if (OPEN.containsKey(address) && !PENDING.contains(address)) {
+            if (OPEN.containsKey(address)) {
                 close(address);
             }
-            if (!OPEN.containsKey(address)) {
-                reopen(address);
-                break;
-            }
+            reopen(address);
+            break;
         }
         armKeep();
     }
 
     /**
-     * Bring one sticker back. If another link is already up, connect beside it.
-     * Pausing the live one is only for a tap on Connect. Doing it on a timer
-     * drops the working button and leaves the radio on Connecting.
+     * Wait for a saved sticker without an 8s abort. A direct connect gives up
+     * while the coin cell is asleep, so the dot stays grey until a press wakes it.
+     * autoConnect stays armed until the sticker is connectable, then holds the link.
      */
     private static void reopen(String address) {
         if (app == null || !shouldHold(address) || OPEN.containsKey(address) || PENDING.contains(address)
                 || UP.contains(address)) {
             return;
         }
-        for (String up : UP) {
-            if (!up.equals(address)) {
-                connect(app, address, false);
-                return;
-            }
-        }
-        probe(app, address);
+        connect(app, address, true);
     }
 
     private static void releaseRadio() {
@@ -685,11 +676,21 @@ public final class StickerHub {
                     || PAUSED.contains(address)) {
                 return;
             }
-            if (!shouldHold(address)) {
+            if (!shouldHold(address) || otherLive(address)) {
                 return;
             }
             reopen(address);
         }, RECONNECT_MS);
+    }
+
+    /** True when some other sticker is already connected. A new connectGatt would drop it. */
+    private static boolean otherLive(String address) {
+        for (String up : UP) {
+            if (!up.equals(address)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean shouldHold(String address) {

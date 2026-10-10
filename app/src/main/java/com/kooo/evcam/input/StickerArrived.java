@@ -48,7 +48,6 @@ final class StickerArrived {
         LAST.put(address, now);
         Context app = context.getApplicationContext();
         String which = which(app, address);
-        StickerChime.play();
         present(app, which);
     }
 
