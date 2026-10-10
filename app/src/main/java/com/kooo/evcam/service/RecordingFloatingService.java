@@ -3,6 +3,7 @@ package com.kooo.evcam.service;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.res.ColorStateList;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -34,6 +35,9 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
+import com.kooo.evcam.input.StickerDevices;
+import com.kooo.evcam.input.StickerFrame;
+import com.kooo.evcam.input.StickerHub;
 import com.kooo.evcam.overlay.DimOverlayService;
 import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.overlay.OverlayCoordinator;
@@ -108,6 +112,40 @@ public class RecordingFloatingService extends Service {
     private RecordingButtonView recordingButton;
     private DimButtonView dimButton;
     private TextView timeTextView;
+    /** One dot per saved sticker, above the buttons. Orange while that link is up. */
+    private LinearLayout stickerDots;
+    private final StickerHub.Watch stickerWatch = new StickerHub.Watch() {
+        @Override
+        public void onState(String address, boolean connected) {
+            paintStickersLater();
+        }
+
+        @Override
+        public void onPacket(String address, byte[] raw) {
+        }
+
+        @Override
+        public void onReady(String address) {
+            paintStickersLater();
+        }
+
+        @Override
+        public void onFail(String address, int reason, int status) {
+            paintStickersLater();
+        }
+
+        @Override
+        public void onLog(String line) {
+        }
+
+        @Override
+        public void onRssi(String address, int rssi) {
+        }
+
+        @Override
+        public void onPhase(String address, int phase) {
+        }
+    };
     /** 录制键 + 间距 + 遮罩键。拖动时按这一整条夹在屏幕里。 */
     private int clusterWidthPx;
     private boolean downOnDim;
@@ -192,6 +230,7 @@ public class RecordingFloatingService extends Service {
         
         // 注册录制状态广播接收器
         registerRecordingStateReceiver();
+        StickerHub.addWatch(stickerWatch);
     }
 
     private void registerSizeUpdateReceiver() {
@@ -363,6 +402,7 @@ public class RecordingFloatingService extends Service {
     public void onDestroy() {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onDestroy");
         super.onDestroy();
+        StickerHub.removeWatch(stickerWatch);
         hideFloatingWindow();
 
         if (isServiceBound) {
@@ -410,9 +450,48 @@ public class RecordingFloatingService extends Service {
             recordingButton = null;
             dimButton = null;
             timeTextView = null;
+            stickerDots = null;
         }
         stopTimeUpdate();
-        com.kooo.evcam.input.StickerHub.setFloatingShown(this, false);
+        StickerHub.setFloatingShown(this, false);
+    }
+
+    private void paintStickersLater() {
+        if (mainHandler != null) {
+            mainHandler.post(this::paintStickers);
+        }
+    }
+
+    /** Orange dot above the float while that saved sticker's link is up. Grey while it is down. */
+    private void paintStickers() {
+        if (stickerDots == null) {
+            return;
+        }
+        stickerDots.removeAllViews();
+        java.util.List<String> saved = StickerDevices.parse(appConfig.getStickerDevices());
+        if (saved.isEmpty()) {
+            stickerDots.setVisibility(View.GONE);
+            return;
+        }
+        stickerDots.setVisibility(View.VISIBLE);
+        float density = getResources().getDisplayMetrics().density;
+        int size = Math.max(8, (int) (10 * density));
+        int gap = Math.max(4, (int) (6 * density));
+        for (String address : saved) {
+            boolean up = StickerHub.isUp(address);
+            View dot = new View(this);
+            dot.setBackgroundResource(R.drawable.sticker_dot);
+            dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this,
+                    up ? R.color.energy : R.color.text_tertiary)));
+            String tail = StickerFrame.tail(StickerFrame.deviceName(address));
+            dot.setContentDescription(getString(up ? R.string.sticker_connected : R.string.sticker_link_off)
+                    + " " + tail);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+            params.leftMargin = gap / 2;
+            params.rightMargin = gap / 2;
+            params.bottomMargin = gap;
+            stickerDots.addView(dot, params);
+        }
     }
 
     /**
@@ -461,6 +540,17 @@ public class RecordingFloatingService extends Service {
         // 透明度沿用原来那个按钮的设置项，合并之后它管这一个
         floatingContainer.setAlpha(appConfig.getFloatingWindowAlpha() / 100f);
 
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        stickerDots = new LinearLayout(this);
+        stickerDots.setOrientation(LinearLayout.HORIZONTAL);
+        stickerDots.setGravity(Gravity.CENTER);
+        column.addView(stickerDots, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
         // 创建水平布局容器
         LinearLayout horizontalContainer = new LinearLayout(this);
         horizontalContainer.setOrientation(LinearLayout.HORIZONTAL);
@@ -494,10 +584,13 @@ public class RecordingFloatingService extends Service {
         timeParams.leftMargin = Math.max(4, buttonSize / 16); // 距离按钮
         horizontalContainer.addView(timeTextView, timeParams);
 
-        // 将水平容器添加到浮动容器
-        floatingContainer.addView(horizontalContainer, new FrameLayout.LayoutParams(
+        column.addView(horizontalContainer, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        floatingContainer.addView(column, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT));
+        paintStickers();
 
         // 设置布局参数
         int windowType;

@@ -277,7 +277,6 @@ public final class StickerHub {
             armKeep();
             return;
         }
-        long now = android.os.SystemClock.elapsedRealtime();
         for (String address : StickerDevices.parse(new AppConfig(app).getStickerDevices())) {
             if (PAUSED.contains(address) || PENDING.contains(address) || !shouldHold(address)) {
                 continue;
@@ -289,10 +288,6 @@ public final class StickerHub {
                 close(address);
             }
             if (!OPEN.containsKey(address)) {
-                Long next = NEXT.get(address);
-                if (next != null && now < next) {
-                    continue;
-                }
                 reopen(address);
                 break;
             }
@@ -837,9 +832,12 @@ public final class StickerHub {
         }
     }
 
-    /** Saved stickers stay up while a screen or the float is up, the switch is on, or a shortcut needs them. */
+    /** A saved sticker stays connected for the life of the process. */
     private static boolean holding(Context context) {
-        return awake() || linkWanted(context) || !WATCHES.isEmpty();
+        if (awake() || linkWanted(context) || !WATCHES.isEmpty()) {
+            return true;
+        }
+        return !StickerDevices.parse(new AppConfig(context).getStickerDevices()).isEmpty();
     }
 
     private static boolean awake() {
