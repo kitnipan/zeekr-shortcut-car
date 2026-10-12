@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.11.2-beta] - 2026-10-13
+
 ### Fixed
 
 - The floating record button and the main screen use the same recording state. Red means recording on both.
