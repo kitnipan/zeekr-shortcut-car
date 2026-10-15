@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.11-beta] - 2026-10-16
+
+### New and improved
+
+- Remote surround is a 960×540 picture per camera, flattened from a grab that keeps that width. The 4-up view is 1920×1080.
+
 ## [2.11.10-beta] - 2026-10-15
 
 ### New and improved

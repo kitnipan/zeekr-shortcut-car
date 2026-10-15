@@ -22,7 +22,7 @@ public final class RemoteSnap {
     public static final int CELL_WIDTH = RemoteFrame.CELL_WIDTH;
     public static final int CELL_HEIGHT = RemoteFrame.CELL_HEIGHT;
 
-    private static final int DIVISIONS = 10;
+    private static final int JPEG_QUALITY = 72;
 
     private final FisheyeMesh mesh = new FisheyeMesh();
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
@@ -62,14 +62,13 @@ public final class RemoteSnap {
 
         int sw = source.getWidth();
         int sh = source.getHeight();
-        FisheyeMesh.Painter painter = c -> c.drawBitmap(source, 0f, 0f, paint);
 
         Bitmap[] channels = new Bitmap[CompositeStreamGeometry.LANE_COUNT];
         for (int streamLane = 0; streamLane < CompositeStreamGeometry.LANE_COUNT; streamLane++) {
             Bitmap cell = Bitmap.createBitmap(CELL_WIDTH, CELL_HEIGHT, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(cell);
             canvas.drawColor(Color.BLACK);
-            drawLaneDefish(canvas, use, streamLane, sw, sh, 0f, 0f, CELL_WIDTH, CELL_HEIGHT, painter);
+            drawLaneDefish(canvas, source, use, streamLane, sw, sh, 0f, 0f, CELL_WIDTH, CELL_HEIGHT);
             channels[streamLane] = cell;
         }
 
@@ -113,7 +112,7 @@ public final class RemoteSnap {
     }
 
     private void putEncoded(RemoteLive live, String slot, Bitmap bitmap) {
-        byte[] jpeg = compress(bitmap, Bitmap.CompressFormat.JPEG, 55);
+        byte[] jpeg = compress(bitmap, Bitmap.CompressFormat.JPEG, JPEG_QUALITY);
         byte[] png = dumpUsb ? compress(bitmap, Bitmap.CompressFormat.PNG, 100) : null;
         live.put(slot, jpeg, png);
     }
@@ -126,9 +125,8 @@ public final class RemoteSnap {
         return out.toByteArray();
     }
 
-    private void drawLaneDefish(Canvas canvas, float[] lanes, int lane, int sw, int sh,
-                                float dx, float dy, float dw, float dh,
-                                FisheyeMesh.Painter painter) {
+    private void drawLaneDefish(Canvas canvas, Bitmap source, float[] lanes, int lane, int sw, int sh,
+                                float dx, float dy, float dw, float dh) {
         if (lane < 0 || lane >= CompositeStreamGeometry.LANE_COUNT) {
             return;
         }
@@ -140,9 +138,25 @@ public final class RemoteSnap {
         if (laneWidth < 2f || laneHeight < 2f) {
             return;
         }
-        mesh.prepare(DIVISIONS, left, top, laneWidth, laneHeight,
-                window[0], window[1], window[2], window[3]);
-        mesh.draw(canvas, dx, dy, dw, dh, painter);
+        int x = Math.max(0, Math.round(left));
+        int y = Math.max(0, Math.round(top));
+        int w = Math.min(sw - x, Math.max(2, Math.round(laneWidth)));
+        int h = Math.min(sh - y, Math.max(2, Math.round(laneHeight)));
+        if (x + w > sw || y + h > sh || w < 2 || h < 2) {
+            return;
+        }
+        // One camera, not the whole strip. Each mesh cell redraws this bitmap.
+        Bitmap laneBmp = Bitmap.createBitmap(source, x, y, w, h);
+        try {
+            FisheyeMesh.Painter lanePainter = c -> c.drawBitmap(laneBmp, 0f, 0f, paint);
+            mesh.prepare(FisheyeMesh.divisionsFor(Math.max(dw, dh)), 0f, 0f, w, h,
+                    window[0], window[1], window[2], window[3]);
+            mesh.draw(canvas, dx, dy, dw, dh, lanePainter);
+        } finally {
+            if (laneBmp != source) {
+                laneBmp.recycle();
+            }
+        }
     }
 
     private Bitmap frameSixteenByNine(Bitmap source, int outW, int outH) {

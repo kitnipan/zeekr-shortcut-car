@@ -1458,7 +1458,7 @@ public class MainActivity extends AppCompatActivity {
         if (w < 2 || h < 2) {
             return null;
         }
-        return view.getBitmap(Math.min(640, w), Math.min(360, h));
+        return view.getBitmap(Math.min(1920, w), Math.min(1080, h));
     }
 
     private void pushRemoteFrame() {

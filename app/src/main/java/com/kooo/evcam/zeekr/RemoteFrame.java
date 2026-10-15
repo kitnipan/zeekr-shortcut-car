@@ -16,9 +16,9 @@ import android.graphics.RectF;
  */
 public final class RemoteFrame {
 
-    /** One cell. 480×270 is 16:9, so the 2×2 frame is 960×540. */
-    public static final int CELL_WIDTH = 480;
-    public static final int CELL_HEIGHT = 270;
+    /** One cell. 960×540 is 16:9, so the 2×2 frame is 1920×1080. */
+    public static final int CELL_WIDTH = 960;
+    public static final int CELL_HEIGHT = 540;
 
     /**
      * Bitmap size for a surround grab. The short side has to cover one cell,
@@ -31,7 +31,8 @@ public final class RemoteFrame {
         }
         int shortest = Math.min(bufferW, bufferH);
         float scale = (float) CELL_WIDTH / shortest;
-        float cap = 2048f / longest;
+        // A 1280×5140 stack at a 2048 cap shrinks each fisheye to ~510px. 4096 keeps the cell width.
+        float cap = 4096f / longest;
         if (scale > cap) {
             scale = cap;
         }
@@ -40,7 +41,7 @@ public final class RemoteFrame {
         return new int[]{w, h};
     }
 
-    private static final int DIVISIONS = 8;
+    private static final int DIVISIONS = FisheyeMesh.divisionsFor(CELL_WIDTH);
 
     private final FisheyeMesh mesh = new FisheyeMesh();
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);

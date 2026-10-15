@@ -10,8 +10,8 @@ public class RemoteFrameTest {
 
     @Test
     public void eachCellIsSixteenByNine() {
-        assertEquals(960, RemoteFrame.CELL_WIDTH * 2);
-        assertEquals(540, RemoteFrame.CELL_HEIGHT * 2);
+        assertEquals(1920, RemoteFrame.CELL_WIDTH * 2);
+        assertEquals(1080, RemoteFrame.CELL_HEIGHT * 2);
         assertEquals(16f / 9f, (float) RemoteFrame.CELL_WIDTH / RemoteFrame.CELL_HEIGHT, 0.001f);
     }
 
