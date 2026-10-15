@@ -11,6 +11,22 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.13-beta] - 2026-10-16
+
+### New and improved
+
+- This build includes upstream 2.11.7-beta. The HUD side view, remote surround, and smart sticker stay as in 2.11.12-beta.
+- While recording, the record button shows what will happen when the screen turns off.
+- Driving info bar redesigned, with Sentry Mode, rear lamps, and a 7X front view. Items are selected in Settings → System → System info (experimental). The bar is added to the surround view recording only.
+- Lock footage (Settings → Storage): videos and photos can be locked during playback, or automatically when the high beams are flashed. Locked files are never deleted by loop recording.
+- Screen off follows the physical screen. With the screen off, the cabin cameras are released. With Keep recording when the screen goes off on, the surround view keeps recording.
+
+### Fixed
+
+- Stuttering at high bitrates and frame rates.
+
+Known issue: with surround view plus both cabin cameras, a camera may freeze and then recover on its own.
+
 ## [2.11.12-beta] - 2026-10-16
 
 ### Fixed
