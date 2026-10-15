@@ -1,6 +1,7 @@
 package com.kooo.evcam.zeekr;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.PixelFormat;
@@ -63,6 +64,8 @@ public class SideViewPopupView extends ViewGroup {
     /** 大于 0：窗口在抬头显示上，位置走 {@link HudFrame}，不再占中控。 */
     private int hudWidth;
     private int hudHeight;
+    /** 抬头显示上 TextureView 自己那层会错位，再叠出一块小画面。采样进这张图再画，那层设成全透明。 */
+    private Bitmap hudSample;
     private final FisheyeMesh.SourceMap turnedMap = (u, v, out) ->
             SideViewProjection.sourcePoint(u, v, viewFov, yaw, pitch, roll, lane, out, 0);
 
@@ -84,6 +87,8 @@ public class SideViewPopupView extends ViewGroup {
     public void setHudSize(int width, int height) {
         hudWidth = Math.max(0, width);
         hudHeight = Math.max(0, height);
+        // 0：合成器不把错位的那层画出来。画网格时改走 hudSample()，不靠这个透明度。
+        textureView.setAlpha(onHud() ? 0f : 1f);
     }
 
     public boolean onHud() {
@@ -285,7 +290,8 @@ public class SideViewPopupView extends ViewGroup {
      */
     private void place(int side) {
         if (onHud()) {
-            int[] frame = HudFrame.place(hudWidth, hudHeight, side == LaneCycle.LEFT);
+            int[] frame = HudFrame.place(hudWidth, hudHeight, side == LaneCycle.LEFT,
+                    appConfig.getSidePopupHudHeightPercent());
             params.x = frame[0];
             params.y = frame[1];
             params.width = frame[2];
@@ -362,12 +368,35 @@ public class SideViewPopupView extends ViewGroup {
             drawMatrix.setRectToRect(sourceRect, destRect, Matrix.ScaleToFit.FILL);
             canvas.clipRect(destRect);
             canvas.concat(drawMatrix);
-            drawChild(canvas, textureView, getDrawingTime());
+            drawTextureOnce(canvas);
         }
         canvas.restoreToCount(save);
     }
 
     private void drawTextureOnce(Canvas canvas) {
+        if (onHud()) {
+            Bitmap sample = hudSample();
+            if (sample != null) {
+                canvas.drawBitmap(sample, 0, 0, null);
+                return;
+            }
+        }
         drawChild(canvas, textureView, getDrawingTime());
+    }
+
+    /** 当前这一帧，尺寸和子视图一样。没有帧就 null。 */
+    private Bitmap hudSample() {
+        int width = textureView.getWidth();
+        int height = textureView.getHeight();
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        if (hudSample == null || hudSample.getWidth() != width || hudSample.getHeight() != height) {
+            if (hudSample != null) {
+                hudSample.recycle();
+            }
+            hudSample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        }
+        return textureView.getBitmap(hudSample);
     }
 }

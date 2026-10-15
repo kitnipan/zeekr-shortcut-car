@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.6-beta] - 2026-10-15
+
+### Fixed
+
+- On the driver HUD the side view fills the strip top to bottom. HUD height (%) lowers it. The extra nested picture on the right is gone.
+
 ## [2.11.5-beta] - 2026-10-15
 
 ### Fixed
