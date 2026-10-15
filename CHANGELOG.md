@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.12-beta] - 2026-10-16
+
+### Fixed
+
+- A saved smart sticker stays connected while the app is open. The link is no longer serviced on the main thread, which dropped it as the screen came up.
+
 ## [2.11.11-beta] - 2026-10-16
 
 ### New and improved

@@ -66,6 +66,12 @@ public class StickerRecoverTest {
     }
 
     @Test
+    public void openAppHoldsTheLinkTight() {
+        assertEquals(StickerRecover.PRIORITY_HIGH, StickerRecover.linkPriority(true));
+        assertEquals(StickerRecover.PRIORITY_BALANCED, StickerRecover.linkPriority(false));
+    }
+
+    @Test
     public void connectIsAllowedWhenThisStickerIsDown() {
         assertEquals(StickerRecover.CONNECT, StickerRecover.allowConnect(false, false));
         assertEquals(StickerRecover.WAIT, StickerRecover.allowConnect(true, false));

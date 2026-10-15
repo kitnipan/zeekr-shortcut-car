@@ -112,7 +112,7 @@ public final class StickerHub {
     /** Sticker screen is open, so a press is for saving, not for running the shortcut. */
     private static boolean capture;
     /** Any screen of this app is in front. Saved stickers stay up and a lost link comes back. */
-    private static boolean inFront;
+    private static volatile boolean inFront;
     /** True while the sticker screen is scanning. A connectGatt during that scan returns nothing. */
     private static boolean scanHold;
     /** The recording float is on screen, so retry keeps going after the app is hidden. */
@@ -191,6 +191,7 @@ public final class StickerHub {
                 NEXT.clear();
             }
             syncOnMain(application);
+            holdPriority(on);
             if (entered) {
                 keep();
             }
@@ -368,6 +369,21 @@ public final class StickerHub {
         }
     }
 
+    /** Short connection interval while a screen is open. Relax it when the app leaves. */
+    private static void holdPriority(boolean tight) {
+        int priority = StickerRecover.linkPriority(tight);
+        List<BluetoothGatt> links = new ArrayList<>(OPEN.values());
+        GATT.post(() -> {
+            for (BluetoothGatt gatt : links) {
+                try {
+                    gatt.requestConnectionPriority(priority);
+                } catch (SecurityException ignored) {
+                    // permission dropped
+                }
+            }
+        });
+    }
+
     private static void armKeep() {
         MAIN.removeCallbacks(KEEP);
         if (app == null) {
@@ -507,7 +523,10 @@ public final class StickerHub {
         boolean gentle = auto || StickerRecover.gentleConnect(othersUp(address));
         BluetoothGatt gatt;
         try {
-            gatt = device.connectGatt(application, gentle, callback, BluetoothDevice.TRANSPORT_LE);
+            // Callbacks stay on the GATT thread. The main thread is busy while the app
+            // opens, and a late callback makes this radio drop the link.
+            gatt = device.connectGatt(application, gentle, callback, BluetoothDevice.TRANSPORT_LE,
+                    BluetoothDevice.PHY_LE_1M, GATT);
         } catch (SecurityException e) {
             PENDING.remove(address);
             fail(address, FAIL_BLUETOOTH, 0);
@@ -534,6 +553,19 @@ public final class StickerHub {
         return new BluetoothGattCallback() {
             @Override
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                if (newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
+                    // Answer the radio here, before the main thread gets a turn.
+                    try {
+                        gatt.requestConnectionPriority(StickerRecover.linkPriority(inFront));
+                        gatt.discoverServices();
+                    } catch (SecurityException e) {
+                        MAIN.post(() -> {
+                            close(address);
+                            fail(address, FAIL_BLUETOOTH, 0);
+                        });
+                        return;
+                    }
+                }
                 MAIN.post(() -> {
                     if (newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
                         if (CLOSING.contains(address)) {
@@ -552,12 +584,6 @@ public final class StickerHub {
                             }
                             connectMissing();
                         }, CONNECT_TIMEOUT_MS);
-                        try {
-                            gatt.discoverServices();
-                        } catch (SecurityException e) {
-                            close(address);
-                            fail(address, FAIL_BLUETOOTH, 0);
-                        }
                         return;
                     }
                     if (newState == BluetoothGatt.STATE_DISCONNECTED) {

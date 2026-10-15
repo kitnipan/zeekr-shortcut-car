@@ -17,6 +17,13 @@ public final class StickerRecover {
     public static final long AGAIN_MS = 500L;
     /** After an unexpected drop, connect while the sticker is still advertising. */
     public static final long RECONNECT_MS = 400L;
+    /**
+     * Matches {@code BluetoothGatt.CONNECTION_PRIORITY_HIGH}. A short interval while the
+     * app is open, so the sticker's own timeout does not hang up the link.
+     */
+    public static final int PRIORITY_HIGH = 1;
+    /** Matches {@code BluetoothGatt.CONNECTION_PRIORITY_BALANCED}. */
+    public static final int PRIORITY_BALANCED = 0;
     /** Gap is unused while a connect is in flight. A second connectGatt then never calls back. */
     public static final long GAP_MS = 400L;
 
@@ -33,6 +40,11 @@ public final class StickerRecover {
      */
     public static boolean gentleConnect(int othersUp) {
         return othersUp > 0;
+    }
+
+    /** App in front holds the link tight. In the background the interval can relax. */
+    public static int linkPriority(boolean appInFront) {
+        return appInFront ? PRIORITY_HIGH : PRIORITY_BALANCED;
     }
 
     public static int allowConnect(boolean scanHold, boolean busy) {
