@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.14-beta] - 2026-10-16
+
+### New and improved
+
+- Equalizer in the drawer: 15 bands and two presets. Set the car's own equalizer to Flat first, then play music in the car's player and tune. The curve stays on after you leave the screen.
+
 ## [2.11.13-beta] - 2026-10-16
 
 ### New and improved

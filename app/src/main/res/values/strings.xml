@@ -597,9 +597,11 @@
     <string name="msg_recording_started_n">已开始录制 %1$d 路</string>
     <string name="msg_recording_waiting_cameras">等待摄像头，恢复后自动继续</string>
     <string name="msg_sd_fallback">未检测到 U 盘，已改为录制到内置存储</string>
+    <string name="msg_codec_fallback">录制故障，已回退到 MediaCodec 模式；若频繁发生请在设置里更改录制模式</string>
     <string name="msg_recording_interrupted">录制中断：%1$s</string>
     <string name="msg_recording_interrupted_resuming">录制中断：%1$s，正在自动恢复…</string>
     <string name="rec_reason_unknown">原因未知</string>
+    <string name="rec_reason_camera_lost">相机被别的程序拿走了</string>
     <string name="rec_reason_write_stalled">无法写入文件</string>
     <!-- 「X 失败：原因」里的原因，由 ui/FailureReason 按异常挑选；挑不出的不显示原因 -->
     <string name="reason_no_network">无网络连接</string>
@@ -709,6 +711,13 @@
     <string name="msg_keep_one_camera_refuse">未开启任何摄像头，请在「编辑视频流配置」中开启</string>
     <string name="msg_refuse_no_external">未检测到 U 盘，插入后自动开始录制</string>
     <string name="nav_remote">Remote view</string>
+    <string name="nav_eq">Equalizer</string>
+    <string name="eq_hint">Set the car\'s own equalizer to Flat first, then play music in the car\'s player and tune. Two presets, each kept on its own.</string>
+    <string name="eq_on">On</string>
+    <string name="eq_flat">Flat</string>
+    <string name="eq_preset_1">Preset 1</string>
+    <string name="eq_preset_2">Preset 2</string>
+    <string name="eq_refused">The head unit refused the equalizer.</string>
     <string name="remote_title">Remote view</string>
     <string name="remote_hint">Open this QR on the phone. Video starts only after someone is watching.</string>
     <string name="remote_watching">Sending · %1$s</string>
@@ -881,6 +890,7 @@
     <string name="status_recording_fallback">已改为录制到 %1$s（%2$s 不可用）</string>
     <string name="status_camera_lane_taken">%1$s：摄像头被占用，其他摄像头继续录制；释放后该路自动恢复录制</string>
     <string name="status_cameras_taken">部分摄像头被占用，其他摄像头继续录制；释放后自动恢复录制</string>
+    <string name="status_camera_taken">环视被车机占用，放开后自动继续录像</string>
     <string name="status_camera_lane_unavailable">%1$s：无法录制，其他摄像头继续录制</string>
     <string name="status_internal_storage">内置存储</string>
     <string name="nav_group_switches">开关</string>

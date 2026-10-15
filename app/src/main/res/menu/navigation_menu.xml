@@ -28,6 +28,10 @@
             android:id="@+id/nav_remote"
             android:icon="@drawable/ic_camera"
             android:title="@string/nav_remote" />
+        <item
+            android:id="@+id/nav_eq"
+            android:icon="@drawable/ic_eq"
+            android:title="@string/nav_eq" />
     </group>
 
     <item android:title="@string/nav_group_switches">

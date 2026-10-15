@@ -1167,6 +1167,8 @@ public class MainActivity extends AppCompatActivity {
                 showPhotoPlaybackInterface();
             } else if (itemId == R.id.nav_remote) {
                 showRemoteInterface();
+            } else if (itemId == R.id.nav_eq) {
+                showFragment(new com.kooo.evcam.audio.CabinEqFragment());
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
             } else if (itemId == R.id.nav_about) {

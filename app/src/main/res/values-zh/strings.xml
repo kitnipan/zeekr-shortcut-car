@@ -559,6 +559,13 @@
     <string name="nav_video_playback">视频回看</string>
     <string name="nav_photo_playback">图片回看</string>
     <string name="nav_remote">远程观看</string>
+    <string name="nav_eq">均衡器</string>
+    <string name="eq_hint">先把车机自带均衡器设成平直，再在车机播放器里放音乐来调。两套预设各存各的。</string>
+    <string name="eq_on">开启</string>
+    <string name="eq_flat">平直</string>
+    <string name="eq_preset_1">预设 1</string>
+    <string name="eq_preset_2">预设 2</string>
+    <string name="eq_refused">车机没有接受这个均衡器。</string>
     <string name="remote_title">远程观看</string>
     <string name="remote_hint">手机打开这个二维码，连上之后才会传画面。没人看的时候不传。</string>
     <string name="remote_watching">正在传画面 · %1$s</string>

@@ -66,6 +66,7 @@ public class ZeekrShortcutApp extends Application {
         // 车机重启过没有看上面黑匣子的开机记录，所以排在它后面
         com.kooo.evcam.camera.StepLog.loadHistory(this);
         Languages.apply(new AppConfig(this).getLanguageMode());
+        com.kooo.evcam.audio.CabinEqEngine.applySaved(this);
         StallWatch.start(this);
         trackAppInFront();
         com.kooo.evcam.input.KeyCatcher.sync(this);

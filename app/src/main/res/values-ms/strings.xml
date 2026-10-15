@@ -584,9 +584,11 @@
     <string name="msg_recording_started_n">Rakaman bermula (%1$d kamera)</string>
     <string name="msg_recording_waiting_cameras">Menunggu kamera. Rakaman disambung semula secara automatik apabila kamera tersedia.</string>
     <string name="msg_sd_fallback">Tiada pemacu USB ditemui. Merakam ke storan dalaman.</string>
+    <string name="msg_codec_fallback">Rakaman gagal dan kembali ke MediaCodec. Jika ini berulang, tukar mod rakaman dalam Tetapan.</string>
     <string name="msg_recording_interrupted">Rakaman terganggu: %1$s</string>
     <string name="msg_recording_interrupted_resuming">Rakaman terganggu: %1$s. Menyambung semula…</string>
     <string name="rec_reason_unknown">punca tidak diketahui</string>
+    <string name="rec_reason_camera_lost">aplikasi lain mengambil kamera</string>
     <string name="rec_reason_write_stalled">tidak dapat menulis ke fail</string>
     <!-- Sebab dalam "X gagal: sebab", dipilih daripada pengecualian oleh ui/FailureReason; jika tiada, sebab tidak ditunjukkan -->
     <string name="reason_no_network">tiada sambungan rangkaian</string>
@@ -651,6 +653,13 @@
     <string name="nav_video_playback">Video</string>
     <string name="nav_photo_playback">Foto</string>
     <string name="nav_remote">Tonton jauh</string>
+    <string name="nav_eq">Penyama</string>
+    <string name="eq_hint">Tetapkan penyama kereta ke Rata dahulu, kemudian mainkan muzik pada pemain kereta dan laras. Dua pratetap, masing-masing disimpan sendiri.</string>
+    <string name="eq_on">Hidup</string>
+    <string name="eq_flat">Rata</string>
+    <string name="eq_preset_1">Pratetap 1</string>
+    <string name="eq_preset_2">Pratetap 2</string>
+    <string name="eq_refused">Unit kepala menolak penyama ini.</string>
     <string name="remote_title">Tonton jauh</string>
     <string name="remote_hint">Buka QR ini pada telefon. Gambar dihantar hanya semasa ada yang menonton.</string>
     <string name="remote_watching">Menghantar · %1$s</string>
@@ -865,6 +874,7 @@
     <string name="status_recording_fallback">Merakam ke %1$s (%2$s tidak tersedia)</string>
     <string name="status_camera_lane_taken">%1$s: kamera sedang digunakan. Kamera lain terus merakam. Rakaman kamera ini disambung semula apabila ia dilepaskan.</string>
     <string name="status_cameras_taken">Sebahagian kamera sedang digunakan. Kamera lain terus merakam. Rakaman setiap kamera disambung semula apabila ia dilepaskan.</string>
+    <string name="status_camera_taken">Pandangan sekeliling digunakan oleh kereta. Rakaman diteruskan apabila ia dilepaskan.</string>
     <string name="status_camera_lane_unavailable">%1$s: tidak dapat merakam. Kamera lain terus merakam.</string>
     <string name="status_internal_storage">storan dalaman</string>
     <string name="nav_group_switches">Suis</string>

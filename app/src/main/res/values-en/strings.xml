@@ -588,9 +588,11 @@
     <string name="msg_recording_started_n">Recording started (cameras: %1$d)</string>
     <string name="msg_recording_waiting_cameras">Waiting for cameras. Recording resumes automatically when they\'re available.</string>
     <string name="msg_sd_fallback">No USB drive found. Recording to internal storage.</string>
+    <string name="msg_codec_fallback">Recording failed and fell back to MediaCodec. If this keeps happening, change the recording mode in Settings.</string>
     <string name="msg_recording_interrupted">Recording interrupted: %1$s</string>
     <string name="msg_recording_interrupted_resuming">Recording interrupted: %1$s. Resuming…</string>
     <string name="rec_reason_unknown">unknown cause</string>
+    <string name="rec_reason_camera_lost">another app took the camera</string>
     <string name="rec_reason_write_stalled">can\'t write to the file</string>
     <!-- The reason in "X failed: reason", picked from the exception by ui/FailureReason; otherwise no reason is shown -->
     <string name="reason_no_network">no network connection</string>
@@ -658,6 +660,13 @@
     <string name="nav_video_playback">Videos</string>
     <string name="nav_photo_playback">Photos</string>
     <string name="nav_remote">Remote view</string>
+    <string name="nav_eq">Equalizer</string>
+    <string name="eq_hint">Set the car\'s own equalizer to Flat first, then play music in the car\'s player and tune. Two presets, each kept on its own.</string>
+    <string name="eq_on">On</string>
+    <string name="eq_flat">Flat</string>
+    <string name="eq_preset_1">Preset 1</string>
+    <string name="eq_preset_2">Preset 2</string>
+    <string name="eq_refused">The head unit refused the equalizer.</string>
     <string name="remote_title">Remote view</string>
     <string name="remote_hint">Open this QR on the phone. Video starts only after someone is watching.</string>
     <string name="remote_watching">Sending · %1$s</string>
@@ -873,6 +882,7 @@
     <string name="status_recording_fallback">Recording to %1$s (%2$s unavailable)</string>
     <string name="status_camera_lane_taken">%1$s: camera in use. The other cameras keep recording. This camera resumes recording when it is released.</string>
     <string name="status_cameras_taken">Some cameras are in use. The others keep recording. Each resumes recording when it is released.</string>
+    <string name="status_camera_taken">The surround view is in use by the car. Recording continues when it is released.</string>
     <string name="status_camera_lane_unavailable">%1$s: can\'t record. The other cameras keep recording.</string>
     <string name="status_internal_storage">internal storage</string>
     <string name="nav_group_switches">Switches</string>

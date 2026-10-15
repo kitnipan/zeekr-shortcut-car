@@ -25,6 +25,8 @@
         tools:ignore="ScopedStorage" />
     <!-- 网络权限：检查更新访问 GitHub；「发送到手机」在局域网里临时提供一个文件 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 均衡器挂在整机输出上，车机播放器正在放的声音才跟着变 -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- 检查更新：下载回来的 APK 要交给系统安装器 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
