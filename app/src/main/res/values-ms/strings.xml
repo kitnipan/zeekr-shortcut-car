@@ -131,6 +131,16 @@
     <!-- System info (experimental): groups, signal names, values -->
     <string name="set_vehicle_info_title">Maklumat sistem (percubaan)</string>
     <string name="set_vehicle_info_summary">Isyarat kenderaan yang didedahkan unit kepala dan keadaan semasanya; item yang ditanda dipaparkan pada Bar maklumat pemanduan</string>
+    <string name="set_screen_probe_title">Skrin (percubaan)</string>
+    <string name="set_screen_probe_summary">Senaraikan setiap skrin yang apl ini boleh buka. Ketik satu dan skrin itu menunjukkan teks</string>
+    <string name="screen_probe_legend">Ini sahaja skrin yang sistem beri kepada apl ini. Ketik satu baris. Bar hitam dengan teks besar muncul di atas skrin itu. Ketik baris yang sama sekali lagi untuk padam. Skrin yang menyala pada cermin depan ialah HUD. Jika anda ketik skrin lain dan teks muncul di sini, sistem mengekalkan tetingkap pada skrin ini.</string>
+    <string name="screen_probe_empty">Sistem tidak menyerahkan sebarang skrin.</string>
+    <string name="screen_probe_title_row">id %1$d · %2$s</string>
+    <string name="screen_probe_main_title">id %1$d · %2$s · skrin ini</string>
+    <string name="screen_probe_closed_title">id %1$d · tidak boleh dibuka</string>
+    <string name="screen_probe_closed">Sistem menyenaraikan skrin ini dan tidak membenarkannya dibuka.</string>
+    <string name="screen_probe_showing">Teks ada pada skrin ini melalui %1$s. Ketik sekali lagi untuk padam.</string>
+    <string name="screen_probe_failed">Tidak dapat dilukis: %1$s</string>
     <string name="vi_legend">Item yang ditanda dipaparkan pada Bar maklumat pemanduan (memerlukan Tetapan → Rakaman → Bar maklumat pemanduan): sebagai ikon jika ada, jika tidak sebagai teks buat masa ini, seperti dinyatakan di bawah setiap baris; item yang tidak muat tidak dipaparkan. Warna label menunjukkan tahap pengesahan: warna teks biasa, konsisten dalam ujian di kereta (masih disemak silang); kelabu, boleh digunakan, butiran belum muktamad; kelabu pudar, boleh dibaca tetapi belum disahkan, hanya boleh ditanda apabila pilihan pembangun dihidupkan.</string>
     <string name="vi_position">Kedudukan (lat/long)</string>
     <string name="vi_position_source">Lokasi sistem</string>

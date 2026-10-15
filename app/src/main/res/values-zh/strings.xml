@@ -141,6 +141,16 @@
     <!-- 系统信息（试验性）：分组、信号名、值 -->
     <string name="set_vehicle_info_title">系统信息（试验性）</string>
     <string name="set_vehicle_info_summary">车机能读到的车辆信号和此刻的状态；离开这一页即停止读取</string>
+    <string name="set_screen_probe_title">屏幕（试验性）</string>
+    <string name="set_screen_probe_summary">列出本应用能打开的每一块屏。点一块，那块屏上写出字</string>
+    <string name="screen_probe_legend">这里只列出系统肯交给本应用的屏。点一行，那块屏顶部出现一块黑底大字。再点同一行就收起。挡风玻璃上亮字的那块就是抬头显示。如果点了别的屏、字却出现在这块中控上，说明系统把窗口留在了这块屏。</string>
+    <string name="screen_probe_empty">系统没有交出任何屏幕。</string>
+    <string name="screen_probe_title_row">编号 %1$d · %2$s</string>
+    <string name="screen_probe_main_title">编号 %1$d · %2$s · 这块中控</string>
+    <string name="screen_probe_closed_title">编号 %1$d · 打不开</string>
+    <string name="screen_probe_closed">系统报了这块屏，但不让打开。</string>
+    <string name="screen_probe_showing">字在这块屏上（%1$s）。再点一次收起。</string>
+    <string name="screen_probe_failed">写不上：%1$s</string>
     <string name="set_controller_title">控制器（试验）</string>
     <string name="set_controller_summary">蓝牙手柄或按钮按下时，记下按键和摇杆信号，供以后做快捷键</string>
     <string name="set_shortcuts_title">快捷键</string>

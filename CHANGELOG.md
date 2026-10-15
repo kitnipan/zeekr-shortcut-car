@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.4-beta] - 2026-10-15
+
+### New and improved
+
+- Settings → System → Screen (experimental) lists every display this app can open. Tap one to paint text on that display.
+
 ## [2.11.3-beta] - 2026-10-15
 
 ### New and improved

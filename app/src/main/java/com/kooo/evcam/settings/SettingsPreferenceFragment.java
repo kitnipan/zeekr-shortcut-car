@@ -1169,6 +1169,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时收，离开就把资源放掉
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
+        onClick("pref_screen_probe", pref ->
+                openFragment(new ScreenProbeFragment(), R.string.set_screen_probe_title));
         onClick("pref_controller", pref ->
                 startActivity(new Intent(getContext(), ControllerProbeActivity.class)));
         onClick("pref_sticker", pref ->
