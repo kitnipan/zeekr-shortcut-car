@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.9-beta] - 2026-10-15
+
+### New and improved
+
+- HUD width (%) sets how wide the side view is on the windscreen. It stays on the outer edge.
+- HUD height (%) sets how tall that picture is. 45 matches the last build. 100 fills the strip.
+
 ## [2.11.8-beta] - 2026-10-15
 
 ### Fixed

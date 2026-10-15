@@ -25,21 +25,32 @@ public class HudFrameTest {
     }
 
     @Test
-    public void frameStaysInsideAndIsNarrowerThanSixteenByNine() {
+    public void frameStaysInsideTheStrip() {
         int[] frame = HudFrame.place(WIDTH, HEIGHT, true);
+        assertTrue(frame[0] >= 0);
         assertTrue(frame[1] >= 0);
+        assertTrue(frame[0] + frame[2] <= WIDTH);
         assertTrue(frame[1] + frame[3] <= HEIGHT);
-        assertTrue(frame[2] < frame[3] * 16 / 9);
     }
 
     @Test
-    public void measuredHudSitsOnTheOuterEdgeAndIsNarrow() {
-        int[] left = HudFrame.place(1440, 480, true);
-        int[] right = HudFrame.place(1440, 480, false);
-        assertEquals(8, left[0]);
-        assertEquals(1440 - 8, right[0] + right[2]);
-        assertEquals(left[3], left[2]);
-        assertTrue(left[0] + left[2] < 720);
-        assertTrue(right[0] > 720);
+    public void widerSettingStaysOnTheOuterEdge() {
+        int[] narrow = HudFrame.place(1440, 480, false, 10);
+        int[] wide = HudFrame.place(1440, 480, false, 27);
+        assertTrue(wide[2] > narrow[2]);
+        assertEquals(1440 - 8, wide[0] + wide[2]);
+        assertEquals(1440 - 8, narrow[0] + narrow[2]);
+        assertEquals(8, HudFrame.place(1440, 480, true, 27)[0]);
+    }
+
+    @Test
+    public void tallerSettingStaysInsideAndFillsAtOneHundred() {
+        int[] normal = HudFrame.place(1440, 480, true, 27, 45);
+        int[] tall = HudFrame.place(1440, 480, true, 27, 100);
+        assertEquals(216, normal[3]);
+        assertTrue(tall[3] > normal[3]);
+        assertEquals(0, tall[1]);
+        assertEquals(480, tall[1] + tall[3]);
+        assertEquals(8, tall[0]);
     }
 }

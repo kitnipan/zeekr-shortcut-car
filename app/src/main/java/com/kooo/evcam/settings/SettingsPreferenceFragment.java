@@ -711,6 +711,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setSidePopupOnHud(value);
             com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
         });
+        bindSlider("pref_side_popup_hud_width", AppConfig.SIDE_POPUP_HUD_MIN_WIDTH,
+                AppConfig.SIDE_POPUP_HUD_MAX_WIDTH, appConfig.getSidePopupHudWidthPercent(),
+                "%", value -> {
+                    appConfig.setSidePopupHudWidthPercent(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSlider("pref_side_popup_hud_height", AppConfig.SIDE_POPUP_HUD_MIN_HEIGHT,
+                AppConfig.SIDE_POPUP_HUD_MAX_HEIGHT, appConfig.getSidePopupHudHeightPercent(),
+                "%", value -> {
+                    appConfig.setSidePopupHudHeightPercent(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
         bindSlider("pref_side_popup_min_speed", 0, AppConfig.SIDE_POPUP_MAX_MIN_SPEED,
                 appConfig.getSidePopupMinSpeed(), "km/h", value -> {
                     appConfig.setSidePopupMinSpeed(value);
