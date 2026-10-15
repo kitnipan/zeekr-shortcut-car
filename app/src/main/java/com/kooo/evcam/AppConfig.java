@@ -114,6 +114,7 @@ public class AppConfig {
     private static final String KEY_INFO_BAR_ITEMS = "info_bar_items";  // 信息条上放哪几项（系统信息里勾的）
     private static final String KEY_INFO_BAR_ALL = "info_bar_all";  // 开发者：连没验证的栏目一起启用
     private static final String KEY_SIDE_POPUP = "side_popup_enabled";  // 打转向灯弹侧视
+    private static final String KEY_SIDE_POPUP_HUD = "side_popup_hud";  // 侧视投到驾驶员抬头显示
     private static final String KEY_BOTH_MIRRORS = "both_mirrors_enabled";  // 快捷键同时打开左右侧视
     private static final String KEY_SIDE_POPUP_MIN_SPEED = "side_popup_min_speed";  // 侧视弹窗的车速门槛 km/h
     /** 默认 30 km/h：再慢原厂自己会弹侧方小窗。 */
@@ -1688,6 +1689,16 @@ public class AppConfig {
     public void setSidePopupEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_SIDE_POPUP, enabled).apply();
         AppLog.i(TAG, "打转向灯弹侧视: " + (enabled ? "开" : "关"));
+    }
+
+    /** 侧视投到挡风玻璃抬头显示。默认开；这块车没有抬头显示屏时仍弹在中控。 */
+    public boolean isSidePopupOnHud() {
+        return prefs.getBoolean(KEY_SIDE_POPUP_HUD, true);
+    }
+
+    public void setSidePopupOnHud(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SIDE_POPUP_HUD, enabled).apply();
+        AppLog.i(TAG, "侧视投抬头显示: " + (enabled ? "开" : "关"));
     }
 
     /** 快捷键同时打开左右侧视。和超级后视镜共用一路相机输出，所以开着时后视镜关掉。 */

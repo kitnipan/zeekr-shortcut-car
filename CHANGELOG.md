@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.3-beta] - 2026-10-15
+
+### New and improved
+
+- Turn-signal side view can show on the driver HUD. While you signal, a small picture of that side sits on the windscreen, and the car's own speed and lane graphics stay. Turn it off in settings to keep the picture on the centre screen.
+
 ## [2.11.2-beta] - 2026-10-13
 
 ### Fixed

@@ -60,6 +60,9 @@ public class SideViewPopupView extends ViewGroup {
     private int yaw;
     private int pitch;
     private int roll;
+    /** 大于 0：窗口在抬头显示上，位置走 {@link HudFrame}，不再占中控。 */
+    private int hudWidth;
+    private int hudHeight;
     private final FisheyeMesh.SourceMap turnedMap = (u, v, out) ->
             SideViewProjection.sourcePoint(u, v, viewFov, yaw, pitch, roll, lane, out, 0);
 
@@ -75,6 +78,16 @@ public class SideViewPopupView extends ViewGroup {
 
     public AutoFitTextureView getTextureView() {
         return textureView;
+    }
+
+    /** 挂到抬头显示前调用。宽高是那块屏的像素；0 表示仍在中控。 */
+    public void setHudSize(int width, int height) {
+        hudWidth = Math.max(0, width);
+        hudHeight = Math.max(0, height);
+    }
+
+    public boolean onHud() {
+        return hudWidth > 0 && hudHeight > 0;
     }
 
     /** 合成流的真实尺寸；不像合成流的忽略（同 {@link RearViewMirrorView#setSourceSize}）。 */
@@ -271,6 +284,14 @@ public class SideViewPopupView extends ViewGroup {
      * 上下位置是剩余高度里的百分比，0 贴顶、100 贴底。
      */
     private void place(int side) {
+        if (onHud()) {
+            int[] frame = HudFrame.place(hudWidth, hudHeight, side == LaneCycle.LEFT);
+            params.x = frame[0];
+            params.y = frame[1];
+            params.width = frame[2];
+            params.height = frame[3];
+            return;
+        }
         int w = getResources().getDisplayMetrics().widthPixels;
         int h = getResources().getDisplayMetrics().heightPixels;
         int size = Math.round(Math.min(h * appConfig.getSidePopupSizePercent() / 100f, w / 2f));

@@ -707,6 +707,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         toast(getString(R.string.msg_side_popup_on));
                     }
                 });
+        bindSwitch("pref_side_popup_hud", appConfig.isSidePopupOnHud(), value -> {
+            appConfig.setSidePopupOnHud(value);
+            com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+        });
         bindSlider("pref_side_popup_min_speed", 0, AppConfig.SIDE_POPUP_MAX_MIN_SPEED,
                 appConfig.getSidePopupMinSpeed(), "km/h", value -> {
                     appConfig.setSidePopupMinSpeed(value);

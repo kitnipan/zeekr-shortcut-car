@@ -227,6 +227,12 @@
                 android:title="@string/set_side_popup_title"
                 android:summary="@string/set_side_popup_summary" />
 
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup_hud"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_hud_title"
+                android:summary="@string/set_side_popup_hud_summary" />
+
             <SeekBarPreference
                 android:key="pref_side_popup_min_speed"
                 android:dependency="pref_side_popup"

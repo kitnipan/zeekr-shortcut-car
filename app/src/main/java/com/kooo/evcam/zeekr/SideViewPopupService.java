@@ -3,14 +3,18 @@ package com.kooo.evcam.zeekr;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Point;
 import android.graphics.SurfaceTexture;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Size;
+import android.view.Display;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.WindowManager;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
@@ -46,6 +50,11 @@ import com.kooo.evcam.telemetry.VehicleState;
  * <h3>车辆信号</h3>
  *
  * <p>亮屏时向 {@link Telemetry} 登记，熄屏就注销、窗口拿掉：熄屏后车机六秒就深睡，不该留着监听和相机过去。</p>
+ *
+ * <h3>抬头显示</h3>
+ *
+ * <p>设置开着、并且找得到驾驶员抬头显示时，同一个窗口挂到那块屏上，只占一小块
+ * （{@link HudFrame}）。相机只有一个悬浮槽，所以中控上不再弹。找不到这块屏就仍在中控。</p>
  */
 public class SideViewPopupService extends Service {
 
@@ -102,7 +111,9 @@ public class SideViewPopupService extends Service {
     public static void applyConfig() {
         SideViewPopupService svc = instance;
         if (svc != null) {
-            if (svc.popup != null) {
+            if (svc.popup != null && svc.popup.onHud() != (svc.hudDisplay() != null)) {
+                svc.detachPopup();
+            } else if (svc.popup != null) {
                 svc.popup.applyConfig();
             }
             svc.evaluate();
@@ -296,7 +307,31 @@ public class SideViewPopupService extends Service {
         }
     }
 
+    /** 该投到抬头显示时返回那块屏，否则 null（窗口留在中控）。 */
+    private Display hudDisplay() {
+        if (!appConfig.isSidePopupOnHud() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return null;
+        }
+        return HudDisplay.find(this);
+    }
+
+    private Context popupContext(Display hud) {
+        if (hud == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return this;
+        }
+        try {
+            return createWindowContext(hud, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null);
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "抬头显示窗口建不了: " + e.getMessage());
+            return this;
+        }
+    }
+
     private void attachPopup(int lane, boolean show) {
+        Display hud = hudDisplay();
+        if (popup != null && popup.isAttached() && popup.onHud() != (hud != null)) {
+            detachPopup();
+        }
         if (popup != null && popup.isAttached()) {
             if (show) {
                 popup.show(lane);
@@ -305,7 +340,14 @@ public class SideViewPopupService extends Service {
             }
             return;
         }
-        popup = new SideViewPopupView(this, appConfig);
+        Context host = popupContext(hud);
+        boolean onHud = hud != null && host != this;
+        popup = new SideViewPopupView(host, appConfig);
+        if (onHud) {
+            Point size = HudDisplay.sizeOf(hud);
+            popup.setHudSize(size.x, size.y);
+            AppLog.i(TAG, "侧视弹窗：投到抬头显示 " + size.x + "×" + size.y);
+        }
         popup.getTextureView().setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture st, int w, int h) {
