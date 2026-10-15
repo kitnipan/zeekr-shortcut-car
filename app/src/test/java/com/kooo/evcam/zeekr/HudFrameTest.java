@@ -25,20 +25,21 @@ public class HudFrameTest {
     }
 
     @Test
-    public void frameStaysInsideAndIsSixteenByNine() {
+    public void frameStaysInsideAndIsNarrowerThanSixteenByNine() {
         int[] frame = HudFrame.place(WIDTH, HEIGHT, true);
         assertTrue(frame[1] >= 0);
         assertTrue(frame[1] + frame[3] <= HEIGHT);
-        assertEquals(16f / 9f, (float) frame[2] / frame[3], 0.02f);
+        assertTrue(frame[2] < frame[3] * 16 / 9);
     }
 
     @Test
-    public void measuredHudKeepsLeftAndRightOnTheirOwnHalf() {
+    public void measuredHudSitsOnTheOuterEdgeAndIsNarrow() {
         int[] left = HudFrame.place(1440, 480, true);
         int[] right = HudFrame.place(1440, 480, false);
-        assertTrue(left[0] + left[2] <= 720);
-        assertTrue(right[0] >= 720);
-        assertTrue(left[1] + left[3] <= 480);
-        assertTrue(right[1] + right[3] <= 480);
+        assertEquals(8, left[0]);
+        assertEquals(1440 - 8, right[0] + right[2]);
+        assertEquals(left[3], left[2]);
+        assertTrue(left[0] + left[2] < 720);
+        assertTrue(right[0] > 720);
     }
 }

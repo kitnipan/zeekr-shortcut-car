@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.8-beta] - 2026-10-15
+
+### Fixed
+
+- The HUD side view is narrower and sits on the outer edge, clear of the factory backing around the car.
+
 ## [2.11.7-beta] - 2026-10-15
 
 ### Fixed
