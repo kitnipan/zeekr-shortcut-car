@@ -118,6 +118,7 @@ public class AppConfig {
     private static final String KEY_SIDE_POPUP_HUD_WIDTH = "side_popup_hud_width";  // 抬头显示上的宽度，屏宽的百分比
     // 新键。2.11.6 的 side_popup_hud_height 默认写过 100，那一版画面更差，不能沿用。
     private static final String KEY_SIDE_POPUP_HUD_HEIGHT = "side_popup_hud_frame_height";
+    private static final String KEY_SIDE_POPUP_HUD_LEFT = "side_popup_hud_left_only";  // 左右相机都贴抬头显示左沿
     private static final String KEY_BOTH_MIRRORS = "both_mirrors_enabled";  // 快捷键同时打开左右侧视
     private static final String KEY_SIDE_POPUP_MIN_SPEED = "side_popup_min_speed";  // 侧视弹窗的车速门槛 km/h
     /** 默认 30 km/h：再慢原厂自己会弹侧方小窗。 */
@@ -1734,6 +1735,15 @@ public class AppConfig {
     public void setSidePopupHudHeightPercent(int percent) {
         prefs.edit().putInt(KEY_SIDE_POPUP_HUD_HEIGHT,
                 Math.max(SIDE_POPUP_HUD_MIN_HEIGHT, Math.min(SIDE_POPUP_HUD_MAX_HEIGHT, percent))).apply();
+    }
+
+    /** 开着时左右相机都贴抬头显示左沿。默认关：左灯贴左、右灯贴右。 */
+    public boolean isSidePopupHudLeftOnly() {
+        return prefs.getBoolean(KEY_SIDE_POPUP_HUD_LEFT, false);
+    }
+
+    public void setSidePopupHudLeftOnly(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SIDE_POPUP_HUD_LEFT, enabled).apply();
     }
 
     /** 快捷键同时打开左右侧视。和超级后视镜共用一路相机输出，所以开着时后视镜关掉。 */

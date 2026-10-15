@@ -66,6 +66,14 @@ public class ShortcutBookTest {
     }
 
     @Test
+    public void hudActionRoundTrips() {
+        Shortcut item = new Shortcut(96, 0, "Pad", "toggle_hud", "tap");
+        Shortcut back = ShortcutBook.parse(ShortcutBook.write(Collections.singletonList(item))).get(0);
+        assertEquals("toggle_hud", back.action);
+        assertEquals(ShortcutAction.HUD, ShortcutAction.fromKey(back.action));
+    }
+
+    @Test
     public void lockAndSaveActionRoundTrips() {
         Shortcut item = new Shortcut(48, 0, "qwerty2", "lock_and_save", "tap");
         Shortcut back = ShortcutBook.parse(ShortcutBook.write(Collections.singletonList(item))).get(0);

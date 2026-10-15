@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.10-beta] - 2026-10-15
+
+### New and improved
+
+- Both cameras on the left puts the left and the right turn-signal picture on the left edge of the HUD. Off keeps each camera on its own side.
+- A shortcut turns the driver HUD side view on and off. A notice and a short blip say which way it went.
+- The shortcut action list scrolls, so every action can be reached.
+
 ## [2.11.9-beta] - 2026-10-15
 
 ### New and improved

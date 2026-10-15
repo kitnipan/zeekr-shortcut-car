@@ -293,7 +293,9 @@ public class SideViewPopupView extends ViewGroup {
         if (onHud()) {
             // 窗口若从屏幕中间起，这台抬头显示会把相机层留在靠原点的位置。
             // 右侧那一路离原点远，就多出一块错位的画面。窗口改从 (0,0) 铺满，画面再挪到该在的地方。
-            int[] frame = HudFrame.place(hudWidth, hudHeight, side == LaneCycle.LEFT,
+            boolean onLeft = HudFrame.pinToLeftEdge(side == LaneCycle.LEFT,
+                    appConfig.isSidePopupHudLeftOnly());
+            int[] frame = HudFrame.place(hudWidth, hudHeight, onLeft,
                     appConfig.getSidePopupHudWidthPercent(), appConfig.getSidePopupHudHeightPercent());
             frameX = frame[0];
             frameY = frame[1];

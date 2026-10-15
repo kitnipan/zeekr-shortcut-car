@@ -211,6 +211,10 @@
     <string name="shortcut_action_both_mirrors">Buka/Tutup kedua-dua cermin sisi</string>
     <string name="shortcut_action_app">Buka apl</string>
     <string name="shortcut_action_dim">Gelapkan skrin</string>
+    <string name="shortcut_action_hud">Hidup/Mati HUD</string>
+    <string name="shortcut_hud_on">HUD hidup</string>
+    <string name="shortcut_hud_off">HUD mati</string>
+    <string name="shortcut_hud_channel">HUD pemandu</string>
     <string name="shortcut_action_save">Simpan saat ini</string>
     <string name="shortcut_action_lock_save">Kunci dan simpan</string>
     <string name="shortcut_action_hold_speak">Tahan untuk bercakap ke luar</string>
@@ -454,6 +458,8 @@
     <string name="set_side_popup_hud_width_summary">Lebar gambar pada cermin depan. Kekal di tepi luar, jauh dari grafik kereta. 27 lebih kurang 16:9 pada kereta ini</string>
     <string name="set_side_popup_hud_height_title">Tinggi HUD (%)</string>
     <string name="set_side_popup_hud_height_summary">Tinggi gambar pada cermin depan. 45 sama seperti binaan lepas. 100 memenuhi jalur itu</string>
+    <string name="set_side_popup_hud_left_title">Kedua-dua kamera di kiri</string>
+    <string name="set_side_popup_hud_left_summary">Isyarat kiri dan kanan kedua-duanya letak gambar di tepi kiri. Mati: setiap kamera di tepinya sendiri</string>
     <string name="set_side_popup_speed_title">Tunjuk mulai kelajuan (km/j)</string>
     <string name="set_side_popup_speed_summary">Di bawah kelajuan ini kereta menunjukkan paparan sisinya sendiri. 0 untuk sebarang kelajuan</string>
     <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>

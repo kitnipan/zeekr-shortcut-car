@@ -51,6 +51,9 @@ public final class ShortcutPerformer {
                     toast(context);
                 }
                 return;
+            case HUD:
+                toggleHud(context);
+                return;
             case SAVE:
                 com.kooo.evcam.recording.SaveMoment.perform(context);
                 return;
@@ -69,6 +72,22 @@ public final class ShortcutPerformer {
             default:
                 return;
         }
+    }
+
+    private static void toggleHud(Context context) {
+        AppConfig config = new AppConfig(context);
+        boolean on = !config.isSidePopupOnHud();
+        if (on && !config.isSidePopupEnabled()
+                && !OverlayCoordinator.setSidePopupEnabled(context, true)) {
+            toast(context);
+            return;
+        }
+        config.setSidePopupOnHud(on);
+        com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+        if (on) {
+            com.kooo.evcam.zeekr.SideViewPopupService.start(context);
+        }
+        HudCue.show(context, on);
     }
 
     private static void toast(Context context) {

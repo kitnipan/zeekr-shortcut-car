@@ -12,6 +12,11 @@ public final class HudFrame {
     private HudFrame() {
     }
 
+    /** 开着 {@code bothOnLeft} 时右灯也贴左沿。关着时跟转向灯走。 */
+    public static boolean pinToLeftEdge(boolean leftSignal, boolean bothOnLeft) {
+        return leftSignal || bothOnLeft;
+    }
+
     /** 宽高用默认百分比。{@code [x, y, width, height]}。 */
     public static int[] place(int displayW, int displayH, boolean left) {
         return place(displayW, displayH, left, 27, 45);

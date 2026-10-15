@@ -1,6 +1,7 @@
 package com.kooo.evcam.zeekr;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -52,5 +53,14 @@ public class HudFrameTest {
         assertEquals(0, tall[1]);
         assertEquals(480, tall[1] + tall[3]);
         assertEquals(8, tall[0]);
+    }
+
+    @Test
+    public void bothCamerasCanPinToTheLeftEdge() {
+        assertFalse(HudFrame.pinToLeftEdge(false, false));
+        assertTrue(HudFrame.pinToLeftEdge(true, false));
+        assertTrue(HudFrame.pinToLeftEdge(false, true));
+        int[] rightOnLeft = HudFrame.place(1440, 480, HudFrame.pinToLeftEdge(false, true), 27, 45);
+        assertEquals(8, rightOnLeft[0]);
     }
 }

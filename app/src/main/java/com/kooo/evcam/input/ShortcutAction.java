@@ -10,6 +10,7 @@ public enum ShortcutAction {
     BOTH_MIRRORS("toggle_both_mirrors", R.string.shortcut_action_both_mirrors),
     APP("open_app", R.string.shortcut_action_app),
     DIM("toggle_dim", R.string.shortcut_action_dim),
+    HUD("toggle_hud", R.string.shortcut_action_hud),
     SAVE("save_moment", R.string.shortcut_action_save),
     LOCK_SAVE("lock_and_save", R.string.shortcut_action_lock_save),
     HOLD_SPEAK("hold_to_speak", R.string.shortcut_action_hold_speak),

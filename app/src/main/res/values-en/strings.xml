@@ -210,6 +210,10 @@
     <string name="shortcut_action_both_mirrors">Open/Close both side mirrors</string>
     <string name="shortcut_action_app">Open app</string>
     <string name="shortcut_action_dim">Dim display</string>
+    <string name="shortcut_action_hud">Turn HUD on/off</string>
+    <string name="shortcut_hud_on">HUD on</string>
+    <string name="shortcut_hud_off">HUD off</string>
+    <string name="shortcut_hud_channel">Driver HUD</string>
     <string name="shortcut_action_save">Save this moment</string>
     <string name="shortcut_action_lock_save">Lock and save</string>
     <string name="shortcut_action_hold_speak">Hold to speak outside</string>
@@ -453,6 +457,8 @@
     <string name="set_side_popup_hud_width_summary">How wide the picture is on the windscreen. It stays on the outer edge, clear of the car graphic. 27 is about 16:9 on this car</string>
     <string name="set_side_popup_hud_height_title">HUD height (%)</string>
     <string name="set_side_popup_hud_height_summary">How tall the picture is on the windscreen. 45 matches the last build. 100 fills the strip</string>
+    <string name="set_side_popup_hud_left_title">Both cameras on the left</string>
+    <string name="set_side_popup_hud_left_summary">Left and right turn signals both put their picture on the left edge. Off keeps each camera on its own side</string>
     <string name="set_side_popup_speed_title">Show from speed (km/h)</string>
     <string name="set_side_popup_speed_summary">Below this speed the car shows its own side view. 0 shows it at any speed</string>
     <string name="msg_side_popup_on">Turn-signal side view on. Signal left or right to see that side</string>
