@@ -422,8 +422,6 @@
     <string name="set_side_popup_summary">打转向灯时弹出那一侧的画面：左灯左侧、右灯右侧，灯灭就收。原厂画面优先：挂 R 档、原厂 360 或侧方小窗在显示时不弹。超级后视镜开着时不弹</string>
     <string name="set_side_popup_hud_title">投到驾驶员抬头显示</string>
     <string name="set_side_popup_hud_summary">把那一侧的画面投到挡风玻璃上，不再占中控屏。画面只占一小块，原厂的车速和车道线还在。这台车没有抬头显示屏时，仍弹在中控屏</string>
-    <string name="set_side_popup_hud_height_title">抬头显示高度（%）</string>
-    <string name="set_side_popup_hud_height_summary">100 顶满挡风玻璃那一条的上下。调低给原厂的车速和车道线留地方</string>
     <string name="set_side_popup_speed_title">从这个车速起弹（km/h）</string>
     <string name="set_side_popup_speed_summary">低于这个车速原厂会自己弹侧方小窗。0 表示任何车速都弹</string>
     <string name="msg_side_popup_on">打转向灯弹侧视已开启：打左灯看左侧、打右灯看右侧</string>

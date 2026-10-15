@@ -450,8 +450,6 @@
     <string name="set_side_popup_summary">Semasa anda memberi isyarat, tetingkap timbul menunjukkan kamera di sisi itu: isyarat kiri, kamera kiri. Ia ditutup apabila isyarat dimatikan. Paparan asal kereta diutamakan: tiada tetingkap timbul semasa mengundur atau ketika paparan 360 atau sisi asal sedang ditunjukkan. Tidak muncul semasa cermin super dibuka</string>
     <string name="set_side_popup_hud_title">Pada HUD pemandu</string>
     <string name="set_side_popup_hud_summary">Letakkan kamera sisi itu pada cermin depan, bukan skrin tengah. Gambar kecil, jadi kelajuan dan lorong asal kereta kekal. Jika kereta ini tiada paparan HUD, ia kekal pada skrin tengah</string>
-    <string name="set_side_popup_hud_height_title">Tinggi HUD (%)</string>
-    <string name="set_side_popup_hud_height_summary">100 memenuhi jalur cermin depan dari atas ke bawah. Lebih rendah memberi lebih ruang untuk kelajuan dan lorong asal kereta</string>
     <string name="set_side_popup_speed_title">Tunjuk mulai kelajuan (km/j)</string>
     <string name="set_side_popup_speed_summary">Di bawah kelajuan ini kereta menunjukkan paparan sisinya sendiri. 0 untuk sebarang kelajuan</string>
     <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>

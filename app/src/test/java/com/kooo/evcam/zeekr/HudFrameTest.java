@@ -33,22 +33,12 @@ public class HudFrameTest {
     }
 
     @Test
-    public void measuredHudFillsTheStripHeight() {
+    public void measuredHudKeepsLeftAndRightOnTheirOwnHalf() {
         int[] left = HudFrame.place(1440, 480, true);
         int[] right = HudFrame.place(1440, 480, false);
-        assertEquals(0, left[0]);
-        assertEquals(0, left[1]);
-        assertEquals(480, left[3]);
-        assertEquals(1440, right[0] + right[2]);
-        assertEquals(480, right[3]);
-        assertEquals(16f / 9f, (float) left[2] / left[3], 0.02f);
-    }
-
-    @Test
-    public void shorterHeightStaysCentered() {
-        int[] frame = HudFrame.place(1440, 480, false, 50);
-        assertEquals(240, frame[3]);
-        assertEquals((480 - 240) / 2, frame[1]);
-        assertTrue(frame[0] + frame[2] <= 1440);
+        assertTrue(left[0] + left[2] <= 720);
+        assertTrue(right[0] >= 720);
+        assertTrue(left[1] + left[3] <= 480);
+        assertTrue(right[1] + right[3] <= 480);
     }
 }

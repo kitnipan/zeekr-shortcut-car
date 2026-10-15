@@ -115,7 +115,6 @@ public class AppConfig {
     private static final String KEY_INFO_BAR_ALL = "info_bar_all";  // 开发者：连没验证的栏目一起启用
     private static final String KEY_SIDE_POPUP = "side_popup_enabled";  // 打转向灯弹侧视
     private static final String KEY_SIDE_POPUP_HUD = "side_popup_hud";  // 侧视投到驾驶员抬头显示
-    private static final String KEY_SIDE_POPUP_HUD_HEIGHT = "side_popup_hud_height";  // 抬头显示上的高度，屏高的百分比
     private static final String KEY_BOTH_MIRRORS = "both_mirrors_enabled";  // 快捷键同时打开左右侧视
     private static final String KEY_SIDE_POPUP_MIN_SPEED = "side_popup_min_speed";  // 侧视弹窗的车速门槛 km/h
     /** 默认 30 km/h：再慢原厂自己会弹侧方小窗。 */
@@ -1700,22 +1699,6 @@ public class AppConfig {
     public void setSidePopupOnHud(boolean enabled) {
         prefs.edit().putBoolean(KEY_SIDE_POPUP_HUD, enabled).apply();
         AppLog.i(TAG, "侧视投抬头显示: " + (enabled ? "开" : "关"));
-    }
-
-    public static final int SIDE_POPUP_HUD_MIN_HEIGHT = 20;
-    public static final int SIDE_POPUP_HUD_MAX_HEIGHT = 100;
-    /** 100：顶满抬头显示那条的上下。 */
-    public static final int SIDE_POPUP_HUD_DEFAULT_HEIGHT = 100;
-
-    /** 抬头显示上侧视窗的高度，屏高的百分比。 */
-    public int getSidePopupHudHeightPercent() {
-        int v = prefs.getInt(KEY_SIDE_POPUP_HUD_HEIGHT, SIDE_POPUP_HUD_DEFAULT_HEIGHT);
-        return Math.max(SIDE_POPUP_HUD_MIN_HEIGHT, Math.min(SIDE_POPUP_HUD_MAX_HEIGHT, v));
-    }
-
-    public void setSidePopupHudHeightPercent(int percent) {
-        prefs.edit().putInt(KEY_SIDE_POPUP_HUD_HEIGHT,
-                Math.max(SIDE_POPUP_HUD_MIN_HEIGHT, Math.min(SIDE_POPUP_HUD_MAX_HEIGHT, percent))).apply();
     }
 
     /** 快捷键同时打开左右侧视。和超级后视镜共用一路相机输出，所以开着时后视镜关掉。 */
