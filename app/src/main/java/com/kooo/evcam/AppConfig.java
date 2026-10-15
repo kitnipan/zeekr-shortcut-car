@@ -232,6 +232,7 @@ public class AppConfig {
     public static final String BITRATE_HIGH = "high";      // 高码率（计算值的150%）
     
     private static final String KEY_CAMERA_OVERRIDE_PREFIX = "zeekr_camera_override_";  // 手动指定的相机映射
+    private static final String KEY_SLOT_MAP_PREFIX = "slot_map_";  // 存下的槽位映射（按车型），见 getStoredSlotMap
 
 
     public static final String CAR_MODEL_ZEEKR_7X_MULTI = "zeekr_7x_multi";  // 极氪7X（环视合成流 + 两路座舱）
@@ -281,8 +282,8 @@ public class AppConfig {
     /**
      * 熄屏录制最多不让车机睡多久（分钟）。用户在设置里按小时填，可带小数（24、30 都行）。
      *
-     * <p>从熄屏那一刻起算：App 拿不到「下车」这个事件，熄屏是最接近的近似（平台笔记 §3.6）。
-     * 到点放开唤醒锁，车机该睡就睡（规格 §3.1）。</p>
+     * <p>从熄屏那一刻起算。熄屏 v3 起熄屏是屏幕真黑了（车辆信号判的，车主下车关门那一下；平台笔记 §3.6「屏幕真黑了」），
+     * 不再是几分钟后车机下电时的安卓熄屏。到点照熄屏那张表再判（规格 §3.1）。</p>
      */
     public int getScreenOffWakeMinutes() {
         int minutes = readInt(KEY_SCREEN_OFF_WAKE_MINUTES, DEFAULT_SCREEN_OFF_WAKE_MINUTES);
@@ -349,18 +350,23 @@ public class AppConfig {
     /**
      * 主界面是不是<b>因为熄屏</b>才退到后台的。
      *
-     * <p>熄屏 15 秒后应用会把自己退到后台、关掉相机（见 MainActivity 的
-     * {@code scheduleBackgroundTask}）。既然是我们自己退下去的，亮屏时就该自己回来 ——
-     * 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。</p>
+     * <p>熄屏 15 秒后主界面会把自己退到后台（见 MainActivity 的 {@code scheduleBackgroundTask}）。
+     * 既然是我们自己退下去的，亮屏时就该自己回来 —— 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。
+     * 熄屏那一刻主界面在前就记（2.11 阶段 6）：车辆信号读不到时熄屏就是车机下电，几秒后就可能结束进程，等不到 15 秒。
+     * 熄屏 v3 起熄屏是屏幕真黑了：车主下车那一下就记，开车门亮屏时主界面就接回来（规格 2.4）。</p>
      *
      * <p>存在配置里而不是内存字段里：退到后台之后这个界面很可能撑不到亮屏那一刻，
-     * 被系统收走之后只有存下来的记号还在。</p>
+     * 被系统收走之后只有存下来的记号还在。所以同步落盘（commit），和「这一趟要录」一样：车机下电（安卓熄屏）后 3–5 秒进程就可能被结束，
+     * 异步写可能还没落盘（2026-10-11 审查）。没变就不写 —— 主界面每次回到前台都清一次，不为它每次进一趟盘。</p>
      *
      * <p>只有这个记号在时才会把界面拉回前台。用户自己切走的、从来没进过前台的，
      * 一律不动 —— 不能因为有人点亮了屏幕就抢到最前面。</p>
      */
     public void setUiLeftForScreenOff(boolean value) {
-        prefs.edit().putBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, value).apply();
+        if (prefs.getBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, false) == value) {
+            return;
+        }
+        prefs.edit().putBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, value).commit();
     }
 
     public boolean didUiLeaveForScreenOff() {
@@ -380,15 +386,16 @@ public class AppConfig {
     /**
      * 熄屏持续录制（项目拥有者 2026-09-26 定）。
      *
-     * <p>停车前在录像（手动、自动都算），熄屏后接着录。只管录：不申请唤醒、不拉住车机，
-     * 车机睡了录像就停在那一刻，醒来接着录；醒着的时候（哨兵模式）断了，环视一恢复就接回，
-     * 和亮屏时一样。每一段都记黑匣子。</p>
+     * <p>停车前在录像（手动、自动都算），熄屏（屏幕真黑了）后接着录环视；两路座舱屏幕黑满 30 秒放开，亮屏再回来
+     * （项目所有者 2026-10-12，熄屏 v3）。只管录：不申请唤醒、不拉住车机；醒着的时候被存储一类打断了，收拾完、查过盘就接回。
+     * 哨兵模式开着，车机一直醒着，环视一直录；没开（车也没在走），录到车机要睡（安卓熄屏，离车约 4–6 分钟后），
+     * 那一刻停录、相机按次序关，亮屏后接着录（{@code ScreenOffPlan}）。关着时屏幕一黑 10 秒后停录。每一段都记黑匣子。</p>
      *
      * <p>为什么要有它（项目拥有者，实测过的事实）：下车前打开车机自己的「哨兵模式」，
      * 车机会一直醒着、只是黑屏；这时 App 开着录像，人下车、屏幕黑了，录像照样一直录。
      * 这个选项就是为了保住这件事，所以<b>默认开</b>。</p>
      *
-     * <p>和开发者选项里的「息屏录制」是两回事：那个没在录的时候也不关相机，这个不管那件事。</p>
+     * <p>和开发者选项里的「息屏录制」是两回事：那个拿唤醒锁拉住车机，这个不拉。</p>
      */
     public boolean isScreenOffKeepRecording() {
         return prefs.getBoolean(KEY_SCREEN_OFF_KEEP_RECORDING, true);
@@ -423,8 +430,12 @@ public class AppConfig {
     }
 
     /**
-     * 熄屏录制（开发者选项，规格 §3.1）有没有生效：熄屏时在录像就接着录，并拿住唤醒锁不让车机睡，
-     * 最长 {@link #getScreenOffWakeMinutes()} 分钟；没在录时也不关相机。
+     * 熄屏录制（开发者选项，规格 §3.1）有没有生效：熄屏时在录像就接着录环视（座舱屏幕黑满 30 秒放开，熄屏 v3），
+     * 并拿住唤醒锁不让车机睡，最长 {@link #getScreenOffWakeMinutes()} 分钟；到点照熄屏那张表再判（{@code ScreenOffPlan}）。
+     *
+     * <p>没在录时不拿锁，空闲时也不再留着相机（大纲 §7 第 5 问，项目所有者 2026-10-11「按建议」：照登记表）：
+     * 熄屏时主界面不算看得见、预览不算有人要，座舱谁都不要，也不保持，于是相机照登记表按次序关 —— 车机要睡
+     * （安卓熄屏，哨兵模式没开、车没在走）的话当场按次序关。以前这个开关开着时主界面熄屏不退后台、相机一直开着。主界面熄屏时照旧不退后台（只是界面，不管相机）。</p>
      */
     public boolean isScreenOffRecordingEnabled() {
         // 默认关。归开发者选项管：关着时按关算，存着的值不动（DEVELOPER_KEYS）
@@ -529,21 +540,6 @@ public class AppConfig {
     }
     
     
-    /**
-     * 格式化码率为可读字符串
-     * @param bitrate 码率（bps）
-     * @return 格式化字符串，如 "3.0 Mbps"
-     */
-    public static String formatBitrate(int bitrate) {
-        float mbps = bitrate / 1000000f;
-        if (mbps >= 1) {
-            return String.format(java.util.Locale.getDefault(), "%.1f Mbps", mbps);
-        } else {
-            return String.format(java.util.Locale.getDefault(), "%d Kbps", bitrate / 1000);
-        }
-    }
-    
-    
     // ==================== 帧率配置相关方法 ====================
 
 
@@ -617,6 +613,26 @@ public class AppConfig {
         }
         editor.apply();
         AppLog.i(TAG, "相机映射已全部恢复自动");
+    }
+
+    // ==================== 存下的槽位映射（2.11 阶段 6） ====================
+
+    /**
+     * 存下的槽位映射，按车型存（大纲 §1 CameraManagerHolder）：上一次相机列表完整时分好的三路相机 id、环视是不是真合成流、
+     * 合成流尺寸，外加那时的手动指定。编码和读回在 {@code ZeekrMultiPlan.Stored} 里，这里只存一行字。
+     *
+     * <p>为什么存：车机拿着后座舱（相机 1）时它不在相机列表里，这时冷启动照列表分，后座舱这一格就没有了，以后既认不出、
+     * 也开不了。列表不完整时照存下的建，少的那一路照样建出来，交给通道调度判「不在」。不归开发者选项管：这是车的事实，不是设置。</p>
+     *
+     * @return 存着的那一行；没存过是 null
+     */
+    public String getStoredSlotMap(String carModel) {
+        return prefs.getString(KEY_SLOT_MAP_PREFIX + carModel, null);
+    }
+
+    /** 存下这个车型的槽位映射（建管线的那条线程上调；只在变了时写）。 */
+    public void setStoredSlotMap(String carModel, String encoded) {
+        prefs.edit().putString(KEY_SLOT_MAP_PREFIX + carModel, encoded).apply();
     }
 
 

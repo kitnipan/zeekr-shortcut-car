@@ -37,9 +37,10 @@ import com.kooo.evcam.telemetry.VehicleState;
  *
  * <h3>相机</h3>
  *
- * <p>和超级后视镜走同一条路（见 {@link RearViewMirrorService}）：窗口的 Surface 交给
- * {@code SingleCamera.setMainFloatingSurface()}，当一路附加输出。两者共用这一个槽位，
- * 所以<b>超级后视镜开着时不弹</b>。窗口挂着就登记 {@link CameraNeeds.Holder#SIDE_POPUP}，拿掉就注销。</p>
+ * <p>和超级后视镜走同一条路（见 {@link RearViewMirrorService}）：窗口的画布用
+ * {@code SingleCamera.declareMirror()} 声明成环视的附加输出，再登记
+ * {@link CameraNeeds.Holder#SIDE_POPUP}。两者共用这一个槽位，
+ * 所以<b>超级后视镜开着时不弹</b>。窗口拿掉就注销。</p>
  *
  * <h3>即时弹出</h3>
  *
@@ -444,18 +445,19 @@ public class SideViewPopupService extends Service {
         if (previewSize != null) {
             popup.setSourceSize(previewSize);
         }
-        boundCamera = camera;
-        boundTexture = surfaceTexture;
-        restoreBufferSize(surfaceTexture);
-        camera.setMainFloatingSurface(new Surface(surfaceTexture), surfaceTexture);
-        boolean wasOpen = camera.isCameraOpened();
-        if (wasOpen) {
-            camera.recreateSession(false);
-        } else {
-            CameraForegroundService.whenReady(this, camera::openCamera);
+        if (camera != boundCamera || surfaceTexture != boundTexture) {
+            withdrawOutput();
+            boundCamera = camera;
+            boundTexture = surfaceTexture;
+            restoreBufferSize(surfaceTexture);
+        }
+        boolean declared = camera.declareMirror(surfaceTexture);
+        CameraNeeds.current().claim(CameraNeeds.Holder.SIDE_POPUP);
+        if (declared) {
+            manager.channelScheduler().wake();
         }
         retryCount = 0;
-        CameraNeeds.current().claim(CameraNeeds.Holder.SIDE_POPUP);
+        boolean wasOpen = camera.isCameraOpened();
         BlackBox.note("侧视弹窗接相机：「" + LaneCycle.labelOf(popup.lane()) + "」路，"
                 + (popup.isShowing() ? "显示中" : "备着") + "，相机" + (wasOpen ? "已开" : "未开，现在开")
                 + "，预览尺寸 " + previewSize + "，几何" + (popup.hasGeometry() ? "已知" : "未知（等第一帧补）"));
@@ -472,22 +474,19 @@ public class SideViewPopupService extends Service {
         }
     }
 
+    /** 只撤回自己那块画布。后视镜后来声明过的话，这里对不上，不动它。 */
+    private void withdrawOutput() {
+        if (boundCamera != null && boundTexture != null) {
+            boundCamera.withdrawMirror(boundTexture);
+        }
+    }
+
     private void unbindCamera() {
         cancelRetry();
         CameraNeeds.current().release(CameraNeeds.Holder.SIDE_POPUP);
-        if (boundCamera != null) {
-            // 槽位要是已经被超级后视镜接走了，就别动它 —— 摘掉的会是后视镜的画面
-            if (boundCamera.getMainFloatingSurfaceTexture() == boundTexture) {
-                try {
-                    boundCamera.setMainFloatingSurface(null, null);
-                    boundCamera.recreateSession(false);
-                } catch (Exception e) {
-                    AppLog.w(TAG, "解绑相机失败: " + e);
-                }
-            }
-            boundCamera = null;
-            boundTexture = null;
-        }
+        withdrawOutput();
+        boundCamera = null;
+        boundTexture = null;
     }
 
     private void scheduleRetry(SurfaceTexture surfaceTexture) {

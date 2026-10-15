@@ -207,6 +207,21 @@ public final class BlackBox {
         return on ? "开" : "关";
     }
 
+    /**
+     * 熄屏期间那几步（停录、放开相机、每一路关完、整轮关完、放唤醒锁）后面带的「，熄屏后 +N ms」；亮着时是空串。
+     * 熄屏 v3 起「熄屏后」从屏幕真黑的那一刻算（车辆信号判的，车主下车那一下；{@code ScreenState.darkForMs}），
+     * 格式不变（「，熄屏后 +Nms」，旧的分析脚本照样读）。黑着时安卓也熄屏了（车机要睡：哨兵模式没开时离车约 4–6 分钟后，
+     * 3–5 秒后进程就被结束），后面再带「、安卓熄屏起 +N ms」：车机要睡那几步赶没赶在进程没了之前，对着「车机要睡」那一行就看得出。
+     */
+    public static String afterScreenOff() {
+        long ms = com.kooo.evcam.screen.ScreenState.darkForMs();
+        if (ms < 0) {
+            return "";
+        }
+        long off = com.kooo.evcam.screen.ScreenState.androidOffForMs();
+        return "，熄屏后 +" + ms + "ms" + (off < 0 ? "" : "、安卓熄屏起 +" + off + "ms");
+    }
+
     /** 已经接上了没有。没接上时事件先攒在内存里。 */
     public static boolean isAttached() {
         return appContext != null;
@@ -465,24 +480,44 @@ public final class BlackBox {
      */
     private static void noteVersionIfNew(Context context) {
         try {
-            String now = context.getPackageManager()
-                    .getPackageInfo(context.getPackageName(), 0).versionName;
+            android.content.pm.PackageInfo info = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0);
+            String now = info.versionName;
             SharedPreferences seen = context.getSharedPreferences(SEEN_PREFS, Context.MODE_PRIVATE);
             String last = seen.getString(KEY_LAST_VERSION, null);
-            if (now == null || now.equals(last)) {
-                return;
+            if (now != null && !now.equals(last)) {
+                seen.edit().putString(KEY_LAST_VERSION, now).apply();
+                noteImportant(last == null ? "版本 " + now + "（第一次记录）"
+                        : "版本变了：" + last + " → " + now
+                                + "（装新版时旧进程是被系统用信号结束的，紧挨着的「收到信号」退出多半就是它）");
             }
-            seen.edit().putString(KEY_LAST_VERSION, now).apply();
-            noteImportant(last == null ? "版本 " + now + "（第一次记录）"
-                    : "版本变了：" + last + " → " + now
-                            + "（装新版时旧进程是被系统用信号结束的，紧挨着的「收到信号」退出多半就是它）");
+            noteFirstRunOfInstall(seen, info.lastUpdateTime);
         } catch (Throwable t) {
             AppLog.w(TAG, "noteVersionIfNew: " + t);
         }
     }
 
+    /**
+     * 装了一次（新版、或者同一版重装）之后第一次运行：一行「这一版装好 X 秒后第一次运行（安装于 …）」（项目所有者 2026-10-15 批准，2.11.5 第 D4 项）。
+     * X 从装好（{@code PackageInfo.lastUpdateTime}）算到这个进程起来那一刻。
+     *
+     * <p>为什么：2.11.1–2.11.4 每一次装完第一次开环视都 15 秒没画面（rel_final §5），装完到打开隔了多久、从哪里打开的，只能事后猜；
+     * 下一次装（测试 T1）看这一行就知道。只认装的时刻变了，和版本号无关。</p>
+     */
+    private static void noteFirstRunOfInstall(SharedPreferences seen, long installedAt) {
+        if (installedAt <= 0 || seen.getLong(KEY_LAST_INSTALL, 0L) == installedAt) {
+            return;
+        }
+        seen.edit().putLong(KEY_LAST_INSTALL, installedAt).apply();
+        long startedWall = System.currentTimeMillis() - (SystemClock.elapsedRealtime() - startedAtMs);
+        noteImportant("这一版装好 " + String.format(Locale.US, "%.1f", (startedWall - installedAt) / 1000f)
+                + " 秒后第一次运行（安装于 " + wallClock(installedAt) + "）");
+    }
+
     /** 上次进程起来时的版本号。 */
     private static final String KEY_LAST_VERSION = "last_version";
+    /** 上一次记下的装好的时刻（{@code PackageInfo.lastUpdateTime}）：变了就是装完之后第一次运行。 */
+    private static final String KEY_LAST_INSTALL = "last_install_ts";
     /** 抄过的最后一次 ANR 的时间戳存在这里，同一次 ANR 只抄一遍。 */
     private static final String SEEN_PREFS = "blackbox_seen";
     private static final String KEY_LAST_ANR = "last_anr_ts";

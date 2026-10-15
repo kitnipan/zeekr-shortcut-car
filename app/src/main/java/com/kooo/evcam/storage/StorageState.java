@@ -25,9 +25,10 @@ import java.util.concurrent.Executors;
  *
  * <h3>规则</h3>
  *
- * <p>一份快照 {@link Snapshot}。刷新时机：U 盘事件、开录（查完再开）、停录、换盘、改存储设置、
- * 主界面回到前台，以及主界面在前台时每 {@link #PERIODIC_MS} 一次（这台车机收不到 U 盘插拔广播，
- * 见平台笔记，定时是兜底）。结果回主线程通知 {@link Listener}。</p>
+ * <p>一份快照 {@link Snapshot}。刷新时机：U 盘事件、开录（查完再开；盘不能用拒了的，头 2 分钟每 2 秒再查一次，
+ * RecordingStops.DiskWait）、停录、换盘、改存储设置、主界面回到前台，以及主界面在前台时每 {@link #PERIODIC_MS} 一次
+ * （这台车机收不到 U 盘插拔广播 —— 09-26 到 10-13 的黑匣子里一行「U 盘事件」都没有，见平台笔记，定时是兜底）。
+ * 结果回主线程通知 {@link Listener}。</p>
  */
 public final class StorageState {
 
@@ -45,6 +46,12 @@ public final class StorageState {
          * 关着是 null（没有地方可存，{@code StorageHelper.footageRoot}）。
          */
         public final File videoDir;
+        /**
+         * 录制器实际写进的目录：中转写入开着是内置存储上的临时目录（录完再搬到 {@link #videoDir}），否则就是 {@link #videoDir}；
+         * null = 没有地方可存。开录照它和 {@link #videoDir} 定写到哪 —— 主线程不再自己去找目录、建目录（盘掉线时会卡住，
+         * 审查 2026-10-11）。
+         */
+        public final File recordDir;
         /** 录像目录所在盘的剩余空间；-1 = 不知道。 */
         public final long freeBytes;
         /** 此刻能不能开录、拍照（和拒录、拒拍用的是同一个判断）。 */
@@ -54,13 +61,14 @@ public final class StorageState {
         /** 此刻挂着的盘，黑匣子那种写法。 */
         public final String mounts;
 
-        static final Snapshot EMPTY = new Snapshot(false, null, null, -1L, false, false, "?");
+        static final Snapshot EMPTY = new Snapshot(false, null, null, null, -1L, false, false, "?");
 
-        Snapshot(boolean known, File root, File videoDir, long freeBytes, boolean available,
+        Snapshot(boolean known, File root, File videoDir, File recordDir, long freeBytes, boolean available,
                  boolean sdFellBack, String mounts) {
             this.known = known;
             this.root = root;
             this.videoDir = videoDir;
+            this.recordDir = recordDir;
             this.freeBytes = freeBytes;
             this.available = available;
             this.sdFellBack = sdFellBack;
@@ -162,6 +170,9 @@ public final class StorageState {
         StorageHelper.clearCache();
         File root = StorageHelper.getExternalSdCardRoot(context);
         File videoDir = StorageHelper.getVideoDir(context);
+        // 中转写入关着时就是 videoDir：不再去碰一遍盘（盘卡住时一次探测就是几秒）
+        File recordDir = new com.kooo.evcam.AppConfig(context).shouldUseRelayWrite()
+                ? StorageHelper.getRecordingDir(context) : videoDir;
         long free = -1L;
         if (videoDir != null) {
             try {
@@ -172,7 +183,7 @@ public final class StorageState {
         }
         boolean available = StorageHelper.isRecordingStorageAvailable(context);
         boolean fellBack = StorageHelper.isSdCardFallback(context);
-        return new Snapshot(true, root, videoDir, free, available, fellBack, StorageHelper.describeMounts());
+        return new Snapshot(true, root, videoDir, recordDir, free, available, fellBack, StorageHelper.describeMounts());
     }
 
     /** 主线程调。第一个监听者到了就开始定时刷新。 */

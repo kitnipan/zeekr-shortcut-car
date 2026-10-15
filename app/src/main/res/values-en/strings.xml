@@ -106,11 +106,11 @@
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
     <string name="set_screen_off_title">Screen-off recording (keep awake)</string>
-    <string name="set_screen_off_summary">If recording when the screen turns off, keep recording and keep the head unit awake for up to the time set below</string>
+    <string name="set_screen_off_summary">If recording when the screen turns off, keep recording the surround view and keep the head unit awake for up to the time set below</string>
     <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string>
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">Requires Sentry Mode. Without it, recording pauses while the car sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off; front and rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>
@@ -378,6 +378,7 @@
     <string name="vi_battery_temp">Battery temperature</string>
     <string name="vi_day_night">Day / night</string>
     <string name="vi_sentry_mode">Sentry Mode</string>
+    <string name="vi_screen_power_event">Center screen</string>
     <string name="vi_aeb">AEB</string>
     <string name="vi_fcw">Forward collision warning</string>
     <string name="vi_ldw">Lane departure warning</string>
@@ -415,6 +416,8 @@
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">Driving</string>
+    <string name="vi_v_screen_off">Screen off</string>
+    <string name="vi_v_screen_on">Screen on</string>
     <string name="set_language_title">Language / 语言</string>
     <string name="lang_auto">Follow system</string>
     <string name="lang_zh">中文</string>
@@ -523,7 +526,6 @@
     <!-- Main screen, notifications, playback -->
     <string name="msg_need_camera_storage">Camera and storage permissions are required</string>
     <string name="msg_camera_access_failed">Can\'t access the cameras</string>
-    <string name="msg_codec_fallback">Recording error. Switched to MediaCodec and kept recording.</string>
     <string name="msg_storage_full_stopped">USB drive full. Recording stopped. No video storage cap is set, so old recordings aren\'t cleaned up automatically.</string>
     <string name="msg_storage_full_refuse">Not enough space on the USB drive to start recording. No video storage cap is set, so old recordings aren\'t cleaned up automatically.</string>
     <string name="msg_storage_cleaning">Not enough space. Cleaning up the oldest recordings, then recording starts…</string>
@@ -584,18 +586,18 @@
     <string name="msg_recording_stopped">Recording stopped</string>
     <string name="msg_recording_started_all">Recording started (all cameras)</string>
     <string name="msg_recording_started_n">Recording started (cameras: %1$d)</string>
+    <string name="msg_recording_waiting_cameras">Waiting for cameras. Recording resumes automatically when they\'re available.</string>
     <string name="msg_sd_fallback">No USB drive found. Recording to internal storage.</string>
     <string name="msg_recording_interrupted">Recording interrupted: %1$s</string>
-    <string name="msg_recording_interrupted_resuming">Recording interrupted: %1$s. It resumes once the surround view is working.</string>
+    <string name="msg_recording_interrupted_resuming">Recording interrupted: %1$s. Resuming…</string>
     <string name="rec_reason_unknown">unknown cause</string>
     <string name="rec_reason_write_stalled">can\'t write to the file</string>
-    <string name="rec_reason_camera_lost">the camera is in use</string>
     <!-- The reason in "X failed: reason", picked from the exception by ui/FailureReason; otherwise no reason is shown -->
     <string name="reason_no_network">no network connection</string>
     <string name="reason_timeout">connection timed out</string>
     <string name="reason_no_space">not enough storage space</string>
     <string name="reason_file_not_found">file not found</string>
-    <string name="msg_screen_off_stopped">Screen off for 10 seconds. Recording stopped.</string>
+    <string name="msg_screen_off_stopped">Recording stopped after the screen turned off</string>
     <string name="msg_screen_off_background">Screen off for 15 seconds. Moved to the background.</string>
     <string name="msg_stats_on">Recording status readout on</string>
     <string name="msg_stats_off">Recording status readout off</string>
@@ -824,10 +826,9 @@
     <string name="record_preparing">Starting…</string>
     <string name="record_idle_detail">%1$d-min clips</string>
     <string name="record_segment_detail">This clip %1$s / %2$d min</string>
-    <string name="record_screen_off_continue">Continues with screen off</string>
-    <string name="record_screen_off_pause">Pauses with screen off, resumes on wake</string>
+    <string name="record_screen_off_continue">Keeps recording surround view with screen off</string>
+    <string name="record_screen_off_pause">Pauses with screen off, resumes when the screen turns on</string>
     <string name="record_screen_off_stop">Stops when screen turns off</string>
-    <string name="record_screen_off_needs_sentry">Needs Sentry Mode to continue with screen off</string>
     <string name="recording_chip">Recording %1$s · clip %2$d</string>
     <string name="rail_photo">Take photo</string>
     <string name="rail_settings">Settings</string>
@@ -858,6 +859,8 @@
     <string name="msg_rail_side_hint">Action buttons are on the driver\'s side. Change this in Settings → Interface → Action button side.</string>
     <string name="record_unavailable">Insert a USB drive to record</string>
     <string name="record_unavailable_detail">No USB drive</string>
+    <string name="record_waiting_cameras">Waiting for cameras</string>
+    <string name="record_waiting_detail">Resumes automatically when available</string>
     <string name="status_profile_composite">Zeekr 7X (surround)</string>
     <string name="status_profile_composite_multi">Zeekr 7X (surround + front and rear cabin)</string>
     <string name="status_fps">≤%1$s fps</string>
@@ -868,7 +871,9 @@
     <string name="status_storage_free">USB %1$s free</string>
     <string name="status_storage_none">No USB drive</string>
     <string name="status_recording_fallback">Recording to %1$s (%2$s unavailable)</string>
-    <string name="status_camera_taken">Camera in use. Recording resumes when it is released.</string>
+    <string name="status_camera_lane_taken">%1$s: camera in use. The other cameras keep recording. This camera resumes recording when it is released.</string>
+    <string name="status_cameras_taken">Some cameras are in use. The others keep recording. Each resumes recording when it is released.</string>
+    <string name="status_camera_lane_unavailable">%1$s: can\'t record. The other cameras keep recording.</string>
     <string name="status_internal_storage">internal storage</string>
     <string name="nav_group_switches">Switches</string>
 
@@ -1004,6 +1009,7 @@
 
     <!-- Notifications -->
     <string name="notif_recording_title">Recording</string>
+    <string name="notif_waiting_cameras_title">Waiting for cameras. Recording resumes automatically when they\'re available.</string>
     <string name="notif_recording_tap">Tap to return to the app</string>
     <string name="notif_background_title">Running in the background</string>
     <string name="notif_tap_to_return">Tap to return to the app</string>

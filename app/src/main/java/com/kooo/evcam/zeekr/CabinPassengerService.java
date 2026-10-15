@@ -40,6 +40,7 @@ public class CabinPassengerService extends Service {
     private AppConfig appConfig;
     private CabinPassengerView window;
     private SingleCamera boundCamera;
+    private SurfaceTexture boundTexture;
     private int retryCount;
     private long lastRebuildMs;
     private Runnable retryRunnable;
@@ -142,6 +143,7 @@ public class CabinPassengerService extends Service {
             return;
         }
         boundCamera = camera;
+        boundTexture = surfaceTexture;
         Size preview = camera.getPreviewSize();
         if (preview != null) {
             window.setBufferSize(preview.getWidth(), preview.getHeight());
@@ -152,15 +154,13 @@ public class CabinPassengerService extends Service {
             surfaceTexture.setDefaultBufferSize(buffer.getWidth(), buffer.getHeight());
             window.setBufferSize(buffer.getWidth(), buffer.getHeight());
         }
-        camera.setMainFloatingSurface(new Surface(surfaceTexture), surfaceTexture);
-        lastRebuildMs = android.os.SystemClock.uptimeMillis();
-        if (camera.isCameraOpened()) {
-            camera.recreateSession(true);
-        } else {
-            CameraForegroundService.whenReady(this, camera::openCamera);
-        }
-        retryCount = 0;
+        boolean declared = camera.declareMirror(surfaceTexture);
         CameraNeeds.current().claim(CameraNeeds.Holder.CABIN);
+        if (declared) {
+            manager.channelScheduler().wake();
+        }
+        lastRebuildMs = android.os.SystemClock.uptimeMillis();
+        retryCount = 0;
         AppLog.i(TAG, "cabin passenger bound, preview " + preview);
     }
 
@@ -181,15 +181,11 @@ public class CabinPassengerService extends Service {
     private void unbindCamera() {
         cancelRetry();
         CameraNeeds.current().release(CameraNeeds.Holder.CABIN);
-        if (boundCamera != null) {
-            try {
-                boundCamera.setMainFloatingSurface(null, null);
-                boundCamera.recreateSession(false);
-            } catch (Exception e) {
-                AppLog.w(TAG, "cabin unbind failed: " + e);
-            }
-            boundCamera = null;
+        if (boundCamera != null && boundTexture != null) {
+            boundCamera.withdrawMirror(boundTexture);
         }
+        boundCamera = null;
+        boundTexture = null;
     }
 
     private void rebind() {
@@ -235,7 +231,10 @@ public class CabinPassengerService extends Service {
                     long now = android.os.SystemClock.uptimeMillis();
                     if (now - lastRebuildMs >= 8000L) {
                         lastRebuildMs = now;
-                        boundCamera.recreateSession(true);
+                        MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
+                        if (manager != null) {
+                            manager.channelScheduler().wake();
+                        }
                     }
                 }
                 handler.postDelayed(this, WATCHDOG_INTERVAL_MS);

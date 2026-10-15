@@ -57,9 +57,8 @@ android {
         // versionName 会成为 Release 名称与 APK 文件名
         //
         // 这一版是 fork：版本名用 2.11.12-beta，检查更新才认。
-        // 上游 versionCode 是 283（2.11.1-alpha）。本 fork 已经发出 2.11.11-beta（321），装不上更小的号，所以号继续往上。
+        // 上游现在是 289（2.11.7-beta）。本 fork 已经发出 2.11.12-beta（322），装不上更小的号。
         versionCode = 322
-        // 检查更新不推 alpha，所以这一版用 beta。
         versionName = "2.11.12-beta"
 
         buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))

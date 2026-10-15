@@ -182,17 +182,18 @@ public class BothMirrorsService extends Service {
         if (previewSize != null) {
             view.setSourceSize(previewSize);
         }
-        boundCamera = camera;
-        boundTexture = surfaceTexture;
-        restoreBufferSize(surfaceTexture);
-        camera.setMainFloatingSurface(new Surface(surfaceTexture), surfaceTexture);
-        if (camera.isCameraOpened()) {
-            camera.recreateSession(false);
-        } else {
-            CameraForegroundService.whenReady(this, camera::openCamera);
+        if (camera != boundCamera || surfaceTexture != boundTexture) {
+            withdrawOutput();
+            boundCamera = camera;
+            boundTexture = surfaceTexture;
+            restoreBufferSize(surfaceTexture);
+        }
+        boolean declared = camera.declareMirror(surfaceTexture);
+        CameraNeeds.current().claim(CameraNeeds.Holder.BOTH_MIRRORS);
+        if (declared) {
+            manager.channelScheduler().wake();
         }
         retryCount = 0;
-        CameraNeeds.current().claim(CameraNeeds.Holder.BOTH_MIRRORS);
     }
 
     private void restoreBufferSize(SurfaceTexture surfaceTexture) {
@@ -205,21 +206,18 @@ public class BothMirrorsService extends Service {
         }
     }
 
+    private void withdrawOutput() {
+        if (boundCamera != null && boundTexture != null) {
+            boundCamera.withdrawMirror(boundTexture);
+        }
+    }
+
     private void unbindCamera() {
         cancelRetry();
         CameraNeeds.current().release(CameraNeeds.Holder.BOTH_MIRRORS);
-        if (boundCamera != null) {
-            if (boundCamera.getMainFloatingSurfaceTexture() == boundTexture) {
-                try {
-                    boundCamera.setMainFloatingSurface(null, null);
-                    boundCamera.recreateSession(false);
-                } catch (Exception e) {
-                    AppLog.w(TAG, "解绑相机失败: " + e);
-                }
-            }
-            boundCamera = null;
-            boundTexture = null;
-        }
+        withdrawOutput();
+        boundCamera = null;
+        boundTexture = null;
     }
 
     private void scheduleRetry(SurfaceTexture surfaceTexture) {
