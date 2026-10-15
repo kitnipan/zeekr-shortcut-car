@@ -18,11 +18,27 @@ public class HudDisplayTest {
     }
 
     @Test
-    public void zeekr7xUsesDisplayFiveWhenNothingIsNamed() {
-        assertEquals(5, HudDisplay.pick(Arrays.asList(
+    public void thisCarUsesDisplayThreeAt1440By480() {
+        assertEquals(3, HudDisplay.pick(Arrays.asList(
                 main(0, "built-in", 3200, 2000),
+                screen(3, "", HudDisplay.ZEEKR_7X_WIDTH, HudDisplay.ZEEKR_7X_HEIGHT),
                 screen(5, "", 2560, 536),
                 screen(1, "passenger", 1920, 720))));
+    }
+
+    @Test
+    public void sameSizeStillCountsWhenTheIdMoved() {
+        assertEquals(4, HudDisplay.pick(Arrays.asList(
+                main(0, "built-in", 3200, 2000),
+                screen(4, "panel", HudDisplay.ZEEKR_7X_WIDTH, HudDisplay.ZEEKR_7X_HEIGHT),
+                screen(5, "", 2560, 536))));
+    }
+
+    @Test
+    public void displayFiveIsNotTheHud() {
+        assertEquals(-1, HudDisplay.pick(Arrays.asList(
+                main(0, "built-in", 3200, 2000),
+                screen(5, "", 2560, 536))));
     }
 
     @Test

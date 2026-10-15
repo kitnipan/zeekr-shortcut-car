@@ -12,13 +12,15 @@ import java.util.Locale;
 /**
  * 驾驶员挡风玻璃上的抬头显示是哪一块屏。
  *
- * <p>先认名字里带 hud 的非主屏。没有的话，极氪 7X 上社区实测是第 5 块屏
- * （WazeHUD：https://t.me/s/zeekroid?before=145）。主屏再叫 5 也不认，免得投到中控上。</p>
+ * <p>先认名字里带 hud 的非主屏。这台极氪 7X 上，屏幕（试验性）点出来的是编号 3、1440×480。
+ * 编号对上就用它；编号变了、尺寸还是 1440×480，也认。主屏再叫这个编号也不认。</p>
  */
 public final class HudDisplay {
 
-    /** 极氪 7X 抬头显示的显示编号。名字对不上时才用。 */
-    public static final int ZEEKR_7X_ID = 5;
+    /** 这台 7X 抬头显示的编号。屏幕（试验性）实车点出来的。 */
+    public static final int ZEEKR_7X_ID = 3;
+    public static final int ZEEKR_7X_WIDTH = 1440;
+    public static final int ZEEKR_7X_HEIGHT = 480;
 
     public static final class Screen {
         public final int id;
@@ -44,7 +46,8 @@ public final class HudDisplay {
         if (screens == null) {
             return -1;
         }
-        int known = -1;
+        int byId = -1;
+        int bySize = -1;
         for (Screen screen : screens) {
             if (screen == null || screen.main) {
                 continue;
@@ -54,10 +57,13 @@ public final class HudDisplay {
                 return screen.id;
             }
             if (screen.id == ZEEKR_7X_ID) {
-                known = screen.id;
+                byId = screen.id;
+            }
+            if (screen.width == ZEEKR_7X_WIDTH && screen.height == ZEEKR_7X_HEIGHT) {
+                bySize = screen.id;
             }
         }
-        return known;
+        return byId >= 0 ? byId : bySize;
     }
 
     public static Display find(Context context) {
@@ -65,23 +71,34 @@ public final class HudDisplay {
         if (manager == null) {
             return null;
         }
-        Display[] all = manager.getDisplays();
+        java.util.Map<Integer, Display> open = new java.util.LinkedHashMap<>();
+        addAll(open, manager.getDisplays());
+        addAll(open, manager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION));
+        for (int id = 0; id <= 16; id++) {
+            Display display = manager.getDisplay(id);
+            if (display != null) {
+                open.put(display.getDisplayId(), display);
+            }
+        }
         List<Screen> screens = new ArrayList<>();
-        for (Display display : all) {
+        for (Display display : open.values()) {
             Point size = sizeOf(display);
             screens.add(new Screen(display.getDisplayId(), display.getName(), size.x, size.y,
                     display.getDisplayId() == Display.DEFAULT_DISPLAY));
         }
         int id = pick(screens);
-        if (id < 0) {
-            return null;
+        return id < 0 ? null : open.get(id);
+    }
+
+    private static void addAll(java.util.Map<Integer, Display> into, Display[] displays) {
+        if (displays == null) {
+            return;
         }
-        for (Display display : all) {
-            if (display.getDisplayId() == id) {
-                return display;
+        for (Display display : displays) {
+            if (display != null) {
+                into.put(display.getDisplayId(), display);
             }
         }
-        return null;
     }
 
     public static Point sizeOf(Display display) {

@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.5-beta] - 2026-10-15
+
+### Fixed
+
+- Turn-signal side view casts to the windscreen display measured on this car: id 3, 1440×480.
+
 ## [2.11.4-beta] - 2026-10-15
 
 ### New and improved
