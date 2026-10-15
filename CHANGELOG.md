@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.7-beta] - 2026-10-15
+
+### Fixed
+
+- The right-side picture on the driver HUD is one image. The picture is the smaller size again. The HUD height setting is removed.
+
 ## [2.11.5-beta] - 2026-10-15
 
 ### Fixed

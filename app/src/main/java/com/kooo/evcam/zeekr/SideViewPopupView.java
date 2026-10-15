@@ -63,6 +63,11 @@ public class SideViewPopupView extends ViewGroup {
     /** 大于 0：窗口在抬头显示上，位置走 {@link HudFrame}，不再占中控。 */
     private int hudWidth;
     private int hudHeight;
+    /** 画面在抬头显示里的位置。窗口本身铺满且从 (0,0) 起，否则右侧那一路的相机会再叠出一块。 */
+    private int frameX;
+    private int frameY;
+    private int frameW;
+    private int frameH;
     private final FisheyeMesh.SourceMap turnedMap = (u, v, out) ->
             SideViewProjection.sourcePoint(u, v, viewFov, yaw, pitch, roll, lane, out, 0);
 
@@ -84,6 +89,7 @@ public class SideViewPopupView extends ViewGroup {
     public void setHudSize(int width, int height) {
         hudWidth = Math.max(0, width);
         hudHeight = Math.max(0, height);
+        setBackgroundColor(onHud() ? 0x00000000 : 0xFF000000);
     }
 
     public boolean onHud() {
@@ -285,13 +291,24 @@ public class SideViewPopupView extends ViewGroup {
      */
     private void place(int side) {
         if (onHud()) {
+            // 窗口若从屏幕中间起，这台抬头显示会把相机层留在靠原点的位置。
+            // 右侧那一路离原点远，就多出一块错位的画面。窗口改从 (0,0) 铺满，画面再挪到该在的地方。
             int[] frame = HudFrame.place(hudWidth, hudHeight, side == LaneCycle.LEFT);
-            params.x = frame[0];
-            params.y = frame[1];
-            params.width = frame[2];
-            params.height = frame[3];
+            frameX = frame[0];
+            frameY = frame[1];
+            frameW = frame[2];
+            frameH = frame[3];
+            params.x = 0;
+            params.y = 0;
+            params.width = hudWidth;
+            params.height = hudHeight;
+            requestLayout();
             return;
         }
+        frameX = 0;
+        frameY = 0;
+        frameW = 0;
+        frameH = 0;
         int w = getResources().getDisplayMetrics().widthPixels;
         int h = getResources().getDisplayMetrics().heightPixels;
         int size = Math.round(Math.min(h * appConfig.getSidePopupSizePercent() / 100f, w / 2f));
@@ -307,7 +324,11 @@ public class SideViewPopupView extends ViewGroup {
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        textureView.layout(0, 0, getWidth(), getHeight());
+        if (onHud() && frameW > 0 && frameH > 0) {
+            textureView.layout(frameX, frameY, frameX + frameW, frameY + frameH);
+        } else {
+            textureView.layout(0, 0, getWidth(), getHeight());
+        }
     }
 
     @Override
@@ -318,19 +339,33 @@ public class SideViewPopupView extends ViewGroup {
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        int width = getWidth();
-        int height = getHeight();
+        boolean hudFrame = onHud() && frameW > 0 && frameH > 0;
+        int width = hudFrame ? frameW : getWidth();
+        int height = hudFrame ? frameH : getHeight();
         if (width <= 0 || height <= 0) {
             return;
         }
         if (!hasGeometry()) {
             // 还不知道几何：子视图照画（TextureView 不画就不取帧，onSurfaceTextureUpdated 也不来，
             // 服务就没机会补上尺寸 —— 窗口会一直黑），再盖成黑的，不露出四路挤在一起的整条合成流
-            super.dispatchDraw(canvas);
-            canvas.drawColor(0xFF000000);
+            if (hudFrame) {
+                int cover = canvas.save();
+                canvas.clipRect(frameX, frameY, frameX + frameW, frameY + frameH);
+                super.dispatchDraw(canvas);
+                canvas.drawColor(0xFF000000);
+                canvas.restoreToCount(cover);
+            } else {
+                super.dispatchDraw(canvas);
+                canvas.drawColor(0xFF000000);
+            }
             return;
         }
         int save = canvas.save();
+        if (hudFrame) {
+            canvas.clipRect(frameX, frameY, frameX + frameW, frameY + frameH);
+            canvas.drawColor(0xFF000000);
+            canvas.translate(frameX, frameY);
+        }
         // 后视镜是反的，摄像头不是。左右转向弹窗都要左右对调，才和镜子里看到的一致。
         canvas.scale(-1f, 1f, width / 2f, height / 2f);
         if (straighten) {
@@ -362,12 +397,18 @@ public class SideViewPopupView extends ViewGroup {
             drawMatrix.setRectToRect(sourceRect, destRect, Matrix.ScaleToFit.FILL);
             canvas.clipRect(destRect);
             canvas.concat(drawMatrix);
-            drawChild(canvas, textureView, getDrawingTime());
+            drawTextureOnce(canvas);
         }
         canvas.restoreToCount(save);
     }
 
     private void drawTextureOnce(Canvas canvas) {
+        // 子视图不在 (0,0) 时，drawChild 会再挪一次。网格已经按本地坐标算好，这里抵消。
+        int left = textureView.getLeft();
+        int top = textureView.getTop();
+        if (left != 0 || top != 0) {
+            canvas.translate(-left, -top);
+        }
         drawChild(canvas, textureView, getDrawingTime());
     }
 }
