@@ -86,6 +86,10 @@ public final class StickerHub {
         int attempt;
         long dueAt;
         long lastDial;
+        /** For the trace: when the link came up, became ready, and last carried a press. */
+        long connectedAt;
+        long readyAt;
+        long lastPressAt;
         Runnable watchdog;
         ArrayDeque<BluetoothGattCharacteristic> subscribe;
 
@@ -112,6 +116,7 @@ public final class StickerHub {
     private static boolean radioOff;
     private static boolean receiverRegistered;
     private static String priority = "";
+    private static String lastWanted = "";
     private static final Runnable PUMP = StickerHub::pump;
     private static final Runnable AUDIT = StickerHub::audit;
 
@@ -170,10 +175,14 @@ public final class StickerHub {
             return;
         }
         boolean entered = on && !inFront;
+        boolean changed = on != inFront;
         inFront = on;
         Context application = context.getApplicationContext();
         G.post(() -> {
             attach(application);
+            if (changed) {
+                trace(on ? "app front" : "app back");
+            }
             for (Link link : LINKS.values()) {
                 if (link.gatt != null && link.phase != Phase.IDLE) {
                     priority(link.gatt);
@@ -210,6 +219,7 @@ public final class StickerHub {
                 return;
             }
             scanHold = on;
+            trace(on ? "scan hold: drop all links" : "scan done: redial");
             if (on) {
                 for (Link link : LINKS.values()) {
                     teardown(link, false, true);
@@ -238,6 +248,7 @@ public final class StickerHub {
             }
             PROBING.add(mac);
             priority = mac;
+            trace("probe " + mac + " (user tapped Connect)");
             Link link = link(mac);
             if (link.phase != Phase.READY) {
                 teardown(link, false, false);
@@ -271,6 +282,7 @@ public final class StickerHub {
         G.post(() -> {
             PROBING.remove(mac);
             Link link = LINKS.remove(mac);
+            trace("forget " + mac);
             if (link != null) {
                 teardown(link, false, true);
             }
@@ -283,6 +295,9 @@ public final class StickerHub {
     private static void attach(Context application) {
         app = application;
         if (!receiverRegistered) {
+            StickerLog.attach(application);
+            trace("---- start " + Build.MANUFACTURER + " " + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT
+                    + " app=" + com.kooo.evcam.BuildConfig.VERSION_NAME);
             IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
             if (Build.VERSION.SDK_INT >= 33) {
                 application.registerReceiver(RADIO, filter, Context.RECEIVER_NOT_EXPORTED);
@@ -329,6 +344,11 @@ public final class StickerHub {
             return;
         }
         Set<String> wanted = wanted();
+        String now = new java.util.TreeSet<>(wanted).toString();
+        if (!now.equals(lastWanted)) {
+            lastWanted = now;
+            trace("wanted " + now);
+        }
         for (String mac : new ArrayList<>(LINKS.keySet())) {
             if (!wanted.contains(mac)) {
                 teardown(LINKS.remove(mac), false, true);
@@ -453,6 +473,8 @@ public final class StickerHub {
         }
         if (link.attempt < 3 || link.attempt % 20 == 0) {
             log("dial " + link.mac + " try " + (link.attempt + 1));
+        } else {
+            trace("dial " + link.mac + " try " + (link.attempt + 1));
         }
         arm(link, StickerRecover.CONNECT_TIMEOUT_MS, FAIL_TIMEOUT);
     }
@@ -466,6 +488,9 @@ public final class StickerHub {
                     return;
                 }
                 if (newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
+                    link.connectedAt = SystemClock.elapsedRealtime();
+                    trace("connected " + mac + " after " + (link.connectedAt - link.lastDial) + "ms try "
+                            + (link.attempt + 1) + " bond=" + bond(gatt));
                     link.phase = Phase.DISCOVERING;
                     UP.add(mac);
                     priority(gatt);
@@ -486,7 +511,16 @@ public final class StickerHub {
                 }
                 // Disconnected, or a connect that came back with an error.
                 boolean wasReady = link.phase == Phase.READY;
-                log("drop " + mac + " status=" + status + (wasReady ? " (was ready)" : ""));
+                long now = SystemClock.elapsedRealtime();
+                if (wasReady) {
+                    log("drop " + mac + " status=" + status + " (" + statusName(status) + ")"
+                            + " up=" + secs(now - link.readyAt)
+                            + " lastPress=" + (link.lastPressAt == 0 ? "never" : secs(now - link.lastPressAt) + " ago")
+                            + " app=" + (inFront ? "front" : "back"));
+                } else {
+                    trace("drop " + mac + " status=" + status + " (" + statusName(status) + ") in "
+                            + link.phase + " newState=" + newState);
+                }
                 if (wasReady) {
                     // A live link just went: redial at once while it still advertises.
                     link.attempt = 0;
@@ -509,6 +543,8 @@ public final class StickerHub {
                     return;
                 }
                 List<BluetoothGattCharacteristic> notifies = findNotifies(gatt);
+                trace("discovered " + mac + " in " + (SystemClock.elapsedRealtime() - link.connectedAt)
+                        + "ms notify=" + notifies.size());
                 if (notifies.isEmpty()) {
                     logServices(gatt);
                     teardown(link, true, true);
@@ -619,7 +655,9 @@ public final class StickerHub {
             priority = "";
         }
         PROBING.remove(link.mac);
-        log("ready " + link.mac);
+        link.readyAt = SystemClock.elapsedRealtime();
+        link.lastPressAt = 0;
+        log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms");
         String mac = link.mac;
         Context context = app;
         MAIN.post(() -> {
@@ -644,6 +682,8 @@ public final class StickerHub {
             AppLog.w(TAG, "sticker " + link.mac + " fail reason=" + reason + " status=" + status
                     + " try=" + link.attempt);
         }
+        trace("fail " + link.mac + " reason=" + reasonName(reason) + " status=" + status
+                + " try=" + link.attempt);
         boolean probing = PROBING.contains(link.mac);
         if (probing || StickerRecover.reportFailure(link.attempt)) {
             report(link.mac, reason, status);
@@ -696,7 +736,11 @@ public final class StickerHub {
         Runnable watchdog = () -> {
             if (LINKS.get(link.mac) == link && link.watchdog != null) {
                 link.watchdog = null;
-                log("timeout " + link.phase + " " + link.mac);
+                if (link.phase == Phase.DIALING) {
+                    trace("timeout DIALING " + link.mac + " (asleep or out of range)");
+                } else {
+                    log("timeout " + link.phase + " " + link.mac);
+                }
                 fail(link, reason, 0);
             }
         };
@@ -729,6 +773,11 @@ public final class StickerHub {
         lastPacket = key;
         lastPacketAt = now;
         AppLog.d(TAG, key);
+        Link pressed = LINKS.get(address);
+        if (pressed != null) {
+            pressed.lastPressAt = now;
+        }
+        trace("press " + key);
         Context context = app;
         MAIN.post(() -> {
             for (Watch watch : WATCHES) {
@@ -888,8 +937,54 @@ public final class StickerHub {
         });
     }
 
+    /** File only: too frequent for the screen, needed to read a drop back. */
+    private static void trace(String line) {
+        StickerLog.line(line);
+    }
+
+    private static String secs(long ms) {
+        return String.format(java.util.Locale.US, "%.1fs", ms / 1000f);
+    }
+
+    private static String bond(BluetoothGatt gatt) {
+        try {
+            int state = gatt.getDevice().getBondState();
+            return state == BluetoothDevice.BOND_BONDED ? "bonded"
+                    : state == BluetoothDevice.BOND_BONDING ? "bonding" : "none";
+        } catch (SecurityException e) {
+            return "?";
+        }
+    }
+
+    private static String reasonName(int reason) {
+        switch (reason) {
+            case FAIL_BLUETOOTH: return "bluetooth";
+            case FAIL_TIMEOUT: return "timeout";
+            case FAIL_NO_SERVICE: return "no-service";
+            default: return "gatt";
+        }
+    }
+
+    /** HCI/GATT disconnect reasons, so the trace says who hung up. */
+    static String statusName(int status) {
+        switch (status) {
+            case 0: return "ok";
+            case 8: return "link timeout";
+            case 19: return "sticker hung up";
+            case 22: return "car hung up";
+            case 34: return "LMP timeout";
+            case 59: return "unacceptable params";
+            case 61: return "MIC failure";
+            case 62: return "failed to establish";
+            case 133: return "gatt error";
+            case 257: return "gatt failure";
+            default: return "status " + status;
+        }
+    }
+
     private static void log(String line) {
         AppLog.d(TAG, line);
+        StickerLog.line(line);
         MAIN.post(() -> {
             for (Watch watch : WATCHES) {
                 watch.onLog(line);

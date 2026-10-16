@@ -16,6 +16,7 @@ Nothing yet.
 ### Fixed
 
 - A smart sticker that drops comes back as soon as it is pressed, and the link stays up while the app is in the background.
+- Smart sticker connections are written to a daily log, sticker-YYYYMMDD.log, in the EVCam_Log folder on the USB stick, so a drop can be traced.
 
 ## [2.11.18-beta] - 2026-10-16
 
