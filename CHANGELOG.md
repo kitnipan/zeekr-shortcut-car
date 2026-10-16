@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.29-beta] - 2026-10-16
+
+### New and improved
+
+- The floating button shows "BLE" before the sticker dots: lit while the app is listening for sticker presses, grey when it is not, red while it is retrying after an error.
+
+### Changed
+
+- Sticker dots on the floating button light up only for about 15 seconds after a sticker is heard, as before 2.11.28.
+
 ## [2.11.28-beta] - 2026-10-16
 
 ### Fixed
