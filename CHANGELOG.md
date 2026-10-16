@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.37-beta] - 2026-10-16
+
+### New and improved
+
+- A smart sticker with 20% battery or less shows a red dot on the floating button, and a message names it once a day.
+
 ## [2.11.36-beta] - 2026-10-16
 
 ### New and improved
