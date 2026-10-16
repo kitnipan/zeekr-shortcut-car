@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.17-beta] - 2026-10-16
+
+### Fixed
+
+- Smart stickers connect reliably, including the second one, and stay connected. A sticker that drops is reconnected right away, and the app keeps trying for as long as the sticker is saved.
+
 ## [2.11.16-beta] - 2026-10-16
 
 ### New and improved
