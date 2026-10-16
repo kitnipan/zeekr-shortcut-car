@@ -21,7 +21,6 @@ import java.util.Map;
  */
 final class StickerAdverts {
 
-    private static final long SAME_MS = 1_000L;
     private static final Map<String, String> LAST_PAYLOAD = new HashMap<>();
     private static final Map<String, Long> LAST_AT = new HashMap<>();
 
@@ -58,55 +57,65 @@ final class StickerAdverts {
         if (name == null && record != null) {
             name = record.getDeviceName();
         }
-        boolean saved = StickerDevices.parse(new AppConfig(context).getStickerDevices()).contains(mac);
-        if (!saved && !StickerMatch.nameHint(name)) {
+        if (!isButton(name)) {
             return;
         }
+        boolean saved = StickerDevices.parse(new AppConfig(context).getStickerDevices()).contains(mac);
         byte[] raw = record == null ? null : record.getBytes();
         String payload = StickerFrame.hex(trim(raw));
         long now = SystemClock.elapsedRealtime();
         synchronized (LAST_PAYLOAD) {
             String last = LAST_PAYLOAD.get(mac);
             Long at = LAST_AT.get(mac);
-            if (payload.equals(last) && at != null && now - at < SAME_MS) {
+            // Only changes: the same broadcast repeats about once a second.
+            if (payload.equals(last)) {
                 return;
             }
             boolean changed = last != null && !payload.equals(last);
             LAST_PAYLOAD.put(mac, payload);
             LAST_AT.put(mac, now);
+            String decoded = decode(raw);
             StickerLog.line("advert " + mac + (saved ? "" : " (unsaved)")
-                    + " name=" + (name == null ? "-" : name)
+                    + (decoded.isEmpty() ? "" : " " + decoded)
                     + " rssi=" + result.getRssi()
                     + " connectable=" + result.isConnectable()
-                    + (changed ? " CHANGED" : "")
-                    + details(record)
+                    + (changed ? "" : " FIRST")
                     + " raw=" + payload);
         }
     }
 
-    private static String details(ScanRecord record) {
-        if (record == null) {
+    static final String BUTTON_NAME = "ZEEKR_button";
+
+    static boolean isButton(String name) {
+        return name != null && name.trim().equalsIgnoreCase(BUTTON_NAME);
+    }
+
+    /**
+     * The button's data rides in an AD structure typed "16-bit UUIDs" (0x02), 18 bytes:
+     * FF, X, Y, 4B 01 03 01, CNT, 04 00 00, then a 6-byte tail. CNT ticks about once a second
+     * and is the same on every button; Y is 00 normally and was seen as 02 on one button at a
+     * time, which looks like a press. Returns "cnt=AA y=00" or "" if the shape does not match.
+     */
+    static String decode(byte[] raw) {
+        if (raw == null) {
             return "";
         }
-        StringBuilder out = new StringBuilder();
-        SparseArray<byte[]> makers = record.getManufacturerSpecificData();
-        if (makers != null) {
-            for (int i = 0; i < makers.size(); i++) {
-                out.append(" mfr[").append(String.format("%04x", makers.keyAt(i))).append("]=")
-                        .append(StickerFrame.hex(makers.valueAt(i)));
+        int i = 0;
+        while (i + 1 < raw.length) {
+            int len = raw[i] & 0xFF;
+            if (len == 0 || i + len >= raw.length + 1) {
+                break;
             }
-        }
-        Map<ParcelUuid, byte[]> data = record.getServiceData();
-        if (data != null) {
-            for (Map.Entry<ParcelUuid, byte[]> e : data.entrySet()) {
-                out.append(" svcdata[").append(e.getKey()).append("]=").append(StickerFrame.hex(e.getValue()));
+            int type = raw[i + 1] & 0xFF;
+            if (type == 0x02 && len == 0x12 && i + 2 + 10 < raw.length && (raw[i + 2] & 0xFF) == 0xFF) {
+                int x = raw[i + 3] & 0xFF;
+                int y = raw[i + 4] & 0xFF;
+                int cnt = raw[i + 9] & 0xFF;
+                return String.format("cnt=%02X x=%02X y=%02X%s", cnt, x, y, y != 0 ? " PRESS?" : "");
             }
+            i += len + 1;
         }
-        List<ParcelUuid> uuids = record.getServiceUuids();
-        if (uuids != null && !uuids.isEmpty()) {
-            out.append(" uuids=").append(uuids);
-        }
-        return out.toString();
+        return "";
     }
 
     /** Advert buffers are padded with zeros to 62 bytes; drop the padding. */

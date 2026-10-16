@@ -278,7 +278,8 @@ public class BleSignalActivity extends AppCompatActivity {
         }
         boolean detailChanged = false;
         if (record != null) {
-            String next = detail(record);
+            String decoded = StickerAdverts.decode(record.getBytes());
+            String next = decoded.isEmpty() ? detail(record) : decoded + "\n" + detail(record);
             if (!next.isEmpty() && !next.equals(row.detail)) {
                 row.detail = next;
                 detailChanged = true;
@@ -303,6 +304,10 @@ public class BleSignalActivity extends AppCompatActivity {
             }
         });
         for (Heard row : rows) {
+            // Only the Zeekr buttons: everything else nearby is noise for this screen.
+            if (!StickerAdverts.isButton(row.name)) {
+                continue;
+            }
             list.addView(rowView(row));
         }
         paintStatus();
