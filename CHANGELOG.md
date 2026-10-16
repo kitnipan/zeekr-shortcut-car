@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.28-beta] - 2026-10-16
+
+### Fixed
+
+- The first smart sticker press after a pause, after opening the app, or after the car wakes up now runs its shortcut instead of being skipped.
+- Smart stickers no longer show as disconnected while they are simply not being pressed.
+
 ## [2.11.27-beta] - 2026-10-16
 
 ### Fixed
