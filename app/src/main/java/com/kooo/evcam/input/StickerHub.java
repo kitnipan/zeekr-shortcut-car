@@ -377,6 +377,24 @@ public final class StickerHub {
 
     /** Safety net: whatever went wrong, an idle wanted sticker gets dialled again. */
     private static void audit() {
+        // This car does not reliably deliver the Bluetooth on/off broadcast (none ever reached the
+        // trace), so a missed "on" must not leave every sticker parked after the car wakes up.
+        BluetoothAdapter adapter = app == null ? null : adapter(app);
+        boolean on = adapter != null && adapter.isEnabled();
+        if (radioOff && on) {
+            radioOff = false;
+            for (Link link : LINKS.values()) {
+                link.attempt = 0;
+                link.dueAt = 0;
+            }
+            log("bluetooth back on (polled)");
+        } else if (!radioOff && !on) {
+            radioOff = true;
+            log("bluetooth off (polled)");
+            for (Link link : LINKS.values()) {
+                teardown(link, false, true);
+            }
+        }
         reconcile();
     }
 

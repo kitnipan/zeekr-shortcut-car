@@ -16,6 +16,7 @@ Nothing yet.
 ### Fixed
 
 - Pressing a smart sticker that has gone to sleep now runs its single-press shortcut once it reconnects, a few seconds later, instead of doing nothing. The sticker hangs up 15 seconds after the last press to save its battery; that is the sticker's own behaviour.
+- Smart stickers reconnect after the car wakes up even if the system does not announce that Bluetooth is back on.
 
 ## [2.11.21-beta] - 2026-10-16
 
