@@ -160,6 +160,11 @@ public final class AutoLock implements Telemetry.Listener {
             return;
         }
         watching = want;
+        if (app != null) {
+            com.kooo.evcam.recording.CaptureLog.attach(app);
+        }
+        com.kooo.evcam.recording.CaptureLog.line("flash watch " + (want ? "ON" : "OFF")
+                + " recording=" + recording + " setting=" + (app != null && flashEnabled(app)));
         Telemetry telemetry = Telemetry.get();
         if (want) {
             // 信号已经在收（信息条开着）时从此刻的读数起算：拨杆一直拨着不算新的一下
@@ -184,6 +189,9 @@ public final class AutoLock implements Telemetry.Listener {
         }
         Boolean flash = readings.bool(Signal.HIGH_BEAM_FLASH);
         boolean rising = Boolean.TRUE.equals(flash) && !Boolean.TRUE.equals(lastFlash);
+        if (flash != lastFlash && (flash == null || !flash.equals(lastFlash))) {
+            com.kooo.evcam.recording.CaptureLog.line("flash signal " + lastFlash + " -> " + flash);
+        }
         lastFlash = flash;
         if (rising) {
             long now = System.currentTimeMillis();
@@ -191,6 +199,10 @@ public final class AutoLock implements Telemetry.Listener {
             if (now - lastInstantAt >= LockWindow.BEFORE_MS + LockWindow.AFTER_MS) {
                 lastInstantAt = now;
                 com.kooo.evcam.recording.InstantCapture.perform(app);
+            } else {
+                com.kooo.evcam.recording.CaptureLog.line("flash ignored: "
+                        + (now - lastInstantAt) / 1000 + "s after the last capture (needs "
+                        + (LockWindow.BEFORE_MS + LockWindow.AFTER_MS) / 1000 + "s)");
             }
         }
     }

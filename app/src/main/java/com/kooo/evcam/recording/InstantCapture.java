@@ -57,7 +57,9 @@ public final class InstantCapture {
             return;
         }
         Context app = context.getApplicationContext();
+        CaptureLog.attach(app);
         long momentMs = System.currentTimeMillis();
+        t("capture start at " + stampOf(momentMs));
         toast(app, app.getString(R.string.instant_capture_start));
         new Thread(() -> {
             synchronized (GATE) {
@@ -65,6 +67,7 @@ public final class InstantCapture {
                     run(app, momentMs);
                 } catch (Exception e) {
                     AppLog.e(TAG, "即时片段失败", e);
+                    t("FAILED: crash " + e);
                     toast(app, app.getString(R.string.instant_capture_failed));
                 }
             }
@@ -75,6 +78,11 @@ public final class InstantCapture {
         LockWindow window = LockWindow.around(momentMs);
         long longest = longestSegment(app);
         long deadline = window.endMs + longest * 2L + 15_000L;
+        File videoDir = StorageHelper.getVideoDir(app);
+        t("window " + stampOf(window.startMs) + " .. " + stampOf(window.endMs)
+                + " segment=" + longest / 1000 + "s videoDir=" + (videoDir == null ? "NONE" : videoDir.getAbsolutePath()
+                + (videoDir.isDirectory() ? "" : " (missing)")));
+        boolean waitedOpen = false;
         List<File> sources = new ArrayList<>();
         List<File> repaired = new ArrayList<>();
         long lastRepair = 0L;
@@ -83,21 +91,29 @@ public final class InstantCapture {
             if (now >= window.endMs + LockWindow.SLACK_MS) {
                 List<File> ready = closedOverlap(app, window);
                 if (ready != null) {
+                    t("files covering the flash (closed): " + names(ready));
                     sources = ready;
                     break;
+                }
+                if (!waitedOpen) {
+                    waitedOpen = true;
+                    t("a covering file is still recording: " + names(candidates(app, window)));
                 }
                 if (now - lastRepair >= 5_000L) {
                     lastRepair = now;
                     dropOpenCopies(repaired);
                     repaired = repairOverlap(app, window);
                     if (!repaired.isEmpty()) {
+                        t("repaired copy of the open file: " + names(repaired));
                         sources = repaired;
                         break;
                     }
+                    t("repair of the open file not possible yet");
                 }
             }
             if (now >= deadline) {
                 sources = playableOverlap(app, window);
+                t("gave up waiting; playable files: " + names(sources));
                 break;
             }
             try {
@@ -108,12 +124,16 @@ public final class InstantCapture {
                 return;
             }
         }
+        List<File> before = sources;
         sources = oneClip(sources, momentMs);
         if (sources.isEmpty()) {
+            t("FAILED: no surround file contains the flash moment. candidates=" + names(before)
+                    + " all surround files=" + names(candidatesAll(app)));
             dropOpenCopies(repaired);
             toast(app, app.getString(R.string.instant_capture_failed));
             return;
         }
+        t("cutting from " + names(sources));
         File cache = new File(app.getCacheDir(), "instant");
         if (!cache.exists() && !cache.mkdirs()) {
             dropOpenCopies(repaired);
@@ -124,16 +144,20 @@ public final class InstantCapture {
         try {
             clips.addAll(cut(app, cache, sources, window, momentMs));
             if (clips.isEmpty()) {
+                t("FAILED: cutting produced no clip (see the cut line above)");
                 toast(app, app.getString(R.string.instant_capture_failed));
                 return;
             }
             int copied = copyToUsb(app, clips);
             if (copied > 0) {
+                t("SAVED " + copied + " clip(s)");
                 final int count = copied;
                 toast(app, app.getString(R.string.instant_capture_saved, count));
             } else if (StorageHelper.getExternalSdCardRoot(app) == null) {
+                t("FAILED: no USB stick found");
                 toast(app, app.getString(R.string.save_moment_no_usb));
             } else {
+                t("FAILED: copy to the USB stick (see the copy line above)");
                 toast(app, app.getString(R.string.instant_capture_failed));
             }
             AppConfig config = new AppConfig(app);
@@ -282,6 +306,8 @@ public final class InstantCapture {
                 clips.add(payload);
             } catch (Exception e) {
                 AppLog.e(TAG, "切即时片段失败: " + source.getAbsolutePath(), e);
+                t("cut failed " + source.getName() + " span=" + span.startUs / 1000 + ".." + span.endUs / 1000
+                        + "ms defish=" + SurroundDefish.wanted(app, source) + ": " + e);
                 if (raw.exists() && !raw.delete()) {
                     AppLog.w(TAG, "删不掉半成品: " + raw.getAbsolutePath());
                 }
@@ -302,8 +328,11 @@ public final class InstantCapture {
         File dest = instantFolder(root, StorageHelper.getVideoDir(app));
         if (dest == null) {
             AppLog.w(TAG, "要存即时片段，但目录建不出来");
+            t("copy: cannot create the folder under " + root.getAbsolutePath());
             return 0;
         }
+        t("copy to " + dest.getAbsolutePath() + (dest.isDirectory() ? "" : " (folder missing)")
+                + " canWrite=" + dest.canWrite());
         int copied = 0;
         for (File clip : clips) {
             try {
@@ -311,6 +340,7 @@ public final class InstantCapture {
                 copied++;
             } catch (Exception e) {
                 AppLog.e(TAG, "拷到 instant captures 失败: " + clip.getAbsolutePath(), e);
+                t("copy failed " + clip.getName() + " (" + clip.length() / 1024 + " KB): " + e);
             }
         }
         AppLog.i(TAG, "即时片段拷到 U 盘 " + copied + "/" + clips.size());
@@ -479,6 +509,47 @@ public final class InstantCapture {
 
     private static long longestSegment(Context context) {
         return longest(segmentLengths(context));
+    }
+
+    private static void t(String line) {
+        CaptureLog.line(line);
+    }
+
+    private static String stampOf(long ms) {
+        return new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date(ms));
+    }
+
+    private static String names(List<File> files) {
+        if (files == null || files.isEmpty()) {
+            return "[]";
+        }
+        StringBuilder out = new StringBuilder("[");
+        for (File f : files) {
+            if (out.length() > 1) {
+                out.append(", ");
+            }
+            out.append(f.getName()).append(' ').append(f.length() / 1024).append("KB")
+                    .append(UsbExport.playable(f) ? "" : " open");
+        }
+        return out.append(']').toString();
+    }
+
+    /** Every surround clip in the video folder, newest last, for the failure line. */
+    private static List<File> candidatesAll(Context app) {
+        List<File> out = new ArrayList<>();
+        File video = StorageHelper.getVideoDir(app);
+        File[] listed = video == null ? null : video.listFiles();
+        if (listed == null) {
+            return out;
+        }
+        java.util.Arrays.sort(listed, (a, b) -> a.getName().compareTo(b.getName()));
+        for (File file : listed) {
+            if (file.isFile() && StoragePlan.isOwnClip(file.getName()) && surround(file)) {
+                out.add(file);
+            }
+        }
+        // The last few are what matters.
+        return out.size() > 4 ? out.subList(out.size() - 4, out.size()) : out;
     }
 
     private static void toast(Context app, String text) {
