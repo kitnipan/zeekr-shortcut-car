@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.35-beta] - 2026-10-16
+
+### New and improved
+
+- The smart sticker screen shows each sticker's battery level and when it was read. It is updated when a sticker is added and about every 6 hours when the sticker is pressed.
+
 ## [2.11.34-beta] - 2026-10-16
 
 ### Fixed
