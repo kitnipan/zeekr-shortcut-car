@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Pure rules for keeping saved stickers connected. {@link StickerHub} owns the radio; this
- * decides who dials next and how long to wait, so the rules can be tested off the car.
+ * Pure rules for the sticker setup / battery-check links. {@link StickerHub} owns the radio;
+ * this decides who dials next and how long to wait, so the rules can be tested off the car.
  *
  * <p>What this head unit's radio does (learned the hard way):</p>
  * <ul>
@@ -16,21 +16,11 @@ import java.util.Map;
  */
 public final class StickerRecover {
 
-    /** Matches {@code BluetoothGatt.CONNECTION_PRIORITY_HIGH}. */
-    public static final int PRIORITY_HIGH = 1;
-    /** Matches {@code BluetoothGatt.CONNECTION_PRIORITY_BALANCED}. */
-    public static final int PRIORITY_BALANCED = 0;
-
     public static final long CONNECT_TIMEOUT_MS = 10_000L;
     public static final long DISCOVER_TIMEOUT_MS = 10_000L;
     public static final long SUBSCRIBE_TIMEOUT_MS = 5_000L;
     /** Wrong device or a sticker with no button service: try again rarely. */
     public static final long NO_SERVICE_MS = 60_000L;
-    /**
-     * After a sleeping sticker reconnects, wait this long for it to send the press itself
-     * before running the single-press shortcut for it.
-     */
-    public static final long WAKE_GRACE_MS = 1_500L;
     /** Safety net: anything wanted and idle gets a dial at least this often. */
     public static final long AUDIT_MS = 20_000L;
 
@@ -54,27 +44,12 @@ public final class StickerRecover {
         return attempt == 3 || (attempt > 0 && attempt % 30 == 0);
     }
 
-    /**
-     * A ready link that drops with status 0 is the sticker's own idle timer (15 s after the
-     * last press, car log 2026-10-16). Signal loss (8) and errors are not: the sticker may
-     * re-advertise by itself after those, so a reconnect is not a press.
-     */
-    public static boolean isTimerDrop(int status) {
-        return status == 0;
-    }
 
     /** Status 133 / 62: stale GATT cache. Clear it before redialling. */
     public static boolean refreshCache(int status) {
         return status == 133 || status == 62;
     }
 
-    /**
-     * Always tight. On a relaxed interval the sticker's own timeout hangs up the link, and
-     * the user wants it up all the time, not only while the app is in front.
-     */
-    public static int linkPriority(boolean appInFront) {
-        return PRIORITY_HIGH;
-    }
 
     /**
      * The one sticker to dial now, or "" when the radio is busy or nobody is due.

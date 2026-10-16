@@ -38,14 +38,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Keeps a GATT link to every saved smart sticker for the life of the process and turns a
- * press into a shortcut.
+ * Smart stickers: turns a press into a shortcut and owns the Bluetooth radio for them.
  *
- * <p>One state machine per sticker, all of it on one thread ({@code sticker-gatt}, which is
- * also where GATT callbacks land), so no state is shared across threads. One dial at a time,
- * always direct (see {@link StickerRecover} for why). Every phase has a watchdog, so a link
- * can never sit half-open: it is either ready (notifications on) or torn down and redialled.
- * Redial backs off but never stops while the sticker is saved.</p>
+ * <p>Saved stickers are never connected: their presses are read from their broadcasts by
+ * {@link StickerBeacon}. A GATT link is made only to set a sticker up (the sticker screen's
+ * Connect) and for a short battery check after a press. This class decides when the broadcast
+ * scan may run (no setup link, no sticker screen holding the radio, Bluetooth on).</p>
+ *
+ * <p>All state lives on one thread ({@code sticker-gatt}, where GATT callbacks also land).
+ * One dial at a time, always direct (see {@link StickerRecover}). Every link phase has a
+ * watchdog, so a setup link is either ready or torn down.</p>
  */
 public final class StickerHub {
 
@@ -91,9 +93,6 @@ public final class StickerHub {
         long readyAt;
         long lastPressAt;
         Runnable watchdog;
-        /** The sticker hung up on its own timer; its next connect means someone pressed it. */
-        boolean asleepByTimer;
-        Runnable wakePress;
         ArrayDeque<BluetoothGattCharacteristic> subscribe;
 
         Link(String mac) {
@@ -128,7 +127,6 @@ public final class StickerHub {
     private static final List<Watch> WATCHES = new CopyOnWriteArrayList<>();
     private static volatile boolean capture;
     private static volatile boolean inFront;
-    private static volatile boolean floating;
     private static volatile Runnable stopScan;
 
     private StickerHub() {
@@ -173,7 +171,7 @@ public final class StickerHub {
         });
     }
 
-    /** App came to the front or left. Front: tight link interval and an immediate redial. */
+    /** App came to the front or left. Front: a waiting setup connect is dialled now. */
     public static void setAppInFront(Context context, boolean on) {
         if (context == null) {
             return;
@@ -188,9 +186,6 @@ public final class StickerHub {
                 trace(on ? "app front" : "app back");
             }
             for (Link link : LINKS.values()) {
-                if (link.gatt != null && link.phase != Phase.IDLE) {
-                    priority(link.gatt);
-                }
                 if (entered && link.phase == Phase.IDLE) {
                     link.dueAt = 0;
                 }
@@ -204,7 +199,6 @@ public final class StickerHub {
         if (context == null) {
             return;
         }
-        floating = on;
         sync(context);
     }
 
@@ -314,14 +308,6 @@ public final class StickerHub {
                 application.registerReceiver(RADIO, filter, Context.RECEIVER_NOT_EXPORTED);
             } else {
                 application.registerReceiver(RADIO, filter);
-            }
-            IntentFilter events = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-            events.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-            events.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
-            if (Build.VERSION.SDK_INT >= 33) {
-                application.registerReceiver(LINK_EVENTS, events, Context.RECEIVER_EXPORTED);
-            } else {
-                application.registerReceiver(LINK_EVENTS, events);
             }
             receiverRegistered = true;
             BluetoothAdapter adapter = adapter(application);
@@ -439,7 +425,6 @@ public final class StickerHub {
         return out;
     }
 
-    /** The broadcast scan may run only when nothing else needs the radio. */
     /** What is keeping the broadcast listening off, for the trace. */
     private static String beaconBlockers() {
         StringBuilder out = new StringBuilder();
@@ -521,6 +506,7 @@ public final class StickerHub {
         });
     }
 
+    /** The broadcast scan may run only when nothing else needs the radio. */
     private static boolean beaconAllowed() {
         if (scanHold || radioOff || !PROBING.isEmpty() || !BATTERY_CHECK.isEmpty()) {
             return false;
@@ -642,7 +628,11 @@ public final class StickerHub {
                             + (link.attempt + 1) + " bond=" + bond(gatt));
                     link.phase = Phase.DISCOVERING;
                     UP.add(mac);
-                    priority(gatt);
+                    try {
+                        gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+                    } catch (SecurityException ignored) {
+                        // permission dropped
+                    }
                     state(mac, true);
                     phase(mac, PHASE_DISCOVERING);
                     boolean started;
@@ -671,10 +661,8 @@ public final class StickerHub {
                             + link.phase + " newState=" + newState);
                 }
                 if (wasReady) {
-                    // Status 0 on a ready link is the sticker's own 15 s idle timer. After that it
-                    // only advertises when pressed, so its next connect is a press.
-                    link.asleepByTimer = StickerRecover.isTimerDrop(status);
-                    // A live link just went: redial at once while it still advertises.
+                    // A setup link went before it was dropped on purpose: a dial again while the
+                    // sticker still advertises, if it is still wanted.
                     link.attempt = 0;
                     teardown(link, StickerRecover.refreshCache(status), true);
                     link.dueAt = SystemClock.elapsedRealtime() + StickerRecover.backoffMs(0);
@@ -706,7 +694,7 @@ public final class StickerHub {
                 trace("discovered " + mac + " in " + (SystemClock.elapsedRealtime() - link.connectedAt)
                         + "ms notify=" + notifies.size());
                 if (notifies.isEmpty()) {
-                    logServices(gatt);
+                    traceServices(mac, gatt);
                     teardown(link, true, true);
                     link.dueAt = SystemClock.elapsedRealtime() + StickerRecover.NO_SERVICE_MS;
                     report(mac, FAIL_NO_SERVICE, 0);
@@ -845,10 +833,6 @@ public final class StickerHub {
         link.lastPressAt = 0;
         log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms bond=" + bond(link.gatt));
         readBattery(link);
-        if (link.asleepByTimer) {
-            link.asleepByTimer = false;
-            armWake(link);
-        }
         String mac = link.mac;
         Context context = app;
         MAIN.post(() -> {
@@ -906,7 +890,6 @@ public final class StickerHub {
             return;
         }
         disarm(link);
-        cancelWake(link);
         boolean wasUp = UP.remove(link.mac);
         BluetoothGatt gatt = link.gatt;
         link.gatt = null;
@@ -962,14 +945,8 @@ public final class StickerHub {
         if (raw == null) {
             return;
         }
-        if (BATTERY_LEVEL.equals(channel)) {
-            // Battery level, not a press. Trace it once a minute.
-            long t = SystemClock.elapsedRealtime();
-            Long last = BATTERY_LOGGED.get(address);
-            if (last == null || t - last > 60_000L) {
-                BATTERY_LOGGED.put(address, t);
-                trace("battery " + address + " " + (raw.length > 0 ? (raw[0] & 0xff) + "%" : "?"));
-            }
+        if (BATTERY_LEVEL_UUID.equals(channel)) {
+            // A sticker without a button channel gets every notify channel; battery is not a press.
             return;
         }
         String key = address + " " + StickerFrame.hex(raw);
@@ -983,10 +960,6 @@ public final class StickerHub {
         Link pressed = LINKS.get(address);
         if (pressed != null) {
             pressed.lastPressAt = now;
-            if (pressed.wakePress != null) {
-                cancelWake(pressed);
-                trace("wake press came from the sticker itself " + address);
-            }
         }
         trace("press " + key + " ch=" + shortUuid(channel));
         MAIN.post(() -> {
@@ -995,31 +968,6 @@ public final class StickerHub {
             }
         });
         runShortcut(address, raw);
-    }
-
-    /**
-     * The press that woke a sleeping sticker is not sent: it only makes it advertise. Run its
-     * single-press shortcut once it is back, unless the real press shows up first.
-     */
-    private static void armWake(Link link) {
-        cancelWake(link);
-        Runnable fire = () -> {
-            if (LINKS.get(link.mac) != link || link.wakePress == null) {
-                return;
-            }
-            link.wakePress = null;
-            trace("wake press " + link.mac + " -> single press shortcut");
-            runShortcut(link.mac, new byte[]{0x31});
-        };
-        link.wakePress = fire;
-        G.postDelayed(fire, StickerRecover.WAKE_GRACE_MS);
-    }
-
-    private static void cancelWake(Link link) {
-        if (link.wakePress != null) {
-            G.removeCallbacks(link.wakePress);
-            link.wakePress = null;
-        }
     }
 
     /** Match a press against the saved shortcuts and run it. Not while a sticker screen captures. */
@@ -1078,14 +1026,6 @@ public final class StickerHub {
         return rest;
     }
 
-    private static void priority(BluetoothGatt gatt) {
-        try {
-            gatt.requestConnectionPriority(StickerRecover.linkPriority(inFront));
-        } catch (SecurityException ignored) {
-            // permission dropped
-        }
-    }
-
     /** A dial while the sticker screen scans or discovery runs never answers on this radio. */
     private static void releaseRadio(BluetoothAdapter adapter) {
         Runnable stop = stopScan;
@@ -1101,10 +1041,6 @@ public final class StickerHub {
         }
     }
 
-    private static boolean saved(String mac) {
-        return app != null && StickerDevices.parse(new AppConfig(app).getStickerDevices()).contains(mac);
-    }
-
     /** Switch on, or a sticker shortcut already saved. */
     private static boolean linkWanted(AppConfig config) {
         if (config.isStickerEnabled()) {
@@ -1116,47 +1052,6 @@ public final class StickerHub {
             }
         }
         return false;
-    }
-
-    /** Pairing progress and raw link drops, with the reason Android gives if any. */
-    private static final BroadcastReceiver LINK_EVENTS = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-            String mac;
-            try {
-                mac = device == null ? "" : StickerDevices.normalize(device.getAddress());
-            } catch (SecurityException e) {
-                return;
-            }
-            String action = intent.getAction();
-            G.post(() -> {
-                if (!LINKS.containsKey(mac)) {
-                    return;
-                }
-                if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
-                    int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
-                    int prev = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
-                    int reason = intent.getIntExtra("android.bluetooth.device.extra.REASON", -1);
-                    trace("bond " + mac + " " + bondName(prev) + " -> " + bondName(state)
-                            + (reason >= 0 ? " reason=" + reason : ""));
-                } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
-                    int reason = intent.getIntExtra("android.bluetooth.device.extra.REASON", -1);
-                    trace("acl down " + mac + (reason >= 0 ? " reason=" + reason : ""));
-                } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
-                    trace("acl up " + mac);
-                }
-            });
-        }
-    };
-
-    private static String bondName(int state) {
-        switch (state) {
-            case BluetoothDevice.BOND_BONDED: return "bonded";
-            case BluetoothDevice.BOND_BONDING: return "bonding";
-            case BluetoothDevice.BOND_NONE: return "none";
-            default: return String.valueOf(state);
-        }
     }
 
     private static void cancelBondProcess(BluetoothDevice device) {
@@ -1176,9 +1071,6 @@ public final class StickerHub {
     }
 
     private static final Set<String> SERVICES_LOGGED = new HashSet<>();
-    private static final Map<String, Long> BATTERY_LOGGED = new HashMap<>();
-    private static final java.util.UUID BATTERY_LEVEL =
-            java.util.UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
 
     /** Full GATT table once per sticker, so the trace shows what kind of device it is. */
     private static void traceServices(String mac, BluetoothGatt gatt) {
@@ -1201,19 +1093,6 @@ public final class StickerHub {
             return full.substring(4, 8);
         }
         return full;
-    }
-
-    private static void logServices(BluetoothGatt gatt) {
-        List<BluetoothGattService> services = gatt.getServices();
-        if (services == null) {
-            return;
-        }
-        for (BluetoothGattService service : services) {
-            log(service.getUuid().toString());
-            for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-                log("  " + characteristic.getUuid() + " props=" + characteristic.getProperties());
-            }
-        }
     }
 
     private static boolean canConnect(Context context) {

@@ -64,13 +64,6 @@ public class StickerRecoverTest {
         assertTrue(StickerRecover.reportFailure(30));
     }
 
-    @Test
-    public void onlyTheIdleTimerDropMakesTheNextConnectAPress() {
-        assertTrue(StickerRecover.isTimerDrop(0));
-        assertFalse(StickerRecover.isTimerDrop(8));
-        assertFalse(StickerRecover.isTimerDrop(19));
-        assertFalse(StickerRecover.isTimerDrop(133));
-    }
 
     @Test
     public void staleCacheStatusesClearTheCache() {
@@ -78,9 +71,4 @@ public class StickerRecoverTest {
         assertFalse(StickerRecover.refreshCache(8));
     }
 
-    @Test
-    public void linkStaysTightInTheBackgroundToo() {
-        assertEquals(StickerRecover.PRIORITY_HIGH, StickerRecover.linkPriority(true));
-        assertEquals(StickerRecover.PRIORITY_HIGH, StickerRecover.linkPriority(false));
-    }
 }
