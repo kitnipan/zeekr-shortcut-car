@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.32-beta] - 2026-10-16
+
+### New and improved
+
+- New shortcut: instant capture. It does the same as flash-to-pass: locks the moment and saves the surround clip to instant captures. It needs a recording to be running.
+
 ## [2.11.31-beta] - 2026-10-16
 
 ### New and improved
