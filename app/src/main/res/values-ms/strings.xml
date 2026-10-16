@@ -315,6 +315,7 @@
     <string name="sticker_rename_hint_a11y">%1$s, ketik untuk tukar nama</string>
     <string name="sticker_battery">Bateri %1$d%%</string>
     <string name="sticker_battery_low">Bateri rendah %1$d%%</string>
+    <string name="sticker_battery_low_warn">Pelekat %1$s: bateri rendah (%2$d%%)</string>
     <string name="sticker_ble_label">BLE</string>
     <string name="sticker_ble_listening">Sedang mendengar tekanan pelekat</string>
     <string name="sticker_ble_off">Tidak mendengar tekanan pelekat</string>
