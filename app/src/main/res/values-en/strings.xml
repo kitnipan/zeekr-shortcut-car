@@ -216,6 +216,7 @@
     <string name="shortcut_hud_channel">Driver HUD</string>
     <string name="shortcut_action_save">Save this moment</string>
     <string name="shortcut_action_lock_save">Lock and save</string>
+    <string name="shortcut_action_instant_capture">Instant capture (same as flash-to-pass)</string>
     <string name="shortcut_action_hold_speak">Hold to speak outside</string>
     <string name="shortcut_action_toggle_speak">Click to speak outside (click again to stop)</string>
     <string name="megaphone_channel">Hold to speak</string>
@@ -244,6 +245,7 @@
     <string name="instant_capture_saved">Saved %1$d clip(s) to instant captures</string>
     <string name="instant_capture_uploaded">Uploaded %1$d clip(s) to Drive</string>
     <string name="instant_capture_failed">Could not save the instant capture</string>
+    <string name="instant_capture_need_recording">Start recording first to make an instant capture</string>
     <string name="instant_capture_upload_failed">Could not upload the instant capture</string>
     <string name="instant_captures_title">Instant captures</string>
     <string name="instant_captures_summary">View the surround clips saved by flash-to-pass. Play or delete them here</string>

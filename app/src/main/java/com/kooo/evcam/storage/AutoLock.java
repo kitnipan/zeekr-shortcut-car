@@ -225,6 +225,40 @@ public final class AutoLock implements Telemetry.Listener {
         });
     }
 
+    /**
+     * Shortcut: the same as a high-beam flash. Lock 10 s either side on every camera and save
+     * the surround clip to {@code instant captures}. Works whether or not the flash setting is
+     * on, but only while recording, since the clip is cut from the recording.
+     */
+    public void instantFromShortcut(Context context) {
+        if (context == null) {
+            return;
+        }
+        Context appContext = context.getApplicationContext();
+        main.post(() -> {
+            if (app == null) {
+                app = appContext;
+            }
+            com.kooo.evcam.recording.CaptureLog.attach(appContext);
+            if (!recording) {
+                com.kooo.evcam.recording.CaptureLog.line("shortcut instant capture: not recording");
+                Toast.makeText(appContext, R.string.instant_capture_need_recording, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            long now = System.currentTimeMillis();
+            if (now - lastInstantAt < LockWindow.BEFORE_MS + LockWindow.AFTER_MS) {
+                com.kooo.evcam.recording.CaptureLog.line("shortcut instant capture ignored: "
+                        + (now - lastInstantAt) / 1000 + "s after the last one");
+                return;
+            }
+            lastInstantAt = now;
+            com.kooo.evcam.recording.CaptureLog.line("shortcut instant capture");
+            worker.post(() -> segmentMs = segmentLengths(appContext));
+            lockAround(appContext, now, true);
+            com.kooo.evcam.recording.InstantCapture.perform(appContext);
+        });
+    }
+
     // ================================================================= 锁
 
     /** 这一刻前后 10 秒：现在锁一遍，窗口结束后再锁一遍。主线程。 */

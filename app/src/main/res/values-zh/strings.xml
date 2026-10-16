@@ -193,6 +193,7 @@
     <string name="shortcut_hud_channel">驾驶员抬头显示</string>
     <string name="shortcut_action_save">保存这一刻</string>
     <string name="shortcut_action_lock_save">锁定并保存</string>
+    <string name="shortcut_action_instant_capture">即时片段（同闪远光）</string>
     <string name="shortcut_action_hold_speak">按住对外喊话</string>
     <string name="shortcut_action_toggle_speak">点按对外喊话（再点停止）</string>
     <string name="megaphone_channel">按住喊话</string>
@@ -221,6 +222,7 @@
     <string name="instant_capture_saved">已保存 %1$d 个片段到 instant captures</string>
     <string name="instant_capture_uploaded">已上传 %1$d 个片段到云端</string>
     <string name="instant_capture_failed">即时片段保存失败</string>
+    <string name="instant_capture_need_recording">先开始录像才能保存即时片段</string>
     <string name="instant_capture_upload_failed">即时片段上传失败</string>
     <string name="instant_captures_title">即时片段</string>
     <string name="instant_captures_summary">查看闪远光存下的环视片段，可以播放或删除</string>

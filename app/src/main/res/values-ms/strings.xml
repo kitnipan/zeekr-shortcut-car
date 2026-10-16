@@ -217,6 +217,7 @@
     <string name="shortcut_hud_channel">HUD pemandu</string>
     <string name="shortcut_action_save">Simpan saat ini</string>
     <string name="shortcut_action_lock_save">Kunci dan simpan</string>
+    <string name="shortcut_action_instant_capture">Tangkapan segera (sama seperti kelip lampu tinggi)</string>
     <string name="shortcut_action_hold_speak">Tahan untuk bercakap ke luar</string>
     <string name="shortcut_action_toggle_speak">Klik untuk bercakap ke luar (klik lagi untuk berhenti)</string>
     <string name="megaphone_channel">Tahan untuk bercakap</string>
@@ -245,6 +246,7 @@
     <string name="instant_capture_saved">%1$d klip disimpan ke instant captures</string>
     <string name="instant_capture_uploaded">%1$d klip dimuat naik ke Drive</string>
     <string name="instant_capture_failed">Tidak dapat menyimpan rakaman segera</string>
+    <string name="instant_capture_need_recording">Mula rakam dahulu untuk membuat tangkapan segera</string>
     <string name="instant_capture_upload_failed">Tidak dapat memuat naik rakaman segera</string>
     <string name="instant_captures_title">Rakaman segera</string>
     <string name="instant_captures_summary">Lihat klip sekeliling yang disimpan oleh kelip lampu tinggi. Main atau padam di sini</string>

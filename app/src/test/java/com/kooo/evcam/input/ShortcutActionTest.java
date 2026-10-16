@@ -16,6 +16,12 @@ public class ShortcutActionTest {
     }
 
     @Test
+    public void instantCaptureIsItsOwnStoredAction() {
+        assertEquals(ShortcutAction.INSTANT_CAPTURE, ShortcutAction.fromKey("instant_capture"));
+        assertEquals(ShortcutAction.LOCK_SAVE, ShortcutAction.fromKey("lock_and_save"));
+    }
+
+    @Test
     public void clickToSpeakHasASafetyCap() {
         assertEquals(10L * 60 * 1000, MegaphoneService.TOGGLE_MAX_MS);
     }
