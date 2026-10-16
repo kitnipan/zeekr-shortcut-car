@@ -26,9 +26,9 @@ import java.util.Set;
 /**
  * Reads presses straight from the ZEEKR_button broadcasts, with no connection at all.
  *
- * <p>The button advertises about once a second, non-connectable, and keeps doing so while it
- * "sleeps". Its data carries a press counter (cnt) that moves once per press and the press
- * kind (y: 00 single, 02 double). So a changed cnt is a press. Connecting was never needed:
+ * <p>After each press the button broadcasts about once a second for ~15 s, non-connectable,
+ * then goes quiet. Its data carries a press counter (cnt) that moves once per press and the
+ * press kind (y: 00 single, 02 double). So a changed cnt is a press. Connecting was never needed:
  * the GATT link hung up 15 s after each press and lost the press that woke it.</p>
  *
  * <p>This radio cannot scan and connect at the same time, so {@link StickerHub} decides
@@ -37,8 +37,11 @@ import java.util.Set;
  */
 final class StickerBeacon {
 
-    /** No advert from any button for this long while scanning: restart the scan. */
-    private static final long SILENT_MS = 30_000L;
+    /**
+     * No advert from any button for this long while scanning: restart the scan. A button is
+     * quiet between presses (it broadcasts for about 15 s after each one), so this is long.
+     */
+    private static final long SILENT_MS = 5L * 60 * 1000;
     private static final long CHECK_MS = 10_000L;
     /** Android refuses more than five scan starts in 30 s; stay well under. */
     private static final long MIN_RESTART_MS = 8_000L;
@@ -46,8 +49,8 @@ final class StickerBeacon {
     private static final long REFRESH_MS = 20L * 60 * 1000;
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    /** A button not heard for this long shows as down. It advertises about once a second. */
-    private static final long HEARD_MS = 15_000L;
+    /** A button not heard for this long shows as down. It is quiet between presses. */
+    private static final long HEARD_MS = 10L * 60 * 1000;
 
     private static final Map<String, Integer> LAST_CNT = new HashMap<>();
     /** Last advert time per button; read from any thread for the status dots. */
@@ -59,6 +62,12 @@ final class StickerBeacon {
     private static boolean wantOn;
     /** A controller or shortcut screen is open: any ZEEKR_button counts, saved or not. */
     private static boolean openToNew;
+    /**
+     * The sticker screens took the radio. Presses made there are theirs, so the next scan
+     * starts from a fresh baseline instead of replaying the last one. Not after Bluetooth off:
+     * the first press after the car wakes must still count.
+     */
+    private static boolean rebaseline;
     private static Set<String> wanted = new HashSet<>();
     private static long startedAt;
     private static long lastAdvertAt;
@@ -70,13 +79,17 @@ final class StickerBeacon {
      * Run the scan for exactly these buttons, or stop it when {@code allowed} is false.
      * Safe to call often; only a change of address set restarts the scan.
      */
-    static void sync(Context context, Set<String> addresses, boolean allowed, boolean anyButton) {
+    static void sync(Context context, Set<String> addresses, boolean allowed, boolean anyButton,
+                     boolean screenHasRadio) {
         Context application = context == null ? null : context.getApplicationContext();
         Set<String> next = new HashSet<>(addresses == null ? new HashSet<>() : addresses);
         MAIN.post(() -> {
             app = application;
             wanted = next;
             openToNew = anyButton;
+            if (screenHasRadio) {
+                rebaseline = true;
+            }
             wantOn = allowed && (!next.isEmpty() || anyButton);
             apply();
         });
@@ -138,8 +151,13 @@ final class StickerBeacon {
         scanning = new HashSet<>(wanted);
         startedAt = now;
         lastAdvertAt = now;
-        // A fresh baseline: a press made while we were not listening is not replayed.
-        LAST_CNT.clear();
+        if (rebaseline) {
+            rebaseline = false;
+            countsLoaded = true;
+            LAST_CNT.clear();
+        } else {
+            loadCounts();
+        }
         StickerHub.trace("beacon scan on " + scanning);
         MAIN.removeCallbacks(CHECK);
         MAIN.postDelayed(CHECK, CHECK_MS);
@@ -180,12 +198,8 @@ final class StickerBeacon {
             if (scanner == null) {
                 return;
             }
-            Map<String, Integer> keep = new HashMap<>(LAST_CNT);
             stop(null);
             start();
-            if (scanner != null) {
-                LAST_CNT.putAll(keep);
-            }
         }
     };
 
@@ -268,6 +282,9 @@ final class StickerBeacon {
         int cnt = f[0];
         int y = f[1];
         Integer last = LAST_CNT.put(mac, cnt);
+        if (last == null || last != cnt) {
+            saveCount(mac, cnt);
+        }
         if (!StickerAdverts.isNewPress(last, cnt)) {
             if (last == null) {
                 StickerHub.trace(String.format("beacon %s baseline cnt=%02X rssi=%d", mac, cnt, result.getRssi()));
@@ -281,6 +298,34 @@ final class StickerBeacon {
                 result.getRssi(), missed > 0 ? " missed=" + missed : ""));
         if (frame != null) {
             StickerHub.beaconPress(mac, frame);
+        }
+    }
+
+    private static final String PREFS = "sticker_beacon";
+    private static boolean countsLoaded;
+
+    /**
+     * The last press counter per button survives scan restarts and app restarts. Otherwise the
+     * first press after a quiet spell, or after the app starts, only set a baseline and was
+     * lost (car log 2.11.27). A button only broadcasts for ~15 s after a press, so at worst a
+     * press made while the app was starting runs a moment late, which is what was meant.
+     */
+    private static void loadCounts() {
+        if (countsLoaded || app == null) {
+            return;
+        }
+        countsLoaded = true;
+        Map<String, ?> all = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getAll();
+        for (Map.Entry<String, ?> e : all.entrySet()) {
+            if (e.getValue() instanceof Integer && !LAST_CNT.containsKey(e.getKey())) {
+                LAST_CNT.put(e.getKey(), (Integer) e.getValue());
+            }
+        }
+    }
+
+    private static void saveCount(String mac, int cnt) {
+        if (app != null) {
+            app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(mac, cnt).apply();
         }
     }
 
