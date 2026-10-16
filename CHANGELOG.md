@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.26-beta] - 2026-10-16
+
+### Fixed
+
+- Smart stickers work all the time. The app now listens to the sticker's own broadcast instead of keeping a connection, so the first press after a pause works right away and nothing drops after 15 seconds. Single and double press are both recognised.
+
 ## [2.11.25-beta] - 2026-10-16
 
 ### New and improved
