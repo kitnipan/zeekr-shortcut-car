@@ -567,6 +567,22 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         empty.setVisibility(shown == 0 ? View.VISIBLE : View.GONE);
     }
 
+    /** "Battery 85% · 2 hours ago", "Battery low 15%", or null before the first reading. */
+    private String batteryText(String address) {
+        Integer pct = StickerHub.batteryPercent(this, address);
+        if (pct == null) {
+            return null;
+        }
+        String text = getString(pct <= 20 ? R.string.sticker_battery_low : R.string.sticker_battery, pct);
+        long at = StickerHub.batteryAt(this, address);
+        long now = System.currentTimeMillis();
+        if (at > 0 && now - at > android.text.format.DateUtils.HOUR_IN_MILLIS) {
+            text = text + " · " + android.text.format.DateUtils.getRelativeTimeSpanString(
+                    at, now, android.text.format.DateUtils.HOUR_IN_MILLIS);
+        }
+        return text;
+    }
+
     private void addRow(String address, String name, Integer rssi, boolean saved) {
         View line = LayoutInflater.from(this).inflate(R.layout.item_sticker, devices, false);
         TextView title = line.findViewById(R.id.sticker_name);
@@ -582,6 +598,10 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
                 detail = detail + "  " + mapped;
             }
             detail = detail + "  " + getString(up ? R.string.sticker_connected : R.string.sticker_link_off);
+            String battery = batteryText(address);
+            if (battery != null) {
+                detail = detail + "\n" + battery;
+            }
         }
         dot.setVisibility(saved ? View.VISIBLE : View.GONE);
         dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this,
