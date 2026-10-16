@@ -17,6 +17,8 @@ Nothing yet.
 
 - The first smart sticker press after a pause, after opening the app, or after the car wakes up now runs its shortcut instead of being skipped.
 - Smart stickers no longer show as disconnected while they are simply not being pressed.
+- Smart sticker presses keep working while only the floating button is showing, and the sticker's dot on the floating button flashes when a press is received.
+- The sticker listening and the BLE signals screen recover by themselves when the system briefly refuses to scan (error 2).
 
 ## [2.11.27-beta] - 2026-10-16
 

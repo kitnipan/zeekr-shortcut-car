@@ -45,6 +45,9 @@ public class BleSignalActivity extends AppCompatActivity {
 
     private static final int ASK = 48;
     private static final long DISCOVERY_MS = 2_000L;
+    private static final int MAX_SCAN_RETRIES = 3;
+    private static final long SCAN_RETRY_MS = 1_500L;
+    private int scanRetries;
     private static final int RAW_BYTES = 24;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -96,7 +99,21 @@ public class BleSignalActivity extends AppCompatActivity {
         @Override
         public void onScanFailed(int errorCode) {
             runOnUiThread(() -> {
+                StickerLog.line("BLE signals scan failed code=" + errorCode + " ("
+                        + StickerBeacon.failName(errorCode) + ") try " + (scanRetries + 1));
                 haltScan();
+                // Code 2 (registration failed) is usually transient on this head unit: try again
+                // a few times before showing the error, and give the radio back in between.
+                if (scanRetries < MAX_SCAN_RETRIES) {
+                    scanRetries++;
+                    status.setText(getString(R.string.sticker_fail, errorCode));
+                    handler.postDelayed(() -> {
+                        if (!isFinishing() && !scanning) {
+                            startScan();
+                        }
+                    }, SCAN_RETRY_MS);
+                    return;
+                }
                 StickerHub.holdForScan(BleSignalActivity.this, false);
                 status.setText(getString(R.string.sticker_fail, errorCode));
             });
@@ -242,6 +259,7 @@ public class BleSignalActivity extends AppCompatActivity {
         if (result == null) {
             return;
         }
+        scanRetries = 0;
         hear(result.getDevice(), result.getRssi(), result.getScanRecord());
     }
 

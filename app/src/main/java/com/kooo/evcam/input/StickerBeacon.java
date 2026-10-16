@@ -119,7 +119,11 @@ final class StickerBeacon {
     }
 
     private static void start() {
-        if (app == null || !canScan(app)) {
+        if (app == null) {
+            return;
+        }
+        if (!canScan(app)) {
+            retryLater("no scan permission");
             return;
         }
         long now = SystemClock.elapsedRealtime();
@@ -131,6 +135,7 @@ final class StickerBeacon {
         BluetoothAdapter adapter = manager == null ? null : manager.getAdapter();
         BluetoothLeScanner next = adapter == null || !adapter.isEnabled() ? null : adapter.getBluetoothLeScanner();
         if (next == null) {
+            retryLater("scanner not ready");
             return;
         }
         // Unfiltered: an address filter matched nothing on this head unit (car log 2.11.26,
@@ -140,13 +145,16 @@ final class StickerBeacon {
                 .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
                 .setReportDelay(0)
                 .build();
+        // A new callback per start: reusing one across quick stop/start cycles is a known way
+        // to get SCAN_FAILED_APPLICATION_REGISTRATION_FAILED (2). Old ones are ignored.
+        ScanCallback fresh = newCallback();
         try {
-            next.startScan(null, settings, CALLBACK);
+            next.startScan(null, settings, fresh);
         } catch (SecurityException | IllegalArgumentException | IllegalStateException e) {
-            StickerHub.trace("beacon scan refused: " + e.getMessage());
-            MAIN.postDelayed(StickerBeacon::apply, RETRY_MS);
+            retryLater("refused: " + e.getMessage());
             return;
         }
+        callback = fresh;
         scanner = next;
         scanning = new HashSet<>(wanted);
         startedAt = now;
@@ -168,22 +176,27 @@ final class StickerBeacon {
     private static void stop(String why) {
         MAIN.removeCallbacks(CHECK);
         MAIN.removeCallbacks(REFRESH);
+        MAIN.removeCallbacks(RETRY);
         BluetoothLeScanner current = scanner;
+        ScanCallback old = callback;
         scanner = null;
+        callback = null;
         scanning = new HashSet<>();
-        if (current == null) {
-            return;
+        if (current != null && old != null) {
+            try {
+                current.stopScan(old);
+            } catch (SecurityException | IllegalStateException ignored) {
+                // Bluetooth already off
+            }
         }
-        try {
-            current.stopScan(CALLBACK);
-        } catch (SecurityException | IllegalStateException ignored) {
-            // Bluetooth already off
+        // A restart keeps the dots lit; only switching the scan off clears them.
+        if ("off".equals(why)) {
+            for (String mac : new ArrayList<>(HEARD.keySet())) {
+                HEARD.remove(mac);
+                StickerHub.beaconState(mac, false);
+            }
         }
-        for (String mac : new ArrayList<>(HEARD.keySet())) {
-            HEARD.remove(mac);
-            StickerHub.beaconState(mac, false);
-        }
-        if (why != null) {
+        if (current != null && why != null) {
             StickerHub.trace("beacon scan " + why);
         }
     }
@@ -228,31 +241,74 @@ final class StickerBeacon {
         }
     };
 
-    private static final ScanCallback CALLBACK = new ScanCallback() {
-        @Override
-        public void onScanResult(int callbackType, ScanResult result) {
-            MAIN.post(() -> seen(result));
-        }
+    private static ScanCallback callback;
+    private static int failures;
 
-        @Override
-        public void onBatchScanResults(List<ScanResult> results) {
-            MAIN.post(() -> {
-                for (ScanResult result : results) {
-                    seen(result);
-                }
-            });
-        }
+    private static final Runnable RETRY = StickerBeacon::apply;
 
-        @Override
-        public void onScanFailed(int errorCode) {
-            MAIN.post(() -> {
-                StickerHub.trace("beacon scan failed code=" + errorCode);
-                scanner = null;
-                scanning = new HashSet<>();
-                MAIN.postDelayed(StickerBeacon::apply, RETRY_MS);
-            });
+    /** Try again later, backing off 5, 10, 20 s, then every 60 s. Never gives up. */
+    private static void retryLater(String why) {
+        failures++;
+        long wait = Math.min(60_000L, RETRY_MS << Math.min(4, failures - 1));
+        StickerHub.trace("beacon scan " + why + ", retry in " + wait / 1000 + "s (#" + failures + ")");
+        MAIN.removeCallbacks(RETRY);
+        MAIN.postDelayed(RETRY, wait);
+    }
+
+    private static ScanCallback newCallback() {
+        return new ScanCallback() {
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                ScanCallback self = this;
+                MAIN.post(() -> {
+                    if (callback == self) {
+                        seen(result);
+                    }
+                });
+            }
+
+            @Override
+            public void onBatchScanResults(List<ScanResult> results) {
+                ScanCallback self = this;
+                MAIN.post(() -> {
+                    if (callback != self) {
+                        return;
+                    }
+                    for (ScanResult result : results) {
+                        seen(result);
+                    }
+                });
+            }
+
+            @Override
+            public void onScanFailed(int errorCode) {
+                ScanCallback self = this;
+                MAIN.post(() -> {
+                    if (callback != self) {
+                        return;
+                    }
+                    callback = null;
+                    scanner = null;
+                    scanning = new HashSet<>();
+                    MAIN.removeCallbacks(CHECK);
+                    MAIN.removeCallbacks(REFRESH);
+                    retryLater("failed code=" + errorCode + " (" + failName(errorCode) + ")");
+                });
+            }
+        };
+    }
+
+    static String failName(int code) {
+        switch (code) {
+            case 1: return "already started";
+            case 2: return "app registration failed";
+            case 3: return "internal error";
+            case 4: return "feature unsupported";
+            case 5: return "out of hardware resources";
+            case 6: return "scanning too frequently";
+            default: return "unknown";
         }
-    };
+    }
 
     private static void seen(ScanResult result) {
         if (scanner == null || result == null || result.getDevice() == null || result.getScanRecord() == null) {
@@ -272,6 +328,7 @@ final class StickerBeacon {
             return;
         }
         lastAdvertAt = SystemClock.elapsedRealtime();
+        failures = 0;
         if (HEARD.put(mac, lastAdvertAt) == null) {
             StickerHub.beaconState(mac, true);
         }

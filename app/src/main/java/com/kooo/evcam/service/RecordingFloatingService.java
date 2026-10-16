@@ -121,6 +121,7 @@ public class RecordingFloatingService extends Service {
 
         @Override
         public void onPacket(String address, byte[] raw) {
+            flashSticker(address);
         }
 
         @Override
@@ -484,6 +485,7 @@ public class RecordingFloatingService extends Service {
             dot.setBackgroundResource(R.drawable.sticker_dot);
             dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this,
                     up ? R.color.energy : R.color.text_tertiary)));
+            dot.setTag(StickerDevices.normalize(address));
             String tail = StickerFrame.tail(StickerFrame.deviceName(address));
             dot.setContentDescription(getString(up ? R.string.sticker_connected : R.string.sticker_link_off)
                     + " " + tail);
@@ -493,6 +495,22 @@ public class RecordingFloatingService extends Service {
             params.bottomMargin = gap;
             stickerDots.addView(dot, params);
         }
+    }
+
+    /** A press arrived from this sticker: pop its dot so the driver sees it was heard. */
+    private void flashSticker(String address) {
+        if (stickerDots == null) {
+            return;
+        }
+        View dot = stickerDots.findViewWithTag(StickerDevices.normalize(address));
+        if (dot == null) {
+            return;
+        }
+        dot.animate().cancel();
+        dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.text_primary)));
+        dot.setScaleX(1.9f);
+        dot.setScaleY(1.9f);
+        dot.animate().scaleX(1f).scaleY(1f).setDuration(450).withEndAction(this::paintStickers).start();
     }
 
     /**
