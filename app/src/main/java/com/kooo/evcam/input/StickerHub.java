@@ -223,6 +223,11 @@ public final class StickerHub {
                 return;
             }
             scanHold = on;
+            scanHoldAt = SystemClock.elapsedRealtime();
+            G.removeCallbacks(HOLD_EXPIRE);
+            if (on) {
+                G.postDelayed(HOLD_EXPIRE, HOLD_MAX_MS);
+            }
             trace(on ? "scan hold: drop all links" : "scan done: redial");
             if (on) {
                 for (Link link : LINKS.values()) {
@@ -252,6 +257,7 @@ public final class StickerHub {
                 return;
             }
             PROBING.add(mac);
+            PROBE_AT.put(mac, SystemClock.elapsedRealtime());
             priority = mac;
             trace("probe " + mac + " (user tapped Connect)");
             Link link = link(mac);
@@ -372,7 +378,13 @@ public final class StickerHub {
             link(mac);
         }
         Set<String> beacons = beaconed();
-        StickerBeacon.sync(app, beacons, beaconAllowed(), !WATCHES.isEmpty(),
+        boolean allowed = beaconAllowed();
+        String why = allowed ? "listening allowed" : "listening off: " + beaconBlockers();
+        if (!why.equals(lastBeaconWhy)) {
+            lastBeaconWhy = why;
+            trace(why + " saved=" + beacons.size());
+        }
+        StickerBeacon.sync(app, beacons, allowed, !WATCHES.isEmpty(),
                 scanHold || !PROBING.isEmpty());
         pump();
         G.removeCallbacks(AUDIT);
@@ -383,6 +395,7 @@ public final class StickerHub {
 
     /** Safety net: whatever went wrong, an idle wanted sticker gets dialled again. */
     private static void audit() {
+        expireProbes();
         // This car does not reliably deliver the Bluetooth on/off broadcast (none ever reached the
         // trace), so a missed "on" must not leave every sticker parked after the car wakes up.
         BluetoothAdapter adapter = app == null ? null : adapter(app);
@@ -426,6 +439,87 @@ public final class StickerHub {
     }
 
     /** The broadcast scan may run only when nothing else needs the radio. */
+    /** What is keeping the broadcast listening off, for the trace. */
+    private static String beaconBlockers() {
+        StringBuilder out = new StringBuilder();
+        if (scanHold) {
+            out.append("sticker screen has the radio ")
+                    .append((SystemClock.elapsedRealtime() - scanHoldAt) / 1000).append("s; ");
+        }
+        if (radioOff) {
+            out.append("bluetooth off; ");
+        }
+        if (!PROBING.isEmpty()) {
+            out.append("setup connect ").append(PROBING).append("; ");
+        }
+        for (Link link : LINKS.values()) {
+            if (link.phase != Phase.IDLE) {
+                out.append("link ").append(link.mac).append(' ').append(link.phase).append("; ");
+            }
+        }
+        return out.toString();
+    }
+
+    /** A sticker screen forgot to give the radio back: take it back after this long. */
+    private static final long HOLD_MAX_MS = 120_000L;
+    /** A setup connect that is still going after this long is abandoned. */
+    private static final long PROBE_MAX_MS = 60_000L;
+    private static long scanHoldAt;
+    private static String lastBeaconWhy = "";
+    private static final Map<String, Long> PROBE_AT = new HashMap<>();
+
+    private static final Runnable HOLD_EXPIRE = () -> {
+        if (scanHold && SystemClock.elapsedRealtime() - scanHoldAt >= HOLD_MAX_MS) {
+            scanHold = false;
+            trace("scan hold expired after " + HOLD_MAX_MS / 1000 + "s: listening again");
+            reconcile();
+        }
+    };
+
+    /** Drop setup connects that have been running too long (audit, every 20 s). */
+    private static void expireProbes() {
+        long now = SystemClock.elapsedRealtime();
+        for (String mac : new ArrayList<>(PROBING)) {
+            Long at = PROBE_AT.get(mac);
+            if (at == null || now - at >= PROBE_MAX_MS) {
+                PROBING.remove(mac);
+                PROBE_AT.remove(mac);
+                if (mac.equals(priority)) {
+                    priority = "";
+                }
+                trace("setup connect " + mac + " given up after " + PROBE_MAX_MS / 1000 + "s");
+            }
+        }
+    }
+
+    /**
+     * The user tapped the BLE label: drop anything holding the radio and start listening fresh.
+     * Recovers every stuck state without quitting the app.
+     */
+    public static void restartListening(Context context) {
+        if (context == null) {
+            return;
+        }
+        Context application = context.getApplicationContext();
+        G.post(() -> {
+            attach(application);
+            trace("restart listening (tapped BLE)");
+            scanHold = false;
+            G.removeCallbacks(HOLD_EXPIRE);
+            PROBING.clear();
+            PROBE_AT.clear();
+            priority = "";
+            for (String mac : new ArrayList<>(LINKS.keySet())) {
+                teardown(LINKS.remove(mac), false, true);
+            }
+            BluetoothAdapter adapter = adapter(application);
+            radioOff = adapter == null || !adapter.isEnabled();
+            lastBeaconWhy = "";
+            reconcile();
+            StickerBeacon.forceRestart();
+        });
+    }
+
     private static boolean beaconAllowed() {
         if (scanHold || radioOff || !PROBING.isEmpty()) {
             return false;
@@ -720,6 +814,7 @@ public final class StickerHub {
             priority = "";
         }
         PROBING.remove(link.mac);
+        PROBE_AT.remove(link.mac);
         // Setup is done: let the screen save it, then drop the link and read broadcasts.
         G.postDelayed(StickerHub::reconcile, 1500);
         link.readyAt = SystemClock.elapsedRealtime();
@@ -759,8 +854,9 @@ public final class StickerHub {
         if (probing || StickerRecover.reportFailure(link.attempt)) {
             report(link.mac, reason, status);
         }
-        // An unsaved sticker the user tapped gets three tries, then stops.
-        if (probing && link.attempt >= 3 && !saved(link.mac)) {
+        // A sticker the user tapped Connect on gets three tries, then stops. Saved ones too:
+        // a probe that never ended kept the broadcast listening off (BLE grey) until restart.
+        if (probing && link.attempt >= 3) {
             PROBING.remove(link.mac);
             LINKS.remove(link.mac);
             if (link.mac.equals(priority)) {

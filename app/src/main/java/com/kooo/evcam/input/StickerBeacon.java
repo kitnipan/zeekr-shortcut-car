@@ -133,6 +133,22 @@ final class StickerBeacon {
         notifyStatus();
     }
 
+    /** The user asked for a fresh start (tapped BLE): new scan now, failures forgotten. */
+    static void forceRestart() {
+        MAIN.post(() -> {
+            failures = 0;
+            MAIN.removeCallbacks(RETRY);
+            if (!wantOn) {
+                notifyStatus();
+                return;
+            }
+            stop(null);
+            startedAt = 0;
+            start();
+            notifyStatus();
+        });
+    }
+
     private static void applyScan() {
         if (!wantOn) {
             stop("off");

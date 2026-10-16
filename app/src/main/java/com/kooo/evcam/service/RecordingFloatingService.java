@@ -528,7 +528,13 @@ public class RecordingFloatingService extends Service {
         label.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         label.setTextColor(ContextCompat.getColor(this, color));
         label.setContentDescription(getString(what));
-        label.setPadding(0, 0, gap, gap);
+        label.setPadding(gap, gap, gap, gap);
+        // Tap to start listening again from scratch, instead of quitting the app.
+        label.setOnClickListener(v -> {
+            StickerHub.restartListening(this);
+            android.widget.Toast.makeText(this, R.string.sticker_ble_restarting,
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
         return label;
     }
 

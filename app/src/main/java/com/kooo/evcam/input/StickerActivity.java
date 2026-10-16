@@ -189,6 +189,9 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
     protected void onPause() {
         handler.removeCallbacks(rssiPoll);
         stopScan();
+        // Always give the radio back, even if the scan already ended: a forgotten hold kept the
+        // sticker listening off (BLE grey) until the app was restarted.
+        StickerHub.holdForScan(this, false);
         StickerHub.setCapture(false);
         StickerHub.setScanStop(null);
         StickerHub.removeWatch(this);

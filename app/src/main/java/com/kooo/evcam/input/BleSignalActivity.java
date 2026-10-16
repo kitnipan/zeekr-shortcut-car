@@ -104,14 +104,11 @@ public class BleSignalActivity extends AppCompatActivity {
                 haltScan();
                 // Code 2 (registration failed) is usually transient on this head unit: try again
                 // a few times before showing the error, and give the radio back in between.
-                if (scanRetries < MAX_SCAN_RETRIES) {
+                if (resumed && scanRetries < MAX_SCAN_RETRIES) {
                     scanRetries++;
                     status.setText(getString(R.string.sticker_fail, errorCode));
-                    handler.postDelayed(() -> {
-                        if (!isFinishing() && !scanning) {
-                            startScan();
-                        }
-                    }, SCAN_RETRY_MS);
+                    handler.removeCallbacks(retryScan);
+                    handler.postDelayed(retryScan, SCAN_RETRY_MS);
                     return;
                 }
                 StickerHub.holdForScan(BleSignalActivity.this, false);
@@ -137,9 +134,18 @@ public class BleSignalActivity extends AppCompatActivity {
         });
     }
 
+    /** Retries run only while the screen is in front; leaving always gives the radio back. */
+    private boolean resumed;
+    private final Runnable retryScan = () -> {
+        if (resumed && !isFinishing() && !scanning) {
+            startScan();
+        }
+    };
+
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
         StickerHub.setScanStop(this::stopScan);
         if (!scanning && ensurePermission()) {
             startScan();
@@ -148,7 +154,12 @@ public class BleSignalActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
+        resumed = false;
+        handler.removeCallbacks(retryScan);
         stopScan();
+        // Always: a scan that already ended (failed, between retries) left the hold set, and the
+        // sticker listening stayed off (BLE grey) until the app was restarted.
+        StickerHub.holdForScan(this, false);
         StickerHub.setScanStop(null);
         super.onPause();
     }
