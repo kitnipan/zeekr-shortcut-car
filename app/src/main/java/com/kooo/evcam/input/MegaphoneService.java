@@ -127,12 +127,18 @@ public class MegaphoneService extends Service {
         }
     }
 
-    /** Sticker presses have no key-up, so a second press stops. */
+    /** Click-to-speak: the mic stays open until the next click, but never longer than this. */
+    static final long TOGGLE_MAX_MS = 10L * 60 * 1000;
+
+    /**
+     * Click to open, click again to close. A sticker or a click-to-speak button has no key-up
+     * and no repeats, so it must not use the hold leash (that closed the mic after 2 s).
+     */
     public static void toggle(Context context) {
-        if (up) {
+        if (isOpen()) {
             stop(context);
         } else {
-            start(context);
+            start(context, TOGGLE_MAX_MS);
         }
     }
 

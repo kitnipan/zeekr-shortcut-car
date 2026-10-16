@@ -183,6 +183,14 @@
                 android:text="@string/shortcut_action_hold_speak" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/controller_action_toggle_speak"
+                style="@style/Widget.Cam.RailSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:layout_marginEnd="8dp"
+                android:text="@string/shortcut_action_toggle_speak" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/controller_action_cabin"
                 style="@style/Widget.Cam.RailSmall"
                 android:layout_width="wrap_content"

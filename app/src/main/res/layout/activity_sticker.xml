@@ -232,6 +232,14 @@
                     android:text="@string/shortcut_action_hold_speak" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/sticker_action_toggle_speak"
+                    style="@style/Widget.Cam.RailSmall"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/shortcut_action_toggle_speak" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/sticker_action_cabin"
                     style="@style/Widget.Cam.RailSmall"
                     android:layout_width="match_parent"

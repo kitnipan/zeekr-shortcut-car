@@ -161,7 +161,8 @@ public class TapToSpeakFragment extends Fragment implements SpeakCapture.Listene
     private String buttonLabel() {
         List<Shortcut> items = ShortcutBook.parse(config.getButtonShortcuts());
         for (Shortcut item : items) {
-            if (item != null && ShortcutAction.HOLD_SPEAK.key.equals(item.action)) {
+            if (item != null && (ShortcutAction.HOLD_SPEAK.key.equals(item.action)
+                    || ShortcutAction.TOGGLE_SPEAK.key.equals(item.action))) {
                 String key = item.keyCode == 0
                         ? getString(R.string.shortcut_scan, item.scanCode)
                         : KeyEvent.keyCodeToString(item.keyCode);

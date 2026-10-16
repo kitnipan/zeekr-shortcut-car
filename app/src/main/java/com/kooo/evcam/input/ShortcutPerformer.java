@@ -61,6 +61,9 @@ public final class ShortcutPerformer {
                 com.kooo.evcam.storage.AutoLock.get().lockFromShortcut(context);
                 return;
             case HOLD_SPEAK:
+                // Only a press with no key-up reaches here (a sticker): holding is impossible,
+                // so it behaves like click-to-speak. Held keys are handled in ShortcutKeys.
+            case TOGGLE_SPEAK:
                 MegaphoneService.toggle(context);
                 return;
             case CABIN_PASSENGER:

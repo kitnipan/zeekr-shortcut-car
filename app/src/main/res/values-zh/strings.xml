@@ -194,6 +194,7 @@
     <string name="shortcut_action_save">保存这一刻</string>
     <string name="shortcut_action_lock_save">锁定并保存</string>
     <string name="shortcut_action_hold_speak">按住对外喊话</string>
+    <string name="shortcut_action_toggle_speak">点按对外喊话（再点停止）</string>
     <string name="megaphone_channel">按住喊话</string>
     <string name="megaphone_speaking">正在对外喊话</string>
     <string name="megaphone_release">松开按钮即停止</string>
