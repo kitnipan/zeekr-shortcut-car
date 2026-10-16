@@ -451,7 +451,9 @@ public final class StickerHub {
             fail(link, FAIL_GATT, -1);
             return;
         }
-        log("dial " + link.mac + " try " + (link.attempt + 1));
+        if (link.attempt < 3 || link.attempt % 20 == 0) {
+            log("dial " + link.mac + " try " + (link.attempt + 1));
+        }
         arm(link, StickerRecover.CONNECT_TIMEOUT_MS, FAIL_TIMEOUT);
     }
 
@@ -633,11 +635,15 @@ public final class StickerHub {
 
     /** A dial, discovery or subscribe that went wrong: tear down, back off, try again. */
     private static void fail(Link link, int reason, int status) {
-        teardown(link, StickerRecover.refreshCache(status) || reason == FAIL_TIMEOUT, true);
+        // Timeouts are the sticker asleep, not a bad cache: keep the cache so reconnect is quick.
+        teardown(link, StickerRecover.refreshCache(status), true);
         link.attempt++;
         link.dueAt = SystemClock.elapsedRealtime() + StickerRecover.backoffMs(link.attempt);
-        AppLog.w(TAG, "sticker " + link.mac + " fail reason=" + reason + " status=" + status
-                + " try=" + link.attempt);
+        // Every ~3 s while asleep; log only now and then.
+        if (link.attempt <= 3 || link.attempt % 20 == 0) {
+            AppLog.w(TAG, "sticker " + link.mac + " fail reason=" + reason + " status=" + status
+                    + " try=" + link.attempt);
+        }
         boolean probing = PROBING.contains(link.mac);
         if (probing || StickerRecover.reportFailure(link.attempt)) {
             report(link.mac, reason, status);

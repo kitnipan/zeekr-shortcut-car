@@ -29,25 +29,24 @@ public final class StickerRecover {
     /** Safety net: anything wanted and idle gets a dial at least this often. */
     public static final long AUDIT_MS = 20_000L;
 
-    private static final long[] BACKOFF_MS = {400L, 1_000L, 2_000L, 4_000L, 8_000L, 15_000L};
+    /**
+     * Gap between dials. The sticker sleeps its radio and only advertises for a moment when
+     * pressed, and autoConnect does not work here, so a direct dial has to be pending nearly
+     * all the time to catch that advert. A long backoff made a dropped sticker look dead.
+     */
+    public static final long REDIAL_GAP_MS = 300L;
 
     private StickerRecover() {
     }
 
-    /**
-     * Wait before dial number {@code attempt + 1}. Attempt 0 is a fresh drop: dial while the
-     * sticker is still advertising. It never gives up; a saved sticker is always wanted.
-     */
+    /** Wait before the next dial. Same short gap every time; it never gives up. */
     public static long backoffMs(int attempt) {
-        if (attempt < 0) {
-            return BACKOFF_MS[0];
-        }
-        return BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
+        return REDIAL_GAP_MS;
     }
 
-    /** Tell the user after this many failures in a row (and every this-many after). */
+    /** Tell the user once after three misses in a row, then about every few minutes. */
     public static boolean reportFailure(int attempt) {
-        return attempt > 0 && attempt % 3 == 0;
+        return attempt == 3 || (attempt > 0 && attempt % 30 == 0);
     }
 
     /** Status 133 / 62: stale GATT cache. Clear it before redialling. */
@@ -55,9 +54,12 @@ public final class StickerRecover {
         return status == 133 || status == 62;
     }
 
-    /** App in front holds the link tight. In the background the interval can relax. */
+    /**
+     * Always tight. On a relaxed interval the sticker's own timeout hangs up the link, and
+     * the user wants it up all the time, not only while the app is in front.
+     */
     public static int linkPriority(boolean appInFront) {
-        return appInFront ? PRIORITY_HIGH : PRIORITY_BALANCED;
+        return PRIORITY_HIGH;
     }
 
     /**

@@ -18,11 +18,10 @@ public class StickerRecoverTest {
     private static final String B = "AA:AA:AA:AA:AA:02";
 
     @Test
-    public void freshDropRedialsFastAndBackoffCapsButNeverStops() {
-        assertEquals(400L, StickerRecover.backoffMs(0));
-        assertTrue(StickerRecover.backoffMs(3) > StickerRecover.backoffMs(1));
-        assertEquals(15_000L, StickerRecover.backoffMs(50));
-        assertEquals(15_000L, StickerRecover.backoffMs(Integer.MAX_VALUE));
+    public void redialStaysPendingSoAPressIsCaught() {
+        assertEquals(300L, StickerRecover.backoffMs(0));
+        assertEquals(300L, StickerRecover.backoffMs(50));
+        assertTrue(StickerRecover.backoffMs(Integer.MAX_VALUE) < 1000L);
     }
 
     @Test
@@ -57,11 +56,12 @@ public class StickerRecoverTest {
     }
 
     @Test
-    public void failureIsReportedEveryThirdTry() {
+    public void failureIsReportedOnceThenRarely() {
         assertFalse(StickerRecover.reportFailure(0));
         assertFalse(StickerRecover.reportFailure(2));
         assertTrue(StickerRecover.reportFailure(3));
-        assertTrue(StickerRecover.reportFailure(6));
+        assertFalse(StickerRecover.reportFailure(6));
+        assertTrue(StickerRecover.reportFailure(30));
     }
 
     @Test
@@ -71,8 +71,8 @@ public class StickerRecoverTest {
     }
 
     @Test
-    public void openAppHoldsTheLinkTight() {
+    public void linkStaysTightInTheBackgroundToo() {
         assertEquals(StickerRecover.PRIORITY_HIGH, StickerRecover.linkPriority(true));
-        assertEquals(StickerRecover.PRIORITY_BALANCED, StickerRecover.linkPriority(false));
+        assertEquals(StickerRecover.PRIORITY_HIGH, StickerRecover.linkPriority(false));
     }
 }
