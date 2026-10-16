@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.24-beta] - 2026-10-16
+
+### New and improved
+
+- The BLE signals screen writes each smart sticker's broadcast to the sticker log, to find out whether a press on a sleeping sticker can be read straight from it.
+
 ## [2.11.23-beta] - 2026-10-16
 
 ### Fixed
