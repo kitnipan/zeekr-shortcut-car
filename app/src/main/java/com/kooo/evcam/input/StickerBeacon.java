@@ -5,7 +5,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
@@ -44,6 +43,7 @@ final class StickerBeacon {
     /** Android refuses more than five scan starts in 30 s; stay well under. */
     private static final long MIN_RESTART_MS = 8_000L;
     private static final long RETRY_MS = 5_000L;
+    private static final long REFRESH_MS = 20L * 60 * 1000;
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     /** A button not heard for this long shows as down. It advertises about once a second. */
@@ -57,6 +57,8 @@ final class StickerBeacon {
     private static BluetoothLeScanner scanner;
     private static Set<String> scanning = new HashSet<>();
     private static boolean wantOn;
+    /** A controller or shortcut screen is open: any ZEEKR_button counts, saved or not. */
+    private static boolean openToNew;
     private static Set<String> wanted = new HashSet<>();
     private static long startedAt;
     private static long lastAdvertAt;
@@ -68,13 +70,14 @@ final class StickerBeacon {
      * Run the scan for exactly these buttons, or stop it when {@code allowed} is false.
      * Safe to call often; only a change of address set restarts the scan.
      */
-    static void sync(Context context, Set<String> addresses, boolean allowed) {
+    static void sync(Context context, Set<String> addresses, boolean allowed, boolean anyButton) {
         Context application = context == null ? null : context.getApplicationContext();
         Set<String> next = new HashSet<>(addresses == null ? new HashSet<>() : addresses);
         MAIN.post(() -> {
             app = application;
             wanted = next;
-            wantOn = allowed && !next.isEmpty();
+            openToNew = anyButton;
+            wantOn = allowed && (!next.isEmpty() || anyButton);
             apply();
         });
     }
@@ -117,17 +120,15 @@ final class StickerBeacon {
         if (next == null) {
             return;
         }
-        List<ScanFilter> filters = new ArrayList<>();
-        for (String mac : wanted) {
-            filters.add(new ScanFilter.Builder().setDeviceAddress(mac).build());
-        }
+        // Unfiltered: an address filter matched nothing on this head unit (car log 2.11.26,
+        // 30 s silent while the BLE signals screen heard both buttons). seen() keeps only ours.
         ScanSettings settings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
                 .setReportDelay(0)
                 .build();
         try {
-            next.startScan(filters, settings, CALLBACK);
+            next.startScan(null, settings, CALLBACK);
         } catch (SecurityException | IllegalArgumentException | IllegalStateException e) {
             StickerHub.trace("beacon scan refused: " + e.getMessage());
             MAIN.postDelayed(StickerBeacon::apply, RETRY_MS);
@@ -142,10 +143,13 @@ final class StickerBeacon {
         StickerHub.trace("beacon scan on " + scanning);
         MAIN.removeCallbacks(CHECK);
         MAIN.postDelayed(CHECK, CHECK_MS);
+        MAIN.removeCallbacks(REFRESH);
+        MAIN.postDelayed(REFRESH, REFRESH_MS);
     }
 
     private static void stop(String why) {
         MAIN.removeCallbacks(CHECK);
+        MAIN.removeCallbacks(REFRESH);
         BluetoothLeScanner current = scanner;
         scanner = null;
         scanning = new HashSet<>();
@@ -165,6 +169,25 @@ final class StickerBeacon {
             StickerHub.trace("beacon scan " + why);
         }
     }
+
+    /**
+     * Android quietly downgrades an unfiltered scan that runs for 30 minutes. Start a fresh one
+     * before that, keeping the press counters so no press is lost or replayed across it.
+     */
+    private static final Runnable REFRESH = new Runnable() {
+        @Override
+        public void run() {
+            if (scanner == null) {
+                return;
+            }
+            Map<String, Integer> keep = new HashMap<>(LAST_CNT);
+            stop(null);
+            start();
+            if (scanner != null) {
+                LAST_CNT.putAll(keep);
+            }
+        }
+    };
 
     /** The car's scanner can go quiet without telling us; restart if nothing arrives. */
     private static final Runnable CHECK = new Runnable() {
@@ -227,14 +250,18 @@ final class StickerBeacon {
         } catch (SecurityException e) {
             return;
         }
-        if (!scanning.contains(mac)) {
+        boolean saved = scanning.contains(mac);
+        int[] shape = StickerAdverts.fields(result.getScanRecord().getBytes());
+        // An unsaved button only while a controller / shortcut screen wants to capture one;
+        // its data shape is what marks it (the name is not in every advert).
+        if (!saved && !(openToNew && shape != null)) {
             return;
         }
         lastAdvertAt = SystemClock.elapsedRealtime();
         if (HEARD.put(mac, lastAdvertAt) == null) {
             StickerHub.beaconState(mac, true);
         }
-        int[] f = StickerAdverts.fields(result.getScanRecord().getBytes());
+        int[] f = shape;
         if (f == null) {
             return;
         }

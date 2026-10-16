@@ -372,7 +372,7 @@ public final class StickerHub {
             link(mac);
         }
         Set<String> beacons = beaconed();
-        StickerBeacon.sync(app, beacons, beaconAllowed());
+        StickerBeacon.sync(app, beacons, beaconAllowed(), !WATCHES.isEmpty());
         pump();
         G.removeCallbacks(AUDIT);
         if (!wanted.isEmpty() || !beacons.isEmpty()) {
