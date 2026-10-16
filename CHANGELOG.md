@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.30-beta] - 2026-10-16
+
+### New and improved
+
+- New shortcut: click to speak outside. Click once to start, click again to stop. It stops by itself after 10 minutes.
+
+### Fixed
+
+- Hold to speak on a smart sticker stopped after 2 seconds. A sticker cannot be held, so it now works like click to speak.
+
 ## [2.11.29-beta] - 2026-10-16
 
 ### New and improved
