@@ -574,6 +574,7 @@
     <string name="remote_idle">已连接，等待手机观看</string>
     <string name="remote_email">账号 %1$s</string>
     <string name="remote_offline">未连上服务器</string>
+    <string name="remote_refresh_code">刷新二维码</string>
     <string name="nav_group_system">系统</string>
     <string name="nav_settings">设置</string>
     <string name="nav_header_subtitle">车机版环视记录仪</string>

@@ -675,6 +675,7 @@
     <string name="remote_idle">Linked. Waiting for a watch.</string>
     <string name="remote_email">Account %1$s</string>
     <string name="remote_offline">Server offline</string>
+    <string name="remote_refresh_code">Refresh code</string>
     <string name="nav_group_system">System</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_header_subtitle">Surround-view dashcam</string>

@@ -81,6 +81,18 @@ public final class CarLink {
     private Ui ui;
     private WatchListener watchListener;
 
+    /** A QR code lives 10 min on the hub; swap it before then while nobody is linked. */
+    private static final long CODE_REFRESH_MS = 8 * 60 * 1000L;
+    private final Runnable codeRefresh = new Runnable() {
+        @Override
+        public void run() {
+            if (running.get() && email.isEmpty()) {
+                refreshCode();
+            }
+            armCodeRefresh();
+        }
+    };
+
     private final Runnable reconnect = new Runnable() {
         @Override
         public void run() {
@@ -106,12 +118,35 @@ public final class CarLink {
     public void start() {
         running.set(true);
         dial();
+        armCodeRefresh();
+    }
+
+    /** Ask the hub for a new QR code. The old one stops working. */
+    public void refreshCode() {
+        WebSocket ws = socket;
+        if (ws == null) {
+            return;
+        }
+        try {
+            JSONObject msg = new JSONObject();
+            msg.put("t", "code");
+            ws.send(msg.toString());
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void armCodeRefresh() {
+        handler.removeCallbacks(codeRefresh);
+        if (running.get()) {
+            handler.postDelayed(codeRefresh, CODE_REFRESH_MS);
+        }
     }
 
     public void stop() {
         running.set(false);
         generation.incrementAndGet();
         handler.removeCallbacks(reconnect);
+        handler.removeCallbacks(codeRefresh);
         reconnectPosted.set(false);
         watching.set(false);
         WebSocket ws = socket;
@@ -248,6 +283,9 @@ public final class CarLink {
                         }
                         publish("ONLINE", j.optString("code"), email);
                         notifyWatch(wasWatching, prevSource);
+                    } else if ("code".equals(type)) {
+                        publish("ONLINE", j.optString("code"), email);
+                        handler.post(CarLink.this::armCodeRefresh);
                     } else if ("linked".equals(type)) {
                         email = j.optString("email", email);
                         publish("LINKED", "", email);

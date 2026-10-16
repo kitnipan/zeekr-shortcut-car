@@ -23,6 +23,7 @@ public class RemoteViewFragment extends Fragment {
     private TextView email;
     private TextView url;
     private ImageView qr;
+    private View refresh;
     private String shownUrl = "";
 
     @Nullable
@@ -38,6 +39,12 @@ public class RemoteViewFragment extends Fragment {
         email = view.findViewById(R.id.remote_email);
         url = view.findViewById(R.id.remote_url);
         qr = view.findViewById(R.id.remote_qr);
+        refresh = view.findViewById(R.id.btn_remote_refresh_code);
+        refresh.setOnClickListener(v -> {
+            if (getActivity() instanceof com.kooo.evcam.MainActivity) {
+                ((com.kooo.evcam.MainActivity) getActivity()).refreshRemoteCode();
+            }
+        });
         view.findViewById(R.id.btn_remote_back).setOnClickListener(v -> {
             if (getActivity() instanceof com.kooo.evcam.MainActivity) {
                 ((com.kooo.evcam.MainActivity) getActivity()).goToRecordingInterface();
@@ -66,6 +73,10 @@ public class RemoteViewFragment extends Fragment {
             email.setText(getString(R.string.remote_email, snap.email));
         }
         url.setText(snap.url == null ? "" : snap.url);
+        // Only an unlinked car shows a QR worth refreshing.
+        boolean unlinked = snap.email == null || snap.email.isEmpty();
+        refresh.setVisibility(unlinked && snap.url != null && !snap.url.isEmpty()
+                ? View.VISIBLE : View.GONE);
         if (snap.url != null && !snap.url.equals(shownUrl)) {
             shownUrl = snap.url;
             qr.setImageBitmap(shownUrl.isEmpty() ? null : QrCode.encode(shownUrl, 560));

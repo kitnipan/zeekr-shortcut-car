@@ -668,6 +668,7 @@
     <string name="remote_idle">Sudah paut. Menunggu tontonan.</string>
     <string name="remote_email">Akaun %1$s</string>
     <string name="remote_offline">Pelayan luar talian</string>
+    <string name="remote_refresh_code">Muat semula kod</string>
     <string name="nav_group_system">Sistem</string>
     <string name="nav_settings">Tetapan</string>
     <string name="nav_header_subtitle">Kamera papan pemuka pandangan sekeliling</string>

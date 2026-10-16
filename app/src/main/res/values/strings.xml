@@ -726,6 +726,7 @@
     <string name="remote_idle">Linked. Waiting for a watch.</string>
     <string name="remote_email">Account %1$s</string>
     <string name="remote_offline">Server offline</string>
+    <string name="remote_refresh_code">Refresh code</string>
 
     <!-- 关于页 -->
     <plurals name="date_group_count">
