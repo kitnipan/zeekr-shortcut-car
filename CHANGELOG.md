@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.36-beta] - 2026-10-16
+
+### New and improved
+
+- Smart stickers can be named. Tap a saved sticker's name on the sticker screen. The name is shown on the sticker screen, in the shortcut list and when the sticker connects.
+
 ## [2.11.35-beta] - 2026-10-16
 
 ### New and improved
