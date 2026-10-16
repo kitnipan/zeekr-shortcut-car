@@ -135,6 +135,14 @@
                 android:text="@string/shortcut_action_mirror" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/controller_action_mirror_hud"
+                style="@style/Widget.Cam.RailSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:layout_marginEnd="8dp"
+                android:text="@string/shortcut_action_mirror_hud" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/controller_action_both_mirrors"
                 style="@style/Widget.Cam.RailSmall"
                 android:layout_width="wrap_content"

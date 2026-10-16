@@ -111,6 +111,47 @@ public class RearViewMirrorService extends Service {
         return instance != null;
     }
 
+    /**
+     * The HUD setting changed: move the open window to the HUD or back to the centre screen.
+     * Same close-and-reopen as any new mirror window, so the camera canvas is handed over and
+     * the surround session is not rebuilt.
+     */
+    public static void applyHud(Context context) {
+        RearViewMirrorService svc = instance;
+        if (svc == null || svc.mirrorView == null) {
+            return;
+        }
+        if (svc.mirrorView.onHud() == svc.wantsHud()) {
+            return;
+        }
+        svc.mirrorView.hide();
+        svc.mirrorView = null;
+        svc.showMirror();
+    }
+
+    /** HUD wanted and present. */
+    private boolean wantsHud() {
+        return appConfig.isRearViewOnHud() && HudDisplay.find(this) != null;
+    }
+
+    /** Window context on the HUD display, or this service for the centre screen. */
+    private Context mirrorHost() {
+        if (!wantsHud()) {
+            return this;
+        }
+        android.view.Display hud = HudDisplay.find(this);
+        if (hud == null) {
+            return this;
+        }
+        try {
+            return createWindowContext(hud,
+                    android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null);
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "后视镜投抬头显示失败: " + e.getMessage());
+            return this;
+        }
+    }
+
     /** 设置页开关了按键模式之后通知正在显示的窗口。 */
     public static void applyButtonMode(Context context) {
         RearViewMirrorService svc = instance;
@@ -267,7 +308,13 @@ public class RearViewMirrorService extends Service {
         if (mirrorView != null && mirrorView.isShowing()) {
             return;
         }
-        mirrorView = new RearViewMirrorView(this, appConfig);
+        Context host = mirrorHost();
+        mirrorView = new RearViewMirrorView(host, appConfig);
+        if (host != this) {
+            android.graphics.Point size = HudDisplay.sizeOf(HudDisplay.find(this));
+            mirrorView.setHudSize(size.x, size.y);
+            AppLog.i(TAG, "后视镜投到抬头显示 " + size.x + "×" + size.y);
+        }
         // 新窗口还不知道合成流尺寸：下一次声明时照环视的尺寸交给它
         sourceSize = null;
         restoreBufferOnFrame = false;

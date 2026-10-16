@@ -29,9 +29,20 @@ public final class ShortcutPerformer {
                 return;
             case MIRROR:
                 AppConfig config = new AppConfig(context);
+                // This button means the centre screen; the HUD one has its own action.
+                if (config.isRearViewOnHud()) {
+                    config.setRearViewOnHud(false);
+                    com.kooo.evcam.zeekr.RearViewMirrorService.applyHud(context);
+                    if (config.isRearViewEnabled()) {
+                        return;
+                    }
+                }
                 if (!OverlayCoordinator.setRearViewEnabled(context, !config.isRearViewEnabled())) {
                     toast(context);
                 }
+                return;
+            case MIRROR_HUD:
+                toggleMirrorOnHud(context);
                 return;
             case BOTH_MIRRORS:
                 AppConfig both = new AppConfig(context);
@@ -77,6 +88,28 @@ public final class ShortcutPerformer {
                 return;
             default:
                 return;
+        }
+    }
+
+    /** Open the super mirror on the HUD; if it is already there, close it. */
+    private static void toggleMirrorOnHud(Context context) {
+        if (com.kooo.evcam.zeekr.HudDisplay.find(context) == null) {
+            Toast.makeText(context, R.string.msg_no_hud, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AppConfig config = new AppConfig(context);
+        if (config.isRearViewEnabled() && config.isRearViewOnHud()) {
+            config.setRearViewOnHud(false);
+            OverlayCoordinator.setRearViewEnabled(context, false);
+            return;
+        }
+        config.setRearViewOnHud(true);
+        if (config.isRearViewEnabled()) {
+            // Already open on the centre screen: move it.
+            com.kooo.evcam.zeekr.RearViewMirrorService.applyHud(context);
+        } else if (!OverlayCoordinator.setRearViewEnabled(context, true)) {
+            config.setRearViewOnHud(false);
+            toast(context);
         }
     }
 

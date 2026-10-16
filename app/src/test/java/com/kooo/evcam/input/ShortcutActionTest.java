@@ -22,6 +22,12 @@ public class ShortcutActionTest {
     }
 
     @Test
+    public void mirrorOnHudIsItsOwnStoredAction() {
+        assertEquals(ShortcutAction.MIRROR_HUD, ShortcutAction.fromKey("toggle_mirror_hud"));
+        assertEquals(ShortcutAction.MIRROR, ShortcutAction.fromKey("toggle_mirror"));
+    }
+
+    @Test
     public void clickToSpeakHasASafetyCap() {
         assertEquals(10L * 60 * 1000, MegaphoneService.TOGGLE_MAX_MS);
     }

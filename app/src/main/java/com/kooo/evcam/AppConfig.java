@@ -119,7 +119,9 @@ public class AppConfig {
     // 新键。2.11.6 的 side_popup_hud_height 默认写过 100，那一版画面更差，不能沿用。
     private static final String KEY_SIDE_POPUP_HUD_HEIGHT = "side_popup_hud_frame_height";
     private static final String KEY_SIDE_POPUP_HUD_LEFT = "side_popup_hud_left_only";  // 左右相机都贴抬头显示左沿
-    private static final String KEY_BOTH_MIRRORS_HUD = "both_mirrors_on_hud";  // 左右侧视两块都投到抬头显示
+    private static final String KEY_BOTH_MIRRORS_HUD = "both_mirrors_on_hud";
+    /** Super mirror window on the driver HUD instead of the centre screen (shortcut toggles it). */
+    private static final String KEY_REAR_VIEW_HUD = "rear_view_on_hud";  // 左右侧视两块都投到抬头显示
     private static final String KEY_BOTH_MIRRORS = "both_mirrors_enabled";  // 快捷键同时打开左右侧视
     private static final String KEY_SIDE_POPUP_MIN_SPEED = "side_popup_min_speed";  // 侧视弹窗的车速门槛 km/h
     /** 默认 30 km/h：再慢原厂自己会弹侧方小窗。 */
@@ -1764,6 +1766,14 @@ public class AppConfig {
     }
 
     /** 左右侧视快捷键把两块画面投到抬头显示。默认关，两块留在中控。 */
+    public boolean isRearViewOnHud() {
+        return prefs.getBoolean(KEY_REAR_VIEW_HUD, false);
+    }
+
+    public void setRearViewOnHud(boolean onHud) {
+        prefs.edit().putBoolean(KEY_REAR_VIEW_HUD, onHud).apply();
+    }
+
     public boolean isBothMirrorsOnHud() {
         return prefs.getBoolean(KEY_BOTH_MIRRORS_HUD, false);
     }

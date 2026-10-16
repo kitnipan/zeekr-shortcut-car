@@ -228,31 +228,73 @@ public class RearViewMirrorView extends ViewGroup {
 
     // ------------------------------------------------------------------ 窗口
 
+    /** HUD size when this window lives on the driver HUD; 0 on the centre screen. */
+    private int hudWidth;
+    private int hudHeight;
+
+    /** Put the window on the HUD: full HUD height, mirror shape kept, centred, not touchable. */
+    public void setHudSize(int width, int height) {
+        hudWidth = Math.max(0, width);
+        hudHeight = Math.max(0, height);
+    }
+
+    public boolean onHud() {
+        return hudWidth > 0 && hudHeight > 0;
+    }
+
+    /** Width and height on the HUD: the configured mirror's shape scaled to the HUD height. */
+    private int[] hudFit() {
+        float w = appConfig.getRearViewWidth(Integer.MAX_VALUE / 4);
+        float h = appConfig.getRearViewHeight(Integer.MAX_VALUE / 4);
+        float aspect = h > 0 ? w / h : 3f;
+        int height = hudHeight;
+        int width = Math.min(hudWidth, Math.round(height * aspect));
+        if (width >= hudWidth) {
+            height = Math.min(hudHeight, Math.round(hudWidth / aspect));
+        }
+        return new int[]{width, height};
+    }
+
     public void show() {
         if (attached) {
             return;
         }
         int width = appConfig.getRearViewWidth(screenWidth());
         int height = appConfig.getRearViewHeight(screenHeight());
+        if (onHud()) {
+            int[] fit = hudFit();
+            width = fit[0];
+            height = fit[1];
+        }
+        int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+        if (onHud()) {
+            // Nobody can touch the windscreen: no drag, dock or tap there.
+            flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        }
         params = new WindowManager.LayoutParams(
                 width, height,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                         ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         : WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                flags,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
 
-        int savedX = appConfig.getRearViewX();
-        int savedY = appConfig.getRearViewY();
-        if (savedX < 0 || savedY < 0) {
-            // 默认落在右上角，和车内后视镜的位置感一致
-            savedX = screenWidth() - width - 40;
-            savedY = 40;
+        if (onHud()) {
+            params.x = (hudWidth - width) / 2;
+            params.y = (hudHeight - height) / 2;
+        } else {
+            int savedX = appConfig.getRearViewX();
+            int savedY = appConfig.getRearViewY();
+            if (savedX < 0 || savedY < 0) {
+                // 默认落在右上角，和车内后视镜的位置感一致
+                savedX = screenWidth() - width - 40;
+                savedY = 40;
+            }
+            params.x = RearViewTouchModel.clampX(savedX, width, screenWidth(), PEEK_WIDTH_PX);
+            params.y = RearViewTouchModel.clampY(savedY, height, screenHeight());
         }
-        params.x = RearViewTouchModel.clampX(savedX, width, screenWidth(), PEEK_WIDTH_PX);
-        params.y = RearViewTouchModel.clampY(savedY, height, screenHeight());
 
         try {
             windowManager.addView(this, params);
@@ -449,6 +491,15 @@ public class RearViewMirrorView extends ViewGroup {
     /** 设置页改了尺寸后，直接套用到正在显示的窗口上。 */
     public void applySizeFromConfig() {
         if (params == null) {
+            return;
+        }
+        if (onHud()) {
+            int[] fit = hudFit();
+            params.width = fit[0];
+            params.height = fit[1];
+            params.x = (hudWidth - fit[0]) / 2;
+            params.y = (hudHeight - fit[1]) / 2;
+            applyLayout();
             return;
         }
         params.width = appConfig.getRearViewWidth(screenWidth());

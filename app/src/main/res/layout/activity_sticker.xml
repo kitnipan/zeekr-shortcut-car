@@ -184,6 +184,14 @@
                     android:text="@string/shortcut_action_mirror" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/sticker_action_mirror_hud"
+                    style="@style/Widget.Cam.RailSmall"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/shortcut_action_mirror_hud" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/sticker_action_both_mirrors"
                     style="@style/Widget.Cam.RailSmall"
                     android:layout_width="match_parent"

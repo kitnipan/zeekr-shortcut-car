@@ -7,6 +7,8 @@ public enum ShortcutAction {
 
     RECORD("toggle_recording", R.string.shortcut_action_record),
     MIRROR("toggle_mirror", R.string.shortcut_action_mirror),
+    /** Super mirror on the driver HUD: open there, or close it when it is already there. */
+    MIRROR_HUD("toggle_mirror_hud", R.string.shortcut_action_mirror_hud),
     BOTH_MIRRORS("toggle_both_mirrors", R.string.shortcut_action_both_mirrors),
     APP("open_app", R.string.shortcut_action_app),
     DIM("toggle_dim", R.string.shortcut_action_dim),

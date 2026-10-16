@@ -162,6 +162,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         });
         bind(R.id.sticker_action_record, ShortcutAction.RECORD);
         bind(R.id.sticker_action_mirror, ShortcutAction.MIRROR);
+        bind(R.id.sticker_action_mirror_hud, ShortcutAction.MIRROR_HUD);
         bind(R.id.sticker_action_both_mirrors, ShortcutAction.BOTH_MIRRORS);
         bind(R.id.sticker_action_app, ShortcutAction.APP);
         bind(R.id.sticker_action_dim, ShortcutAction.DIM);

@@ -96,6 +96,7 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
         bindPress(R.id.controller_press_double, PressKind.DOUBLE);
         bind(R.id.controller_action_record, ShortcutAction.RECORD);
         bind(R.id.controller_action_mirror, ShortcutAction.MIRROR);
+        bind(R.id.controller_action_mirror_hud, ShortcutAction.MIRROR_HUD);
         bind(R.id.controller_action_both_mirrors, ShortcutAction.BOTH_MIRRORS);
         bind(R.id.controller_action_app, ShortcutAction.APP);
         bind(R.id.controller_action_dim, ShortcutAction.DIM);
