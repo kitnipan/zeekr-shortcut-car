@@ -1133,6 +1133,35 @@ public final class StickerHub {
         StickerLog.line(line);
     }
 
+    /** Broadcast listening state for the float's BLE label. */
+    public static final int BEACON_OFF = 0;
+    public static final int BEACON_LISTENING = 1;
+    public static final int BEACON_RETRYING = 2;
+
+    private static final List<Runnable> BEACON_LISTENERS = new CopyOnWriteArrayList<>();
+
+    /** Main thread. */
+    public static int beaconStatus() {
+        return StickerBeacon.status();
+    }
+
+    public static void addBeaconListener(Runnable listener) {
+        if (listener != null && !BEACON_LISTENERS.contains(listener)) {
+            BEACON_LISTENERS.add(listener);
+        }
+    }
+
+    public static void removeBeaconListener(Runnable listener) {
+        BEACON_LISTENERS.remove(listener);
+    }
+
+    /** Main thread, from StickerBeacon. */
+    static void beaconStatusChanged() {
+        for (Runnable listener : BEACON_LISTENERS) {
+            listener.run();
+        }
+    }
+
     /** A press read from a broadcast. Main thread. Same path as a GATT press. */
     static void beaconPress(String address, byte[] raw) {
         for (Watch watch : WATCHES) {

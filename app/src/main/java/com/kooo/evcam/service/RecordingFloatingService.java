@@ -234,6 +234,7 @@ public class RecordingFloatingService extends Service {
         // 注册录制状态广播接收器
         registerRecordingStateReceiver();
         StickerHub.addWatch(stickerWatch);
+        StickerHub.addBeaconListener(beaconListener);
     }
 
     private void registerSizeUpdateReceiver() {
@@ -405,6 +406,7 @@ public class RecordingFloatingService extends Service {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onDestroy");
         super.onDestroy();
         StickerHub.removeWatch(stickerWatch);
+        StickerHub.removeBeaconListener(beaconListener);
         hideFloatingWindow();
 
         if (isServiceBound) {
@@ -458,6 +460,9 @@ public class RecordingFloatingService extends Service {
         StickerHub.setFloatingShown(this, false);
     }
 
+    /** Sticker listening started, stopped or began failing: repaint the BLE label. */
+    private final Runnable beaconListener = this::paintStickersLater;
+
     private void paintStickersLater() {
         if (mainHandler != null) {
             mainHandler.post(this::paintStickers);
@@ -479,6 +484,8 @@ public class RecordingFloatingService extends Service {
         float density = getResources().getDisplayMetrics().density;
         int size = Math.max(8, (int) (10 * density));
         int gap = Math.max(4, (int) (6 * density));
+        stickerDots.addView(bleLabel(gap), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         for (String address : saved) {
             boolean up = StickerHub.isUp(address);
             View dot = new View(this);
@@ -495,6 +502,34 @@ public class RecordingFloatingService extends Service {
             params.bottomMargin = gap;
             stickerDots.addView(dot, params);
         }
+    }
+
+    /**
+     * "BLE" in front of the dots: lit while the app is listening for sticker presses, grey while
+     * it is not (paused or Bluetooth off), red while listening failed and is being retried.
+     */
+    private TextView bleLabel(int gap) {
+        int status = StickerHub.beaconStatus();
+        int color;
+        int what;
+        if (status == StickerHub.BEACON_LISTENING) {
+            color = R.color.energy;
+            what = R.string.sticker_ble_listening;
+        } else if (status == StickerHub.BEACON_RETRYING) {
+            color = R.color.recording_text;
+            what = R.string.sticker_ble_retrying;
+        } else {
+            color = R.color.text_tertiary;
+            what = R.string.sticker_ble_off;
+        }
+        TextView label = new TextView(this);
+        label.setText(R.string.sticker_ble_label);
+        label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 9);
+        label.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        label.setTextColor(ContextCompat.getColor(this, color));
+        label.setContentDescription(getString(what));
+        label.setPadding(0, 0, gap, gap);
+        return label;
     }
 
     /** A press arrived from this sticker: pop its dot so the driver sees it was heard. */

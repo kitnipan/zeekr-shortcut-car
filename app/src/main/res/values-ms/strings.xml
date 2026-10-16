@@ -303,6 +303,10 @@
     <string name="sticker_discovering">Bersambung. Membaca perkhidmatan…</string>
     <string name="sticker_forget">Lupakan</string>
     <string name="sticker_connected">Bersambung</string>
+    <string name="sticker_ble_label">BLE</string>
+    <string name="sticker_ble_listening">Sedang mendengar tekanan pelekat</string>
+    <string name="sticker_ble_off">Tidak mendengar tekanan pelekat</string>
+    <string name="sticker_ble_retrying">Gagal mendengar pelekat, mencuba semula</string>
     <string name="sticker_arrived_named">%1$s · %2$s</string>
     <string name="sticker_link_off">Tidak bersambung</string>
     <string name="sticker_waiting">Tekan pelekat</string>

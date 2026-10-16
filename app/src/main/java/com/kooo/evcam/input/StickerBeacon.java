@@ -49,8 +49,8 @@ final class StickerBeacon {
     private static final long REFRESH_MS = 20L * 60 * 1000;
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    /** A button not heard for this long shows as down. It is quiet between presses. */
-    private static final long HEARD_MS = 10L * 60 * 1000;
+    /** A button not heard for this long shows as down (it broadcasts ~15 s after a press). */
+    private static final long HEARD_MS = 15_000L;
 
     private static final Map<String, Integer> LAST_CNT = new HashMap<>();
     /** Last advert time per button; read from any thread for the status dots. */
@@ -106,7 +106,34 @@ final class StickerBeacon {
         return at != null && SystemClock.elapsedRealtime() - at < HEARD_MS;
     }
 
+    private static int lastStatus = -1;
+
+    /** Listening, not listening, or failed and retrying. Main thread. */
+    static int status() {
+        if (scanner != null) {
+            return StickerHub.BEACON_LISTENING;
+        }
+        if (wantOn && failures > 0) {
+            return StickerHub.BEACON_RETRYING;
+        }
+        return StickerHub.BEACON_OFF;
+    }
+
+    /** Tell the float when listening starts, stops or starts failing. */
+    private static void notifyStatus() {
+        int now = status();
+        if (now != lastStatus) {
+            lastStatus = now;
+            StickerHub.beaconStatusChanged();
+        }
+    }
+
     private static void apply() {
+        applyScan();
+        notifyStatus();
+    }
+
+    private static void applyScan() {
         if (!wantOn) {
             stop("off");
             return;
@@ -156,6 +183,7 @@ final class StickerBeacon {
         }
         callback = fresh;
         scanner = next;
+        failures = 0;
         scanning = new HashSet<>(wanted);
         startedAt = now;
         lastAdvertAt = now;
@@ -213,6 +241,7 @@ final class StickerBeacon {
             }
             stop(null);
             start();
+            notifyStatus();
         }
     };
 
@@ -235,6 +264,7 @@ final class StickerBeacon {
                 StickerHub.trace("beacon scan silent " + SILENT_MS / 1000 + "s, restarting");
                 stop(null);
                 start();
+                notifyStatus();
                 return;
             }
             MAIN.postDelayed(this, CHECK_MS);
@@ -253,6 +283,7 @@ final class StickerBeacon {
         StickerHub.trace("beacon scan " + why + ", retry in " + wait / 1000 + "s (#" + failures + ")");
         MAIN.removeCallbacks(RETRY);
         MAIN.postDelayed(RETRY, wait);
+        notifyStatus();
     }
 
     private static ScanCallback newCallback() {
