@@ -77,11 +77,15 @@ public class BleSignalActivity extends AppCompatActivity {
     private final ScanCallback scanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
+            StickerAdverts.seen(getApplicationContext(), result);
             runOnUiThread(() -> addResult(result));
         }
 
         @Override
         public void onBatchScanResults(List<ScanResult> results) {
+            for (ScanResult result : results) {
+                StickerAdverts.seen(getApplicationContext(), result);
+            }
             runOnUiThread(() -> {
                 for (ScanResult result : results) {
                     addResult(result);
@@ -192,6 +196,7 @@ public class BleSignalActivity extends AppCompatActivity {
             return;
         }
         scanner = next;
+        StickerAdverts.start(this);
         try {
             scanner.startScan(null, new ScanSettings.Builder()
                     .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -218,6 +223,7 @@ public class BleSignalActivity extends AppCompatActivity {
         cancelClassic();
         unlistenDiscovery();
         if (scanner != null && leStarted) {
+            StickerAdverts.stop();
             try {
                 scanner.stopScan(scanCallback);
             } catch (SecurityException ignored) {
