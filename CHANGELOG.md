@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.25-beta] - 2026-10-16
+
+### New and improved
+
+- The BLE signals screen and the sticker log show only Zeekr buttons, and each line says when a button's broadcast looks like a press.
+
 ## [2.11.24-beta] - 2026-10-16
 
 ### New and improved
