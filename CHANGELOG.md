@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.39-beta] - 2026-10-17
+
+### Changed
+
+- ZEEKR smart stickers are added and used from their signal only, with no connection. Adding one takes a single tap.
+- The sticker battery level and low-battery warning are removed: the sticker only reports its battery over a connection.
+
 ## [2.11.38-beta] - 2026-10-16
 
 ### Changed
