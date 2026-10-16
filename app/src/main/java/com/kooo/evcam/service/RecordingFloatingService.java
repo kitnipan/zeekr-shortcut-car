@@ -493,7 +493,7 @@ public class RecordingFloatingService extends Service {
             dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this,
                     up ? R.color.energy : R.color.text_tertiary)));
             dot.setTag(StickerDevices.normalize(address));
-            String tail = StickerFrame.tail(StickerFrame.deviceName(address));
+            String tail = com.kooo.evcam.input.StickerNames.label(this, address);
             dot.setContentDescription(getString(up ? R.string.sticker_connected : R.string.sticker_link_off)
                     + " " + tail);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);

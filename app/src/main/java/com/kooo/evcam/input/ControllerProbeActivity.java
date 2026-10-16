@@ -198,7 +198,7 @@ public class ControllerProbeActivity extends AppCompatActivity implements Sticke
         Shortcut draft = new Shortcut(frame.control, 0, device, "", frame.press.key);
         int label = StickerFrame.controlLabel(frame.control);
         String control = label == 0 ? String.valueOf(frame.control) : getString(label);
-        offer(draft, frame.press, control + " " + StickerFrame.tail(device));
+        offer(draft, frame.press, control + " " + StickerNames.label(this, address));
     }
 
     @Override

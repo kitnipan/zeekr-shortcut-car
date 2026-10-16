@@ -589,7 +589,17 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         TextView meta = line.findViewById(R.id.sticker_meta);
         TextView action = line.findViewById(R.id.sticker_action);
         View dot = line.findViewById(R.id.sticker_dot);
-        title.setText(name == null || name.isEmpty() ? getString(R.string.sticker_unnamed) : name);
+        String alias = saved ? StickerNames.alias(this, address) : "";
+        if (!alias.isEmpty()) {
+            title.setText(alias);
+        } else {
+            title.setText(name == null || name.isEmpty() ? getString(R.string.sticker_unnamed) : name);
+        }
+        if (saved) {
+            // Tap the name to give this sticker its own name.
+            title.setOnClickListener(v -> rename(address));
+            title.setContentDescription(getString(R.string.sticker_rename_hint_a11y, title.getText()));
+        }
         String detail = rssi == null ? address : getString(R.string.sticker_device_meta, address, rssi);
         boolean up = saved && StickerHub.isUp(address);
         if (saved) {
@@ -620,6 +630,31 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         devices.addView(line);
     }
 
+    /** Name this sticker. Blank (or Clear) goes back to the address tail. */
+    private void rename(String address) {
+        android.widget.EditText input = com.kooo.evcam.ui.CamDialogs.input(this);
+        input.setSingleLine(true);
+        input.setFilters(new android.text.InputFilter[]{
+                new android.text.InputFilter.LengthFilter(StickerNames.MAX_LENGTH)});
+        input.setHint(R.string.sticker_rename_hint);
+        input.setText(StickerNames.alias(this, address));
+        input.setSelection(input.getText().length());
+        com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(
+                this, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(getString(R.string.sticker_rename_title,
+                        StickerFrame.tail(StickerFrame.deviceName(address))))
+                .setView(input)
+                .setPositiveButton(R.string.sticker_rename_save, (dialog, which) -> {
+                    StickerNames.setAlias(this, address, input.getText().toString());
+                    render();
+                })
+                .setNeutralButton(R.string.sticker_rename_clear, (dialog, which) -> {
+                    StickerNames.setAlias(this, address, "");
+                    render();
+                })
+                .setNegativeButton(android.R.string.cancel, null));
+    }
+
     private void forget(String address) {
         String deviceName = StickerFrame.deviceName(address);
         List<Shortcut> kept = new ArrayList<>();
@@ -632,6 +667,7 @@ public class StickerActivity extends AppCompatActivity implements StickerHub.Wat
         config.setStickerDevices(StickerDevices.write(
                 StickerDevices.remove(StickerDevices.parse(config.getStickerDevices()), address)));
         StickerHub.disconnect(address);
+        StickerNames.setAlias(this, address, "");
         render();
     }
 

@@ -105,6 +105,10 @@ final class StickerArrived {
     }
 
     private static String which(Context context, String address) {
+        String alias = StickerNames.alias(context, address);
+        if (!alias.isEmpty()) {
+            return alias;
+        }
         String tail = StickerFrame.tail(StickerFrame.deviceName(address));
         String name = name(context, address);
         if (name.isEmpty()) {

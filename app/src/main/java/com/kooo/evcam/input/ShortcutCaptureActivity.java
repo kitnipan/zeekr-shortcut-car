@@ -184,7 +184,8 @@ public class ShortcutCaptureActivity extends AppCompatActivity implements Sticke
         highlightPress();
         int label = StickerFrame.controlLabel(frame.control);
         String control = label == 0 ? String.valueOf(frame.control) : getString(label);
-        prompt.setText(getString(R.string.shortcut_picked, control + " " + StickerFrame.tail(device)));
+        prompt.setText(getString(R.string.shortcut_picked,
+                control + " " + StickerNames.label(this, StickerFrame.address(device))));
         pressKinds.setVisibility(View.VISIBLE);
         actions.setVisibility(View.VISIBLE);
     }

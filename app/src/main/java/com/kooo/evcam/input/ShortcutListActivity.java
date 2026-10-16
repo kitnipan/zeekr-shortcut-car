@@ -85,7 +85,7 @@ public class ShortcutListActivity extends AppCompatActivity {
         if (StickerFrame.isSticker(item.deviceName)) {
             int label = StickerFrame.controlLabel(item.keyCode);
             String control = label == 0 ? String.valueOf(item.keyCode) : getString(label);
-            String tail = StickerFrame.tail(item.deviceName);
+            String tail = StickerNames.label(this, StickerFrame.address(item.deviceName));
             return tail.isEmpty() ? control : control + " " + tail;
         }
         if (item.keyCode != 0) {
