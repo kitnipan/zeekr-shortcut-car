@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.27-beta] - 2026-10-16
+
+### Fixed
+
+- Smart sticker presses now reach shortcuts, the controller screen and the shortcut button screen. In 2.11.26 the app listened for the stickers in a way this car does not support, so no press arrived.
+
 ## [2.11.26-beta] - 2026-10-16
 
 ### Fixed
