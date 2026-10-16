@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.18-beta] - 2026-10-16
+
+### New and improved
+
+- Car Link code can be refreshed. While no account is linked, the car replaces an expiring code on its own, and Refresh code asks for a new one right away.
+
 ## [2.11.17-beta] - 2026-10-16
 
 ### Fixed
