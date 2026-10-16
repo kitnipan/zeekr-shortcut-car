@@ -79,6 +79,7 @@ public final class FisheyeGlPipe {
             0.5f, 0.5f, 0.5f, 0.5f,
     };
     private static final int MAX_LANES = 4;
+    private static final int EGL_RECORDABLE_ANDROID = 0x3142;
 
     private static final String VERTEX_SHADER =
             "attribute vec2 aPosition;\n" +
@@ -257,6 +258,22 @@ public final class FisheyeGlPipe {
     private final SimpleDateFormat stampClock =
             new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
     private SurfaceTexture input;
+    private EGLConfig eglConfig;
+
+    /**
+     * Remote-watch tap: a second output (an encoder's input Surface) drawn from the same
+     * camera texture, with its own layout and always defished. GL thread only.
+     */
+    private Surface tapTarget;
+    private EGLSurface tapSurface = EGL14.EGL_NO_SURFACE;
+    private float[] tapLanes = new float[MAX_LANES * 4];
+    private float[] tapSources = new float[MAX_LANES * 4];
+    private int tapCount;
+    private float tapAspect = 1f;
+    private Correction tapCorrection = new Correction(true, 0f, 1f, 1f);
+    private long tapMinNs;
+    private long tapLastNs = Long.MIN_VALUE;
+    private final int[] tapSize = new int[2];
     private final float[] texMatrix = new float[16];
     private final int[] size = new int[2];
     private FloatBuffer quad;
@@ -507,6 +524,78 @@ public final class FisheyeGlPipe {
         });
     }
 
+    /**
+     * Also draw every camera frame (at most {@code maxFps}) into {@code target}, laid out by
+     * {@code outLanes} and read from {@code srcLanes} (x, y, w, h, normalised). The tap is
+     * always defished with the given lens settings, whatever the screen does.
+     * Replaces any previous tap. Waits until the GL thread took it.
+     *
+     * @return false when the target could not be bound (EGL refused it)
+     */
+    public boolean setTap(Surface target, float[] outLanes, float[] srcLanes, float cellAspect,
+                          float fovDegrees, String projection, int maxFps) {
+        if (released || target == null) {
+            return false;
+        }
+        final float[] out = Arrays.copyOf(outLanes, MAX_LANES * 4);
+        final float[] src = Arrays.copyOf(srcLanes, MAX_LANES * 4);
+        final int count = Math.min(MAX_LANES, outLanes.length / 4);
+        final Correction c = new Correction(true,
+                FisheyeProjection.shaderProjectionCode(projection),
+                FisheyeProjection.shaderParameter(fovDegrees, projection), 1f);
+        final long minNs = maxFps > 0 ? 1_000_000_000L / maxFps - 2_000_000L : 0L;
+        boolean[] ok = new boolean[1];
+        CountDownLatch done = new CountDownLatch(1);
+        handler.post(() -> {
+            try {
+                if (target != tapTarget) {
+                    destroyTapSurface();
+                    tapSurface = EGL14.eglCreateWindowSurface(display, eglConfig, target,
+                            new int[]{EGL14.EGL_NONE}, 0);
+                    if (tapSurface == EGL14.EGL_NO_SURFACE) {
+                        AppLog.w(TAG, name + " tap surface refused 0x"
+                                + Integer.toHexString(EGL14.eglGetError()));
+                        return;
+                    }
+                    tapTarget = target;
+                    tapLastNs = Long.MIN_VALUE;
+                }
+                tapLanes = out;
+                tapSources = src;
+                tapCount = count;
+                tapAspect = cellAspect <= 0f ? 1f : cellAspect;
+                tapCorrection = c;
+                tapMinNs = Math.max(0L, minNs);
+                ok[0] = true;
+            } finally {
+                done.countDown();
+            }
+        });
+        try {
+            done.await(START_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return ok[0];
+    }
+
+    /** Stop drawing into the tap. Waits, so the caller can release the encoder right after. */
+    public void clearTap() {
+        if (released) {
+            return;
+        }
+        CountDownLatch done = new CountDownLatch(1);
+        handler.post(() -> {
+            destroyTapSurface();
+            done.countDown();
+        });
+        try {
+            done.await(START_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     /** 收掉。任何线程都能调；在别的线程上调会等它收完（最多 1 秒），免得新管线接不上同一块输出。 */
     public void release() {
         if (released) {
@@ -542,6 +631,7 @@ public final class FisheyeGlPipe {
         if (!EGL14.eglInitialize(display, version, 0, version, 1)) {
             throw new IllegalStateException("eglInitialize failed");
         }
+        // Recordable first: the remote-watch tap draws into an encoder Surface from this context.
         int[] attributes = {
                 EGL14.EGL_RED_SIZE, 8,
                 EGL14.EGL_GREEN_SIZE, 8,
@@ -549,13 +639,18 @@ public final class FisheyeGlPipe {
                 EGL14.EGL_ALPHA_SIZE, 8,
                 EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
                 EGL14.EGL_SURFACE_TYPE, EGL14.EGL_WINDOW_BIT,
+                EGL_RECORDABLE_ANDROID, 1,
                 EGL14.EGL_NONE
         };
         EGLConfig[] configs = new EGLConfig[1];
         int[] count = new int[1];
         if (!EGL14.eglChooseConfig(display, attributes, 0, configs, 0, 1, count, 0) || count[0] < 1) {
-            throw new IllegalStateException("no suitable EGL config");
+            attributes[attributes.length - 3] = EGL14.EGL_NONE;
+            if (!EGL14.eglChooseConfig(display, attributes, 0, configs, 0, 1, count, 0) || count[0] < 1) {
+                throw new IllegalStateException("no suitable EGL config");
+            }
         }
+        eglConfig = configs[0];
         context = EGL14.eglCreateContext(display, configs[0], EGL14.EGL_NO_CONTEXT,
                 new int[]{EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE}, 0);
         if (context == EGL14.EGL_NO_CONTEXT) {
@@ -638,6 +733,7 @@ public final class FisheyeGlPipe {
         if (drawLatest()) {
             presented++;
         }
+        drawTap();
     }
 
     /**
@@ -658,26 +754,8 @@ public final class FisheyeGlPipe {
         EGL14.eglQuerySurface(display, surface, EGL14.EGL_HEIGHT, size, 1);
         GLES20.glViewport(0, 0, size[0], size[1]);
 
-        Correction c = correction;
-        GLES20.glUseProgram(program);
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texture);
-        GLES20.glUniformMatrix4fv(texMatrixHandle, 1, false, texMatrix, 0);
-        GLES20.glUniform4fv(lanesHandle, MAX_LANES, lanes, 0);
-        GLES20.glUniform1f(laneCountHandle, laneCount);
-        GLES20.glUniform1f(onHandle, c.on ? 1f : 0f);
-        GLES20.glUniform1f(projectionHandle, c.projection);
-        GLES20.glUniform1f(parameterHandle, c.parameter);
-        GLES20.glUniform1f(strengthHandle, c.strength);
-        GLES20.glUniform1f(aspectHandle, cellAspect <= 0f ? 1f : cellAspect);
-        GLES20.glUniform4fv(sourcesHandle, MAX_LANES, sources != null ? sources : lanes, 0);
-        GLES20.glUniform1f(padHandle, padBar ? 1f : 0f);
-        GLES20.glUniform1f(outContentHandle, outContent);
-        GLES20.glUniform1f(srcContentHandle, srcContent);
-        GLES20.glEnableVertexAttribArray(positionHandle);
-        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quad);
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
-        GLES20.glDisableVertexAttribArray(positionHandle);
+        drawQuad(lanes, laneCount, sources != null ? sources : lanes, correction,
+                cellAspect, padBar);
         drawStamp();
 
         if (encodeTarget != null && input != null) {
@@ -690,6 +768,76 @@ public final class FisheyeGlPipe {
             return false;
         }
         return true;
+    }
+
+    private void drawQuad(float[] outLanes, int count, float[] srcLanes, Correction c,
+                          float aspect, boolean pad) {
+        GLES20.glUseProgram(program);
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texture);
+        GLES20.glUniformMatrix4fv(texMatrixHandle, 1, false, texMatrix, 0);
+        GLES20.glUniform4fv(lanesHandle, MAX_LANES, outLanes, 0);
+        GLES20.glUniform1f(laneCountHandle, count);
+        GLES20.glUniform1f(onHandle, c.on ? 1f : 0f);
+        GLES20.glUniform1f(projectionHandle, c.projection);
+        GLES20.glUniform1f(parameterHandle, c.parameter);
+        GLES20.glUniform1f(strengthHandle, c.strength);
+        GLES20.glUniform1f(aspectHandle, aspect <= 0f ? 1f : aspect);
+        GLES20.glUniform4fv(sourcesHandle, MAX_LANES, srcLanes, 0);
+        GLES20.glUniform1f(padHandle, pad ? 1f : 0f);
+        GLES20.glUniform1f(outContentHandle, outContent);
+        GLES20.glUniform1f(srcContentHandle, srcContent);
+        GLES20.glEnableVertexAttribArray(positionHandle);
+        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quad);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+        GLES20.glDisableVertexAttribArray(positionHandle);
+    }
+
+    /** Remote-watch tap: same texture, its own layout, rate-capped, then back to the screen. */
+    private void drawTap() {
+        if (tapSurface == EGL14.EGL_NO_SURFACE || input == null || frames == 0) {
+            return;
+        }
+        long ts = input.getTimestamp();
+        if (tapLastNs != Long.MIN_VALUE && ts - tapLastNs < tapMinNs && ts >= tapLastNs) {
+            return;
+        }
+        tapLastNs = ts;
+        if (!EGL14.eglMakeCurrent(display, tapSurface, tapSurface, context)) {
+            AppLog.w(TAG, name + " tap makeCurrent failed, dropping tap");
+            destroyTapSurface();
+            restoreScreen();
+            return;
+        }
+        EGL14.eglQuerySurface(display, tapSurface, EGL14.EGL_WIDTH, tapSize, 0);
+        EGL14.eglQuerySurface(display, tapSurface, EGL14.EGL_HEIGHT, tapSize, 1);
+        GLES20.glViewport(0, 0, tapSize[0], tapSize[1]);
+        GLES20.glClearColor(0f, 0f, 0f, 1f);
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+        drawQuad(tapLanes, tapCount, tapSources, tapCorrection, tapAspect, false);
+        EGLExt.eglPresentationTimeANDROID(display, tapSurface, ts);
+        if (!EGL14.eglSwapBuffers(display, tapSurface)) {
+            AppLog.w(TAG, name + " tap swap failed 0x" + Integer.toHexString(EGL14.eglGetError()));
+            destroyTapSurface();
+        }
+        restoreScreen();
+    }
+
+    private void restoreScreen() {
+        if (surface != EGL14.EGL_NO_SURFACE) {
+            EGL14.eglMakeCurrent(display, surface, surface, context);
+        }
+    }
+
+    private void destroyTapSurface() {
+        if (tapSurface != EGL14.EGL_NO_SURFACE && display != EGL14.EGL_NO_DISPLAY) {
+            EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE,
+                    EGL14.EGL_NO_CONTEXT);
+            EGL14.eglDestroySurface(display, tapSurface);
+            restoreScreen();
+        }
+        tapSurface = EGL14.EGL_NO_SURFACE;
+        tapTarget = null;
     }
 
     private void initStamp() {
@@ -834,6 +982,7 @@ public final class FisheyeGlPipe {
                     stampBitmap.recycle();
                     stampBitmap = null;
                 }
+                destroyTapSurface();
                 EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE,
                         EGL14.EGL_NO_CONTEXT);
                 if (surface != EGL14.EGL_NO_SURFACE) {

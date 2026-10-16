@@ -37,6 +37,14 @@ public final class PreviewDewarp {
     private static volatile FisheyeGlPipe pipe;
     private static volatile WeakReference<TextureView> pipeView = new WeakReference<>(null);
     private static volatile AppConfig config;
+    /**
+     * Developer option at route time: the pipe defishes what the screen shows. Off, the pipe
+     * still sits there (remote watch taps it) but copies frames through unchanged, and the
+     * four-lane container keeps its own mesh.
+     */
+    private static volatile boolean screenDewarp;
+    /** Stream lanes (x, y, w, h, normalised) of the routed composite, for the remote tap. */
+    private static volatile float[] laneRects;
     /** 拿住它：SharedPreferences 只弱引用监听器。 */
     private static SharedPreferences.OnSharedPreferenceChangeListener listener;
 
@@ -64,8 +72,20 @@ public final class PreviewDewarp {
      */
     public static boolean isActive(TextureView view) {
         FisheyeGlPipe current = pipe;
-        return view != null && current != null && current.isAlive()
+        return screenDewarp && view != null && current != null && current.isAlive()
                 && (pipeView.get() == view || current.output() == view.getSurfaceTexture());
+    }
+
+    /** The live surround pipe, dewarping on screen or not. Null when the camera is wired direct. */
+    public static FisheyeGlPipe pipe() {
+        FisheyeGlPipe current = pipe;
+        return current != null && current.isAlive() ? current : null;
+    }
+
+    /** Lane rects of the routed composite stream, stream order. Null when not routed. */
+    public static float[] laneRects() {
+        float[] rects = laneRects;
+        return rects == null ? null : rects.clone();
     }
 
     private static Surface routed(String cameraId, TextureView view, SurfaceTexture texture,
@@ -76,9 +96,8 @@ public final class PreviewDewarp {
         }
         Context context = view.getContext().getApplicationContext();
         AppConfig appConfig = new AppConfig(context);
-        if (!appConfig.isGpuFisheyePreview()) {
-            return null;
-        }
+        // Always routed: remote watch reads surround frames off this pipe, never the TextureView.
+        boolean dewarpOnScreen = appConfig.isGpuFisheyePreview();
         if (bufferSize == null) {
             AppLog.w(TAG, "预览尺寸还不知道，这一次照旧直连");
             return null;
@@ -124,6 +143,8 @@ public final class PreviewDewarp {
             pipe = started;
             pipeView = new WeakReference<>(view);
             config = appConfig;
+            screenDewarp = dewarpOnScreen;
+            laneRects = lanes.clone();
             push();
             if (listener == null) {
                 listener = appConfig.onFisheyeChanged(PreviewDewarp::push);
@@ -142,7 +163,8 @@ public final class PreviewDewarp {
                     redraw(gone);
                 });
             });
-            AppLog.i(TAG, "相机 " + cameraId + " 的预览改走 GPU 逐像素校正，" + plan.laneCount()
+            AppLog.i(TAG, "相机 " + cameraId + " 的预览改走 GPU 管线（屏幕校正 "
+                    + (dewarpOnScreen ? "开" : "关，原样拷贝") + "），" + plan.laneCount()
                     + " 路，缓冲 " + bufferSize);
             redraw(view);
             return surface;
@@ -156,8 +178,8 @@ public final class PreviewDewarp {
         if (current == null || appConfig == null) {
             return;
         }
-        current.setCorrection(appConfig.isFisheyeCorrection(), appConfig.getFisheyeFov(),
-                appConfig.getFisheyeProjection());
+        current.setCorrection(screenDewarp && appConfig.isFisheyeCorrection(),
+                appConfig.getFisheyeFov(), appConfig.getFisheyeProjection());
     }
 
     private static void releaseLocked() {

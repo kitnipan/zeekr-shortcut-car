@@ -105,6 +105,8 @@ public class MainActivity extends AppCompatActivity {
     private final com.kooo.evcam.remote.RemoteLive remoteLive = new com.kooo.evcam.remote.RemoteLive();
     private final com.kooo.evcam.remote.RemoteSnap remoteSnap = new com.kooo.evcam.remote.RemoteSnap();
     private final float[] remoteLanes = new float[16];
+    /** H.264 live watch. JPEG pump below only fills in until video packets flow. */
+    private com.kooo.evcam.remote.RemoteStream remoteStream;
     private final Runnable remotePump = new Runnable() {
         @Override
         public void run() {
@@ -1516,10 +1518,18 @@ public class MainActivity extends AppCompatActivity {
     private void startRemoteLink() {
         remoteLive.attach(this);
         carLink = new com.kooo.evcam.remote.CarLink(this);
+        remoteStream = new com.kooo.evcam.remote.RemoteStream(remoteStreamHost(), carLink);
         carLink.setWatchListener((watching, source) -> {
             remoteHandler.removeCallbacks(remotePump);
-            if (!watching) {
+            if (remoteStream == null) {
                 return;
+            }
+            if (!watching) {
+                remoteStream.stop();
+                return;
+            }
+            if (!remoteStream.start(source)) {
+                AppLog.w(TAG, "remote video unavailable, JPEG only");
             }
             // Instant switch: push cached JPEG for the requested slot, then keep pumping.
             byte[] cached = remoteLive.jpegFor(source);
@@ -1542,6 +1552,47 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         carLink.start();
+    }
+
+    private com.kooo.evcam.remote.RemoteStream.Host remoteStreamHost() {
+        return new com.kooo.evcam.remote.RemoteStream.Host() {
+            @Override
+            public android.view.TextureView surroundView() {
+                return textureFront;
+            }
+
+            @Override
+            public android.view.TextureView driverView() {
+                return textureBack;
+            }
+
+            @Override
+            public android.view.TextureView backseatView() {
+                return textureLeft;
+            }
+
+            @Override
+            public boolean copyLaneWindows(float[] out) {
+                return compositeContainer != null && compositeContainer.copyLaneWindows(out);
+            }
+
+            @Override
+            public int[] laneOrder() {
+                return compositeContainer != null
+                        ? compositeContainer.getLaneOrder()
+                        : new int[]{0, 1, 2, 3};
+            }
+
+            @Override
+            public float fisheyeFov() {
+                return appConfig.getFisheyeFov();
+            }
+
+            @Override
+            public String fisheyeProjection() {
+                return appConfig.getFisheyeProjection();
+            }
+        };
     }
 
     /**
@@ -1583,6 +1634,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void pushRemoteFrame() {
         if (carLink == null || !carLink.isWatching()) {
+            return;
+        }
+        // Video is flowing: the JPEG grab would only cost frames.
+        if (remoteStream != null && remoteStream.isRunning()
+                && remoteStream.msSinceLastPacket() < 3000L) {
             return;
         }
         if (!remoteBusy.compareAndSet(false, true)) {
@@ -3086,6 +3142,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         remoteHandler.removeCallbacks(remotePump);
+        if (remoteStream != null) {
+            remoteStream.release();
+            remoteStream = null;
+        }
         remoteCompose.shutdownNow();
         remoteLive.shutdown();
         if (carLink != null) {

@@ -164,6 +164,36 @@ public final class CarLink {
         });
     }
 
+    /** Above this much unsent uplink, video deltas are dropped until the next keyframe. */
+    private static final long VIDEO_BACKLOG_BYTES = 768 * 1024;
+    private volatile boolean videoNeedKey;
+
+    /**
+     * One H.264 packet (see {@link RemoteStream#frame}). Order matters, so nothing is
+     * coalesced; when the uplink backs up, deltas are dropped until a keyframe fits.
+     *
+     * @return false when the packet was dropped
+     */
+    public boolean pushVideo(byte[] packet, boolean key) {
+        if (!watching.get() || packet == null || packet.length == 0) {
+            return true;
+        }
+        WebSocket ws = socket;
+        if (ws == null) {
+            return true;
+        }
+        if (ws.queueSize() > VIDEO_BACKLOG_BYTES) {
+            videoNeedKey = true;
+            return false;
+        }
+        if (videoNeedKey && !key) {
+            return false;
+        }
+        videoNeedKey = false;
+        ws.send(ByteString.of(packet));
+        return true;
+    }
+
     /** Already a JPEG. Caller owns the array. */
     public void pushJpeg(byte[] jpeg) {
         if (!watching.get() || jpeg == null || jpeg.length == 0) {
