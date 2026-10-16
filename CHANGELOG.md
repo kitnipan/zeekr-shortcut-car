@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.33-beta] - 2026-10-16
+
+### New and improved
+
+- New shortcut: open or close the Super mirror on the HUD. If the Super mirror is already open on the centre screen, the shortcut moves it to the HUD. The existing Super mirror shortcut always uses the centre screen.
+
 ## [2.11.32-beta] - 2026-10-16
 
 ### New and improved
