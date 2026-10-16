@@ -304,6 +304,14 @@ public final class StickerHub {
             } else {
                 application.registerReceiver(RADIO, filter);
             }
+            IntentFilter events = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+            events.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+            events.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+            if (Build.VERSION.SDK_INT >= 33) {
+                application.registerReceiver(LINK_EVENTS, events, Context.RECEIVER_EXPORTED);
+            } else {
+                application.registerReceiver(LINK_EVENTS, events);
+            }
             receiverRegistered = true;
             BluetoothAdapter adapter = adapter(application);
             radioOff = adapter == null || !adapter.isEnabled();
@@ -542,7 +550,15 @@ public final class StickerHub {
                     fail(link, FAIL_GATT, status);
                     return;
                 }
+                if (SERVICES_LOGGED.add(mac)) {
+                    traceServices(mac, gatt);
+                }
                 List<BluetoothGattCharacteristic> notifies = findNotifies(gatt);
+                StringBuilder chosen = new StringBuilder();
+                for (BluetoothGattCharacteristic c : notifies) {
+                    chosen.append(' ').append(shortUuid(c.getUuid()));
+                }
+                trace("subscribe " + mac + ":" + chosen);
                 trace("discovered " + mac + " in " + (SystemClock.elapsedRealtime() - link.connectedAt)
                         + "ms notify=" + notifies.size());
                 if (notifies.isEmpty()) {
@@ -572,13 +588,13 @@ public final class StickerHub {
 
             @Override
             public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-                packet(mac, characteristic.getValue());
+                packet(mac, characteristic.getUuid(), characteristic.getValue());
             }
 
             @Override
             public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
                                                 byte[] value) {
-                packet(mac, value == null ? characteristic.getValue() : value);
+                packet(mac, characteristic.getUuid(), value == null ? characteristic.getValue() : value);
             }
 
             @Override
@@ -657,7 +673,8 @@ public final class StickerHub {
         PROBING.remove(link.mac);
         link.readyAt = SystemClock.elapsedRealtime();
         link.lastPressAt = 0;
-        log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms");
+        log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms bond=" + bond(link.gatt));
+        tryBond(link);
         String mac = link.mac;
         Context context = app;
         MAIN.post(() -> {
@@ -761,8 +778,18 @@ public final class StickerHub {
     private static long lastPacketAt;
 
     /** GATT thread. Duplicate notifications within 80 ms are one press. */
-    private static void packet(String address, byte[] raw) {
+    private static void packet(String address, java.util.UUID channel, byte[] raw) {
         if (raw == null) {
+            return;
+        }
+        if (BATTERY_LEVEL.equals(channel)) {
+            // Battery level, not a press. Trace it once a minute.
+            long t = SystemClock.elapsedRealtime();
+            Long last = BATTERY_LOGGED.get(address);
+            if (last == null || t - last > 60_000L) {
+                BATTERY_LOGGED.put(address, t);
+                trace("battery " + address + " " + (raw.length > 0 ? (raw[0] & 0xff) + "%" : "?"));
+            }
             return;
         }
         String key = address + " " + StickerFrame.hex(raw);
@@ -777,7 +804,7 @@ public final class StickerHub {
         if (pressed != null) {
             pressed.lastPressAt = now;
         }
-        trace("press " + key);
+        trace("press " + key + " ch=" + shortUuid(channel));
         Context context = app;
         MAIN.post(() -> {
             for (Watch watch : WATCHES) {
@@ -827,8 +854,12 @@ public final class StickerHub {
                 }
             }
         }
-        preferred.addAll(rest);
-        return preferred;
+        // Only the button channel when the sticker has it. Subscribing to its HID/battery
+        // channels too is suspected of making it hang up on an unpaired car.
+        if (!preferred.isEmpty()) {
+            return preferred;
+        }
+        return rest;
     }
 
     private static void priority(BluetoothGatt gatt) {
@@ -871,6 +902,67 @@ public final class StickerHub {
         return false;
     }
 
+    /**
+     * Experiment: an unpaired sticker hangs up about 12.5 s after connecting, on a timer.
+     * Pair once per sticker per process and see whether the drops stop.
+     */
+    private static void tryBond(Link link) {
+        if (link.gatt == null || !BOND_TRIED.add(link.mac)) {
+            return;
+        }
+        try {
+            BluetoothDevice device = link.gatt.getDevice();
+            if (device.getBondState() != BluetoothDevice.BOND_NONE) {
+                return;
+            }
+            boolean started = device.createBond();
+            trace("bond request " + link.mac + " started=" + started);
+        } catch (SecurityException e) {
+            trace("bond request " + link.mac + " denied");
+        }
+    }
+
+    /** Pairing progress and raw link drops, with the reason Android gives if any. */
+    private static final BroadcastReceiver LINK_EVENTS = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+            String mac;
+            try {
+                mac = device == null ? "" : StickerDevices.normalize(device.getAddress());
+            } catch (SecurityException e) {
+                return;
+            }
+            String action = intent.getAction();
+            G.post(() -> {
+                if (!LINKS.containsKey(mac)) {
+                    return;
+                }
+                if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                    int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
+                    int prev = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
+                    int reason = intent.getIntExtra("android.bluetooth.device.extra.REASON", -1);
+                    trace("bond " + mac + " " + bondName(prev) + " -> " + bondName(state)
+                            + (reason >= 0 ? " reason=" + reason : ""));
+                } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                    int reason = intent.getIntExtra("android.bluetooth.device.extra.REASON", -1);
+                    trace("acl down " + mac + (reason >= 0 ? " reason=" + reason : ""));
+                } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                    trace("acl up " + mac);
+                }
+            });
+        }
+    };
+
+    private static String bondName(int state) {
+        switch (state) {
+            case BluetoothDevice.BOND_BONDED: return "bonded";
+            case BluetoothDevice.BOND_BONDING: return "bonding";
+            case BluetoothDevice.BOND_NONE: return "none";
+            default: return String.valueOf(state);
+        }
+    }
+
     private static void cancelBondProcess(BluetoothDevice device) {
         try {
             device.getClass().getMethod("cancelBondProcess").invoke(device);
@@ -885,6 +977,35 @@ public final class StickerHub {
         } catch (Exception ignored) {
             // hidden API missing
         }
+    }
+
+    private static final Set<String> SERVICES_LOGGED = new HashSet<>();
+    private static final Set<String> BOND_TRIED = new HashSet<>();
+    private static final Map<String, Long> BATTERY_LOGGED = new HashMap<>();
+    private static final java.util.UUID BATTERY_LEVEL =
+            java.util.UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
+
+    /** Full GATT table once per sticker, so the trace shows what kind of device it is. */
+    private static void traceServices(String mac, BluetoothGatt gatt) {
+        List<BluetoothGattService> services = gatt.getServices();
+        if (services == null) {
+            return;
+        }
+        for (BluetoothGattService service : services) {
+            trace("  svc " + mac + " " + shortUuid(service.getUuid()));
+            for (BluetoothGattCharacteristic c : service.getCharacteristics()) {
+                trace("    chr " + shortUuid(c.getUuid()) + " props=0x" + Integer.toHexString(c.getProperties()));
+            }
+        }
+    }
+
+    /** 16-bit form for standard UUIDs (ffd2, 2a19), full string otherwise. */
+    private static String shortUuid(java.util.UUID uuid) {
+        String full = uuid.toString();
+        if (full.endsWith("-0000-1000-8000-00805f9b34fb") && full.startsWith("0000")) {
+            return full.substring(4, 8);
+        }
+        return full;
     }
 
     private static void logServices(BluetoothGatt gatt) {
