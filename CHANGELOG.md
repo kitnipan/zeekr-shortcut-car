@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.31-beta] - 2026-10-16
+
+### New and improved
+
+- Flash-to-pass instant captures are written step by step to capture-YYYYMMDD.log in the EVCam_Log folder on the USB stick, to find out why a capture is not saved.
+
 ## [2.11.30-beta] - 2026-10-16
 
 ### New and improved
