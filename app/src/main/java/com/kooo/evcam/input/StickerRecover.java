@@ -26,6 +26,8 @@ public final class StickerRecover {
     public static final long SUBSCRIBE_TIMEOUT_MS = 5_000L;
     /** Wrong device or a sticker with no button service: try again rarely. */
     public static final long NO_SERVICE_MS = 60_000L;
+    /** Read from a ready sticker this often to test whether it keeps the link alive. */
+    public static final long KEEP_ALIVE_MS = 5_000L;
     /** Safety net: anything wanted and idle gets a dial at least this often. */
     public static final long AUDIT_MS = 20_000L;
 

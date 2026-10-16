@@ -91,6 +91,8 @@ public final class StickerHub {
         long readyAt;
         long lastPressAt;
         Runnable watchdog;
+        Runnable keepAlive;
+        int keepAliveReads;
         ArrayDeque<BluetoothGattCharacteristic> subscribe;
 
         Link(String mac) {
@@ -598,6 +600,18 @@ public final class StickerHub {
             }
 
             @Override
+            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
+                                             int status) {
+                keepAliveRead(mac, gatt, status);
+            }
+
+            @Override
+            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
+                                             byte[] value, int status) {
+                keepAliveRead(mac, gatt, status);
+            }
+
+            @Override
             public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     return;
@@ -674,7 +688,7 @@ public final class StickerHub {
         link.readyAt = SystemClock.elapsedRealtime();
         link.lastPressAt = 0;
         log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms bond=" + bond(link.gatt));
-        tryBond(link);
+        armKeepAlive(link);
         String mac = link.mac;
         Context context = app;
         MAIN.post(() -> {
@@ -727,6 +741,10 @@ public final class StickerHub {
             return;
         }
         disarm(link);
+        if (link.keepAlive != null) {
+            G.removeCallbacks(link.keepAlive);
+            link.keepAlive = null;
+        }
         boolean wasUp = UP.remove(link.mac);
         BluetoothGatt gatt = link.gatt;
         link.gatt = null;
@@ -903,23 +921,65 @@ public final class StickerHub {
     }
 
     /**
-     * Experiment: an unpaired sticker hangs up about 12.5 s after connecting, on a timer.
-     * Pair once per sticker per process and see whether the drops stop.
+     * The sticker hangs up 15 s after its last button press (car log 2026-10-16). Test whether
+     * a read from the car every 5 s counts as activity and keeps the link up. The battery level
+     * is the harmless thing to read; nothing is ever written to the sticker.
      */
-    private static void tryBond(Link link) {
-        if (link.gatt == null || !BOND_TRIED.add(link.mac)) {
+    private static void armKeepAlive(Link link) {
+        if (link.keepAlive != null) {
+            G.removeCallbacks(link.keepAlive);
+        }
+        link.keepAliveReads = 0;
+        Runnable tick = new Runnable() {
+            @Override
+            public void run() {
+                if (LINKS.get(link.mac) != link || link.phase != Phase.READY || link.gatt == null) {
+                    return;
+                }
+                BluetoothGattCharacteristic level = find(link.gatt, BATTERY_LEVEL);
+                boolean sent = false;
+                if (level != null) {
+                    try {
+                        sent = link.gatt.readCharacteristic(level);
+                    } catch (SecurityException ignored) {
+                        // permission dropped
+                    }
+                }
+                if (!sent && link.keepAliveReads == 0) {
+                    trace("keepalive " + link.mac + " cannot read battery");
+                }
+                G.postDelayed(this, StickerRecover.KEEP_ALIVE_MS);
+            }
+        };
+        link.keepAlive = tick;
+        G.postDelayed(tick, StickerRecover.KEEP_ALIVE_MS);
+    }
+
+    private static void keepAliveRead(String mac, BluetoothGatt gatt, int status) {
+        Link link = LINKS.get(mac);
+        if (link == null || link.gatt != gatt) {
             return;
         }
-        try {
-            BluetoothDevice device = link.gatt.getDevice();
-            if (device.getBondState() != BluetoothDevice.BOND_NONE) {
-                return;
-            }
-            boolean started = device.createBond();
-            trace("bond request " + link.mac + " started=" + started);
-        } catch (SecurityException e) {
-            trace("bond request " + link.mac + " denied");
+        link.keepAliveReads++;
+        // First read and every 12th (~1 min): enough to see it working without flooding.
+        if (link.keepAliveReads == 1 || link.keepAliveReads % 12 == 0 || status != BluetoothGatt.GATT_SUCCESS) {
+            trace("keepalive " + mac + " read #" + link.keepAliveReads + " status=" + status
+                    + " up=" + secs(SystemClock.elapsedRealtime() - link.readyAt));
         }
+    }
+
+    private static BluetoothGattCharacteristic find(BluetoothGatt gatt, java.util.UUID uuid) {
+        List<BluetoothGattService> services = gatt.getServices();
+        if (services == null) {
+            return null;
+        }
+        for (BluetoothGattService service : services) {
+            BluetoothGattCharacteristic c = service.getCharacteristic(uuid);
+            if (c != null) {
+                return c;
+            }
+        }
+        return null;
     }
 
     /** Pairing progress and raw link drops, with the reason Android gives if any. */
@@ -980,7 +1040,6 @@ public final class StickerHub {
     }
 
     private static final Set<String> SERVICES_LOGGED = new HashSet<>();
-    private static final Set<String> BOND_TRIED = new HashSet<>();
     private static final Map<String, Long> BATTERY_LOGGED = new HashMap<>();
     private static final java.util.UUID BATTERY_LEVEL =
             java.util.UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");

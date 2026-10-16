@@ -9,6 +9,8 @@ public final class StickerMatch {
     public static final UUID SERVICE = UUID.fromString("0000ffd0-0000-1000-8000-00805f9b34fb");
     public static final UUID NOTIFY = UUID.fromString("0000ffd2-0000-1000-8000-00805f9b34fb");
     public static final UUID CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+    /** Button channel on the 07:50:… stickers (service 1820): 31 / 32 per press type. */
+    public static final UUID BUTTON = UUID.fromString("00002a60-0000-1000-8000-00805f9b34fb");
 
     /** Advertises the sticker service. */
     public static final int RANK_SERVICE = 0;
@@ -28,7 +30,7 @@ public final class StickerMatch {
         if (uuid == null) {
             return false;
         }
-        if (NOTIFY.equals(uuid)) {
+        if (NOTIFY.equals(uuid) || BUTTON.equals(uuid)) {
             return true;
         }
         return uuid.toString().toLowerCase(Locale.US).contains("ffd2");
