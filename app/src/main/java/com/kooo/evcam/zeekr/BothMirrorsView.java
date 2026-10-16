@@ -35,6 +35,17 @@ public class BothMirrorsView extends ViewGroup {
 
     private WindowManager.LayoutParams params;
     private boolean attached;
+    /** 抬头显示的整条尺寸。0 表示窗口在中控。 */
+    private int hudWidth;
+    private int hudHeight;
+    private int leftX;
+    private int leftY;
+    private int leftW;
+    private int leftH;
+    private int rightX;
+    private int rightY;
+    private int rightW;
+    private int rightH;
     private CompositeStreamGeometry.Plan plan;
     private boolean straighten;
     private int viewFov;
@@ -86,6 +97,17 @@ public class BothMirrorsView extends ViewGroup {
 
     public boolean isAttached() {
         return attached;
+    }
+
+    /** 窗口铺满抬头显示，两块画面再各自贴外沿。找不到这块屏就不要调。 */
+    public void setHudSize(int width, int height) {
+        hudWidth = Math.max(0, width);
+        hudHeight = Math.max(0, height);
+        setBackgroundColor(onHud() ? 0x00000000 : 0xFF000000);
+    }
+
+    public boolean onHud() {
+        return hudWidth > 0 && hudHeight > 0;
     }
 
     public void show() {
@@ -157,8 +179,29 @@ public class BothMirrorsView extends ViewGroup {
         }
     }
 
-    /** 两块方窗在屏幕中线相接，跟单侧弹窗同一套边长和上下位置。 */
+    /** 中控：两块方窗在屏幕中线相接。抬头显示：窗口铺满，左画面贴左沿、右画面贴右沿，中间留给原厂图形。 */
     private void place() {
+        if (onHud()) {
+            int[] left = HudFrame.place(hudWidth, hudHeight, true,
+                    appConfig.getSidePopupHudWidthPercent(), appConfig.getSidePopupHudHeightPercent());
+            int[] right = HudFrame.place(hudWidth, hudHeight, false,
+                    appConfig.getSidePopupHudWidthPercent(), appConfig.getSidePopupHudHeightPercent());
+            leftX = left[0];
+            leftY = left[1];
+            leftW = left[2];
+            leftH = left[3];
+            rightX = right[0];
+            rightY = right[1];
+            rightW = right[2];
+            rightH = right[3];
+            params.x = 0;
+            params.y = 0;
+            params.width = hudWidth;
+            params.height = hudHeight;
+            return;
+        }
+        leftX = leftY = leftW = leftH = 0;
+        rightX = rightY = rightW = rightH = 0;
         int w = getResources().getDisplayMetrics().widthPixels;
         int h = getResources().getDisplayMetrics().heightPixels;
         int size = Math.round(Math.min(h * appConfig.getSidePopupSizePercent() / 100f, w / 2f));
@@ -188,31 +231,54 @@ public class BothMirrorsView extends ViewGroup {
         if (width <= 0 || height <= 0) {
             return;
         }
+        if (onHud()) {
+            if (!hasGeometry()) {
+                coverFrame(canvas, leftX, leftY, leftW, leftH);
+                coverFrame(canvas, rightX, rightY, rightW, rightH);
+                return;
+            }
+            drawPane(canvas, LaneCycle.LEFT, leftX, leftY, leftW, leftH, width, height);
+            drawPane(canvas, LaneCycle.RIGHT, rightX, rightY, rightW, rightH, width, height);
+            return;
+        }
         if (!hasGeometry()) {
             super.dispatchDraw(canvas);
             canvas.drawColor(0xFF000000);
             return;
         }
         int pane = width / 2;
-        drawPane(canvas, LaneCycle.LEFT, 0, pane, width, height);
-        drawPane(canvas, LaneCycle.RIGHT, pane, width - pane, width, height);
+        drawPane(canvas, LaneCycle.LEFT, 0, 0, pane, height, width, height);
+        drawPane(canvas, LaneCycle.RIGHT, pane, 0, width - pane, height, width, height);
     }
 
-    private void drawPane(Canvas canvas, int side, int left, int paneW, int width, int height) {
+    /** 几何还没来：只在这一块里取帧再盖黑，中间的原厂图形露着。 */
+    private void coverFrame(Canvas canvas, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        int save = canvas.save();
+        canvas.clipRect(x, y, x + w, y + h);
+        super.dispatchDraw(canvas);
+        canvas.drawColor(0xFF000000);
+        canvas.restoreToCount(save);
+    }
+
+    private void drawPane(Canvas canvas, int side, int left, int top, int paneW, int paneH,
+                          int mapW, int mapH) {
         lane = side;
         roll = side == LaneCycle.RIGHT ? rollRight : rollLeft;
         int save = canvas.save();
-        canvas.clipRect(left, 0, left + paneW, height);
+        canvas.clipRect(left, top, left + paneW, top + paneH);
         float cx = left + paneW / 2f;
-        float cy = height / 2f;
+        float cy = top + paneH / 2f;
         canvas.scale(-1f, 1f, cx, cy);
         if (straighten) {
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
                     plan, side, RearViewGeometry.Viewport.full());
             mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
-                    r.laneOffsetX * width, r.laneOffsetY * height,
-                    r.laneScaleX * width, r.laneScaleY * height, turnedMap);
-            mesh.draw(canvas, left, 0f, paneW, height, paintTexture);
+                    r.laneOffsetX * mapW, r.laneOffsetY * mapH,
+                    r.laneScaleX * mapW, r.laneScaleY * mapH, turnedMap);
+            mesh.draw(canvas, left, top, paneW, paneH, paintTexture);
         } else {
             if (roll != 0) {
                 float rad = (float) Math.toRadians(-roll);
@@ -225,9 +291,9 @@ public class BothMirrorsView extends ViewGroup {
             int upPercent = Math.round(pitch / SideViewProjection.MAX_PITCH_DEGREES * 100f);
             RearViewGeometry.Viewport viewport = SideViewAim.viewport(side, zoomPercent, backPercent, upPercent);
             float[] rect = RearViewGeometry.combinedSourceRect(plan, side, viewport);
-            sourceRect.set(rect[0] * width, rect[1] * height,
-                    (rect[0] + rect[2]) * width, (rect[1] + rect[3]) * height);
-            destRect.set(left, 0, left + paneW, height);
+            sourceRect.set(rect[0] * mapW, rect[1] * mapH,
+                    (rect[0] + rect[2]) * mapW, (rect[1] + rect[3]) * mapH);
+            destRect.set(left, top, left + paneW, top + paneH);
             drawMatrix.setRectToRect(sourceRect, destRect, Matrix.ScaleToFit.FILL);
             canvas.clipRect(destRect);
             canvas.concat(drawMatrix);

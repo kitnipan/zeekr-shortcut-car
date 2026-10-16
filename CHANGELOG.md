@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.15-beta] - 2026-10-16
+
+### New and improved
+
+- Both side mirrors on the HUD. The both-mirrors shortcut puts the left picture on the left edge and the right picture on the right edge. Off keeps both on the centre screen.
+
 ## [2.11.14-beta] - 2026-10-16
 
 ### New and improved

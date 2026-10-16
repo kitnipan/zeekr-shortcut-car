@@ -26,6 +26,15 @@ public class HudFrameTest {
     }
 
     @Test
+    public void bothMirrorsStayOnOppositeEdges() {
+        int[] left = HudFrame.place(1440, 480, true, 40, 45);
+        int[] right = HudFrame.place(1440, 480, false, 40, 45);
+        assertEquals(8, left[0]);
+        assertEquals(1440 - 8, right[0] + right[2]);
+        assertTrue(left[0] + left[2] < right[0]);
+    }
+
+    @Test
     public void frameStaysInsideTheStrip() {
         int[] frame = HudFrame.place(WIDTH, HEIGHT, true);
         assertTrue(frame[0] >= 0);

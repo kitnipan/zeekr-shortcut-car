@@ -463,6 +463,8 @@
     <string name="set_side_popup_hud_height_summary">Tinggi gambar pada cermin depan. 45 sama seperti binaan lepas. 100 memenuhi jalur itu</string>
     <string name="set_side_popup_hud_left_title">Kedua-dua kamera di kiri</string>
     <string name="set_side_popup_hud_left_summary">Isyarat kiri dan kanan kedua-duanya letak gambar di tepi kiri. Mati: setiap kamera di tepinya sendiri</string>
+    <string name="set_both_mirrors_hud_title">Kedua-dua cermin sisi pada HUD</string>
+    <string name="set_both_mirrors_hud_summary">Pintasan kedua-dua cermin letak gambar kiri di tepi kiri dan gambar kanan di tepi kanan. Mati: kedua-duanya kekal di skrin tengah</string>
     <string name="set_side_popup_speed_title">Tunjuk mulai kelajuan (km/j)</string>
     <string name="set_side_popup_speed_summary">Di bawah kelajuan ini kereta menunjukkan paparan sisinya sendiri. 0 untuk sebarang kelajuan</string>
     <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>

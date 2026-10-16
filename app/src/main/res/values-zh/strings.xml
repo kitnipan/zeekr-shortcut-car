@@ -432,6 +432,8 @@
     <string name="set_side_popup_hud_height_summary">挡风玻璃上画面有多高。45 和上一版一样。100 顶满这条屏</string>
     <string name="set_side_popup_hud_left_title">左右相机都靠左</string>
     <string name="set_side_popup_hud_left_summary">左右转向灯的画面都贴在抬头显示左沿。关掉时各靠各的一边</string>
+    <string name="set_both_mirrors_hud_title">左右侧视投到抬头显示</string>
+    <string name="set_both_mirrors_hud_summary">左右侧视快捷键把左画面贴左沿、右画面贴右沿。关掉时两块仍在中控</string>
     <string name="set_side_popup_speed_title">从这个车速起弹（km/h）</string>
     <string name="set_side_popup_speed_summary">低于这个车速原厂会自己弹侧方小窗。0 表示任何车速都弹</string>
     <string name="msg_side_popup_on">打转向灯弹侧视已开启：打左灯看左侧、打右灯看右侧</string>

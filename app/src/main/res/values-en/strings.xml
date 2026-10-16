@@ -462,6 +462,8 @@
     <string name="set_side_popup_hud_height_summary">How tall the picture is on the windscreen. 45 matches the last build. 100 fills the strip</string>
     <string name="set_side_popup_hud_left_title">Both cameras on the left</string>
     <string name="set_side_popup_hud_left_summary">Left and right turn signals both put their picture on the left edge. Off keeps each camera on its own side</string>
+    <string name="set_both_mirrors_hud_title">Both side mirrors on the HUD</string>
+    <string name="set_both_mirrors_hud_summary">The both-mirrors shortcut puts the left picture on the left edge and the right picture on the right edge. Off keeps both on the centre screen</string>
     <string name="set_side_popup_speed_title">Show from speed (km/h)</string>
     <string name="set_side_popup_speed_summary">Below this speed the car shows its own side view. 0 shows it at any speed</string>
     <string name="msg_side_popup_on">Turn-signal side view on. Signal left or right to see that side</string>

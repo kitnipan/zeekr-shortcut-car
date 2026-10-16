@@ -3,13 +3,16 @@ package com.kooo.evcam.zeekr;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Point;
 import android.graphics.SurfaceTexture;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Size;
-import android.view.Surface;
+import android.view.Display;
 import android.view.TextureView;
+import android.view.WindowManager;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
@@ -40,6 +43,8 @@ public class BothMirrorsService extends Service {
     private SurfaceTexture boundTexture;
     private int retryCount;
     private Runnable retryRunnable;
+    private boolean hudFailed;
+    private boolean sawHudSetting;
 
     public static void start(Context context) {
         context.startService(new Intent(context, BothMirrorsService.class));
@@ -55,9 +60,18 @@ public class BothMirrorsService extends Service {
 
     public static void applyConfig() {
         BothMirrorsService svc = instance;
-        if (svc != null && svc.view != null) {
-            svc.view.applyConfig();
+        if (svc == null) {
+            return;
         }
+        svc.handler.post(() -> {
+            if (svc.view != null && svc.view.onHud() != svc.wantsHud()) {
+                svc.reattach();
+                return;
+            }
+            if (svc.view != null) {
+                svc.view.applyConfig();
+            }
+        });
     }
 
     /** 遮罩后加会盖住窗口。摘下重挂，让左右侧视回到遮罩上面。 */
@@ -113,11 +127,46 @@ public class BothMirrorsService extends Service {
         return CameraForegroundService.stickiness(this);
     }
 
+    /** 设置开着、并且找得到抬头显示时，窗口挂到那块屏。否则留在中控。 */
+    private boolean wantsHud() {
+        boolean on = appConfig.isBothMirrorsOnHud();
+        if (on != sawHudSetting) {
+            sawHudSetting = on;
+            hudFailed = false;
+        }
+        return on && !hudFailed
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                && HudDisplay.find(this) != null;
+    }
+
+    private Context hudHost() {
+        if (!wantsHud()) {
+            return this;
+        }
+        Display hud = HudDisplay.find(this);
+        if (hud == null) {
+            return this;
+        }
+        try {
+            return createWindowContext(hud, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null);
+        } catch (RuntimeException e) {
+            hudFailed = true;
+            AppLog.w(TAG, "抬头显示窗口建不了: " + e.getMessage());
+            return this;
+        }
+    }
+
     private void show() {
         if (view != null && view.isAttached()) {
             return;
         }
-        view = new BothMirrorsView(this, appConfig);
+        Context host = hudHost();
+        view = new BothMirrorsView(host, appConfig);
+        if (host != this) {
+            Point size = HudDisplay.sizeOf(HudDisplay.find(this));
+            view.setHudSize(size.x, size.y);
+            AppLog.i(TAG, "左右侧视：投到抬头显示 " + size.x + "×" + size.y);
+        }
         view.getTextureView().setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture st, int w, int h) {
