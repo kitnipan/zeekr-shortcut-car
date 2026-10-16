@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.16-beta] - 2026-10-16
+
+### New and improved
+
+- Remote watch is live video instead of still pictures. Surround channels are straightened on the car before they are sent, so the picture no longer has black, bent edges. Cabin cameras stream as video too.
+
 ## [2.11.15-beta] - 2026-10-16
 
 ### New and improved

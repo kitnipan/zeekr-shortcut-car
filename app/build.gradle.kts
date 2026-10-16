@@ -56,10 +56,10 @@ android {
         // 每次发布 tag 前同步更新这两个值：versionCode 决定能否覆盖安装，
         // versionName 会成为 Release 名称与 APK 文件名
         //
-        // 这一版是 fork：版本名用 2.11.15-beta，检查更新才认。
-        // 上游现在是 289（2.11.7-beta）。本 fork 已经发出 2.11.14-beta（324），装不上更小的号。
-        versionCode = 325
-        versionName = "2.11.15-beta"
+        // 这一版是 fork：版本名用 2.11.16-beta，检查更新才认。
+        // 上游现在是 289（2.11.7-beta）。本 fork 已经发出 2.11.15-beta（325），装不上更小的号。
+        versionCode = 326
+        versionName = "2.11.16-beta"
 
         buildConfigField("String", "DRIVE_CLIENT_ID", gradleStringLiteral(driveCredential("DRIVE_CLIENT_ID")))
         buildConfigField("String", "DRIVE_CLIENT_SECRET", gradleStringLiteral(driveCredential("DRIVE_CLIENT_SECRET")))
