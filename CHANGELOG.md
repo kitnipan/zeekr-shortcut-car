@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.38-beta] - 2026-10-16
+
+### Changed
+
+- Smart sticker code cleaned up. Nothing changes in use.
+
 ## [2.11.37-beta] - 2026-10-16
 
 ### New and improved
