@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.20-beta] - 2026-10-16
+
+### Fixed
+
+- Smart sticker test build: it listens only on the button channel and asks to pair once, to stop the link dropping every few seconds. The sticker log now shows the sticker's channels, pairing, and why a link went down.
+
 ## [2.11.19-beta] - 2026-10-16
 
 ### Fixed
