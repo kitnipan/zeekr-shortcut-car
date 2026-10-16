@@ -91,8 +91,9 @@ public final class StickerHub {
         long readyAt;
         long lastPressAt;
         Runnable watchdog;
-        Runnable keepAlive;
-        int keepAliveReads;
+        /** The sticker hung up on its own timer; its next connect means someone pressed it. */
+        boolean asleepByTimer;
+        Runnable wakePress;
         ArrayDeque<BluetoothGattCharacteristic> subscribe;
 
         Link(String mac) {
@@ -532,6 +533,9 @@ public final class StickerHub {
                             + link.phase + " newState=" + newState);
                 }
                 if (wasReady) {
+                    // Status 0 on a ready link is the sticker's own 15 s idle timer. After that it
+                    // only advertises when pressed, so its next connect is a press.
+                    link.asleepByTimer = StickerRecover.isTimerDrop(status);
                     // A live link just went: redial at once while it still advertises.
                     link.attempt = 0;
                     teardown(link, StickerRecover.refreshCache(status), true);
@@ -597,18 +601,6 @@ public final class StickerHub {
             public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
                                                 byte[] value) {
                 packet(mac, characteristic.getUuid(), value == null ? characteristic.getValue() : value);
-            }
-
-            @Override
-            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
-                                             int status) {
-                keepAliveRead(mac, gatt, status);
-            }
-
-            @Override
-            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
-                                             byte[] value, int status) {
-                keepAliveRead(mac, gatt, status);
             }
 
             @Override
@@ -688,7 +680,10 @@ public final class StickerHub {
         link.readyAt = SystemClock.elapsedRealtime();
         link.lastPressAt = 0;
         log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms bond=" + bond(link.gatt));
-        armKeepAlive(link);
+        if (link.asleepByTimer) {
+            link.asleepByTimer = false;
+            armWake(link);
+        }
         String mac = link.mac;
         Context context = app;
         MAIN.post(() -> {
@@ -741,10 +736,7 @@ public final class StickerHub {
             return;
         }
         disarm(link);
-        if (link.keepAlive != null) {
-            G.removeCallbacks(link.keepAlive);
-            link.keepAlive = null;
-        }
+        cancelWake(link);
         boolean wasUp = UP.remove(link.mac);
         BluetoothGatt gatt = link.gatt;
         link.gatt = null;
@@ -821,13 +813,49 @@ public final class StickerHub {
         Link pressed = LINKS.get(address);
         if (pressed != null) {
             pressed.lastPressAt = now;
+            if (pressed.wakePress != null) {
+                cancelWake(pressed);
+                trace("wake press came from the sticker itself " + address);
+            }
         }
         trace("press " + key + " ch=" + shortUuid(channel));
-        Context context = app;
         MAIN.post(() -> {
             for (Watch watch : WATCHES) {
                 watch.onPacket(address, raw);
             }
+        });
+        runShortcut(address, raw);
+    }
+
+    /**
+     * The press that woke a sleeping sticker is not sent: it only makes it advertise. Run its
+     * single-press shortcut once it is back, unless the real press shows up first.
+     */
+    private static void armWake(Link link) {
+        cancelWake(link);
+        Runnable fire = () -> {
+            if (LINKS.get(link.mac) != link || link.wakePress == null) {
+                return;
+            }
+            link.wakePress = null;
+            trace("wake press " + link.mac + " -> single press shortcut");
+            runShortcut(link.mac, new byte[]{0x31});
+        };
+        link.wakePress = fire;
+        G.postDelayed(fire, StickerRecover.WAKE_GRACE_MS);
+    }
+
+    private static void cancelWake(Link link) {
+        if (link.wakePress != null) {
+            G.removeCallbacks(link.wakePress);
+            link.wakePress = null;
+        }
+    }
+
+    /** Match a press against the saved shortcuts and run it. Not while a sticker screen captures. */
+    private static void runShortcut(String address, byte[] raw) {
+        Context context = app;
+        MAIN.post(() -> {
             if (capture || context == null) {
                 return;
             }
@@ -918,68 +946,6 @@ public final class StickerHub {
             }
         }
         return false;
-    }
-
-    /**
-     * The sticker hangs up 15 s after its last button press (car log 2026-10-16). Test whether
-     * a read from the car every 5 s counts as activity and keeps the link up. The battery level
-     * is the harmless thing to read; nothing is ever written to the sticker.
-     */
-    private static void armKeepAlive(Link link) {
-        if (link.keepAlive != null) {
-            G.removeCallbacks(link.keepAlive);
-        }
-        link.keepAliveReads = 0;
-        Runnable tick = new Runnable() {
-            @Override
-            public void run() {
-                if (LINKS.get(link.mac) != link || link.phase != Phase.READY || link.gatt == null) {
-                    return;
-                }
-                BluetoothGattCharacteristic level = find(link.gatt, BATTERY_LEVEL);
-                boolean sent = false;
-                if (level != null) {
-                    try {
-                        sent = link.gatt.readCharacteristic(level);
-                    } catch (SecurityException ignored) {
-                        // permission dropped
-                    }
-                }
-                if (!sent && link.keepAliveReads == 0) {
-                    trace("keepalive " + link.mac + " cannot read battery");
-                }
-                G.postDelayed(this, StickerRecover.KEEP_ALIVE_MS);
-            }
-        };
-        link.keepAlive = tick;
-        G.postDelayed(tick, StickerRecover.KEEP_ALIVE_MS);
-    }
-
-    private static void keepAliveRead(String mac, BluetoothGatt gatt, int status) {
-        Link link = LINKS.get(mac);
-        if (link == null || link.gatt != gatt) {
-            return;
-        }
-        link.keepAliveReads++;
-        // First read and every 12th (~1 min): enough to see it working without flooding.
-        if (link.keepAliveReads == 1 || link.keepAliveReads % 12 == 0 || status != BluetoothGatt.GATT_SUCCESS) {
-            trace("keepalive " + mac + " read #" + link.keepAliveReads + " status=" + status
-                    + " up=" + secs(SystemClock.elapsedRealtime() - link.readyAt));
-        }
-    }
-
-    private static BluetoothGattCharacteristic find(BluetoothGatt gatt, java.util.UUID uuid) {
-        List<BluetoothGattService> services = gatt.getServices();
-        if (services == null) {
-            return null;
-        }
-        for (BluetoothGattService service : services) {
-            BluetoothGattCharacteristic c = service.getCharacteristic(uuid);
-            if (c != null) {
-                return c;
-            }
-        }
-        return null;
     }
 
     /** Pairing progress and raw link drops, with the reason Android gives if any. */

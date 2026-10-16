@@ -65,6 +65,14 @@ public class StickerRecoverTest {
     }
 
     @Test
+    public void onlyTheIdleTimerDropMakesTheNextConnectAPress() {
+        assertTrue(StickerRecover.isTimerDrop(0));
+        assertFalse(StickerRecover.isTimerDrop(8));
+        assertFalse(StickerRecover.isTimerDrop(19));
+        assertFalse(StickerRecover.isTimerDrop(133));
+    }
+
+    @Test
     public void staleCacheStatusesClearTheCache() {
         assertTrue(StickerRecover.refreshCache(133));
         assertFalse(StickerRecover.refreshCache(8));

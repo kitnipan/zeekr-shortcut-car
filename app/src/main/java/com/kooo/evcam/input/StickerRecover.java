@@ -26,8 +26,11 @@ public final class StickerRecover {
     public static final long SUBSCRIBE_TIMEOUT_MS = 5_000L;
     /** Wrong device or a sticker with no button service: try again rarely. */
     public static final long NO_SERVICE_MS = 60_000L;
-    /** Read from a ready sticker this often to test whether it keeps the link alive. */
-    public static final long KEEP_ALIVE_MS = 5_000L;
+    /**
+     * After a sleeping sticker reconnects, wait this long for it to send the press itself
+     * before running the single-press shortcut for it.
+     */
+    public static final long WAKE_GRACE_MS = 1_500L;
     /** Safety net: anything wanted and idle gets a dial at least this often. */
     public static final long AUDIT_MS = 20_000L;
 
@@ -49,6 +52,15 @@ public final class StickerRecover {
     /** Tell the user once after three misses in a row, then about every few minutes. */
     public static boolean reportFailure(int attempt) {
         return attempt == 3 || (attempt > 0 && attempt % 30 == 0);
+    }
+
+    /**
+     * A ready link that drops with status 0 is the sticker's own idle timer (15 s after the
+     * last press, car log 2026-10-16). Signal loss (8) and errors are not: the sticker may
+     * re-advertise by itself after those, so a reconnect is not a press.
+     */
+    public static boolean isTimerDrop(int status) {
+        return status == 0;
     }
 
     /** Status 133 / 62: stale GATT cache. Clear it before redialling. */
