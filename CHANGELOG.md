@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.21-beta] - 2026-10-16
+
+### Fixed
+
+- Smart sticker test build: listens only on the button channel, no longer asks to pair, and checks in with the sticker every 5 seconds to try to keep it from hanging up 15 seconds after the last press.
+
 ## [2.11.20-beta] - 2026-10-16
 
 ### Fixed
