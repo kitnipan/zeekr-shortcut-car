@@ -90,15 +90,45 @@ final class StickerAdverts {
         return name != null && name.trim().equalsIgnoreCase(BUTTON_NAME);
     }
 
+    /** Single press (y=00) and double press (y=02), confirmed in the car 2026-10-16. */
+    static final int Y_SINGLE = 0x00;
+    static final int Y_DOUBLE = 0x02;
+
     /**
-     * The button's data rides in an AD structure typed "16-bit UUIDs" (0x02), 18 bytes:
-     * FF, X, Y, 4B 01 03 01, CNT, 04 00 00, then a 6-byte tail. CNT ticks about once a second
-     * and is the same on every button; Y is 00 normally and was seen as 02 on one button at a
-     * time, which looks like a press. Returns "cnt=AA y=00" or "" if the shape does not match.
+     * {cnt, y} from a button advert, or null when the bytes are not one. cnt is the button's
+     * own press counter: it changes once per press and stays put between presses.
      */
-    static String decode(byte[] raw) {
+    static int[] fields(byte[] raw) {
+        int at = buttonData(raw);
+        if (at < 0) {
+            return null;
+        }
+        return new int[]{raw[at + 7] & 0xFF, raw[at + 2] & 0xFF};
+    }
+
+    /**
+     * A new press when this cnt differs from the last one seen for the button. The first
+     * advert after start only sets the baseline, so nothing fires when the app opens.
+     */
+    static boolean isNewPress(Integer lastCnt, int cnt) {
+        return lastCnt != null && lastCnt != cnt;
+    }
+
+    /** The GATT-style press byte for a y value (31 single, 32 double), or null if unknown. */
+    static byte[] frameFor(int y) {
+        if (y == Y_SINGLE) {
+            return new byte[]{0x31};
+        }
+        if (y == Y_DOUBLE) {
+            return new byte[]{0x32};
+        }
+        return null;
+    }
+
+    /** Offset of the FF byte that starts the button data, or -1. */
+    private static int buttonData(byte[] raw) {
         if (raw == null) {
-            return "";
+            return -1;
         }
         int i = 0;
         while (i + 1 < raw.length) {
@@ -108,15 +138,31 @@ final class StickerAdverts {
             }
             int type = raw[i + 1] & 0xFF;
             if (type == 0x02 && len == 0x12 && i + 2 + 10 < raw.length && (raw[i + 2] & 0xFF) == 0xFF) {
-                int x = raw[i + 3] & 0xFF;
-                int y = raw[i + 4] & 0xFF;
-                int cnt = raw[i + 9] & 0xFF;
-                return String.format("cnt=%02X x=%02X y=%02X%s", cnt, x, y, y != 0 ? " PRESS?" : "");
+                return i + 2;
             }
             i += len + 1;
         }
-        return "";
+        return -1;
     }
+
+    /**
+     * The button's data rides in an AD structure typed "16-bit UUIDs" (0x02), 18 bytes:
+     * FF, X, Y, 4B 01 03 01, CNT, 04 00 00, then a 6-byte tail. CNT ticks about once a second
+     * and is the same on every button; cnt is the button's press counter and Y the
+     * press kind (00 single, 02 double). Returns "cnt=AA y=00" or "" if the shape does not match.
+     */
+    static String decode(byte[] raw) {
+        int at = buttonData(raw);
+        if (at < 0) {
+            return "";
+        }
+        int x = raw[at + 1] & 0xFF;
+        int y = raw[at + 2] & 0xFF;
+        int cnt = raw[at + 7] & 0xFF;
+        return String.format("cnt=%02X x=%02X y=%02X%s", cnt, x, y,
+                y == Y_DOUBLE ? " DOUBLE" : y == Y_SINGLE ? "" : " Y?");
+    }
+
 
     /** Advert buffers are padded with zeros to 62 bytes; drop the padding. */
     private static byte[] trim(byte[] raw) {

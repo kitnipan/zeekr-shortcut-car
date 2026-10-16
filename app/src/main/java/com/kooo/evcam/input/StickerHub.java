@@ -157,7 +157,8 @@ public final class StickerHub {
 
     /** Live GATT link, not merely a saved address. */
     public static boolean isUp(String address) {
-        return UP.contains(StickerDevices.normalize(address));
+        String mac = StickerDevices.normalize(address);
+        return UP.contains(mac) || StickerBeacon.isHeard(mac);
     }
 
     /** Connect saved stickers, drop removed ones. Safe to call often. */
@@ -227,6 +228,7 @@ public final class StickerHub {
                 for (Link link : LINKS.values()) {
                     teardown(link, false, true);
                 }
+                reconcile();
                 return;
             }
             for (Link link : LINKS.values()) {
@@ -344,6 +346,7 @@ public final class StickerHub {
                     for (Link link : LINKS.values()) {
                         teardown(link, false, true);
                     }
+                    reconcile();
                 }
             });
         }
@@ -368,9 +371,11 @@ public final class StickerHub {
         for (String mac : wanted) {
             link(mac);
         }
+        Set<String> beacons = beaconed();
+        StickerBeacon.sync(app, beacons, beaconAllowed());
         pump();
         G.removeCallbacks(AUDIT);
-        if (!wanted.isEmpty()) {
+        if (!wanted.isEmpty() || !beacons.isEmpty()) {
             G.postDelayed(AUDIT, StickerRecover.AUDIT_MS);
         }
     }
@@ -403,14 +408,33 @@ public final class StickerHub {
         if (app == null || UserExit.isExited(app)) {
             return out;
         }
-        AppConfig config = new AppConfig(app);
-        List<String> saved = StickerDevices.parse(config.getStickerDevices());
-        // Saved stickers are held for the life of the process; a sticker screen may add one.
-        if (!saved.isEmpty() || !WATCHES.isEmpty() || inFront || floating || linkWanted(config)) {
-            out.addAll(saved);
-        }
+        // Saved stickers are read from their broadcasts (StickerBeacon), never connected.
+        // A GATT link is only made while a sticker screen sets one up.
         out.addAll(PROBING);
         return out;
+    }
+
+    /** Saved stickers whose broadcasts should be read. */
+    private static Set<String> beaconed() {
+        Set<String> out = new HashSet<>();
+        if (app == null || UserExit.isExited(app)) {
+            return out;
+        }
+        out.addAll(StickerDevices.parse(new AppConfig(app).getStickerDevices()));
+        return out;
+    }
+
+    /** The broadcast scan may run only when nothing else needs the radio. */
+    private static boolean beaconAllowed() {
+        if (scanHold || radioOff || !PROBING.isEmpty()) {
+            return false;
+        }
+        for (Link link : LINKS.values()) {
+            if (link.phase != Phase.IDLE) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Dial the next due sticker if the radio is free; otherwise wake when someone is due. */
@@ -695,6 +719,8 @@ public final class StickerHub {
             priority = "";
         }
         PROBING.remove(link.mac);
+        // Setup is done: let the screen save it, then drop the link and read broadcasts.
+        G.postDelayed(StickerHub::reconcile, 1500);
         link.readyAt = SystemClock.elapsedRealtime();
         link.lastPressAt = 0;
         log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms bond=" + bond(link.gatt));
@@ -1102,8 +1128,23 @@ public final class StickerHub {
     }
 
     /** File only: too frequent for the screen, needed to read a drop back. */
-    private static void trace(String line) {
+    static void trace(String line) {
         StickerLog.line(line);
+    }
+
+    /** A press read from a broadcast. Main thread. Same path as a GATT press. */
+    static void beaconPress(String address, byte[] raw) {
+        for (Watch watch : WATCHES) {
+            watch.onPacket(address, raw);
+        }
+        runShortcut(address, raw);
+    }
+
+    /** A button started or stopped being heard on air. Main thread. */
+    static void beaconState(String address, boolean heard) {
+        for (Watch watch : WATCHES) {
+            watch.onState(address, heard);
+        }
     }
 
     private static String secs(long ms) {
