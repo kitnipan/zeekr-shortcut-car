@@ -488,23 +488,14 @@ public class RecordingFloatingService extends Service {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         for (String address : saved) {
             boolean up = StickerHub.isUp(address);
-            Integer battery = StickerHub.batteryPercent(this, address);
-            boolean low = battery != null && battery <= LOW_BATTERY_PCT;
             View dot = new View(this);
             dot.setBackgroundResource(R.drawable.sticker_dot);
-            // Low battery wins over heard / not heard: red either way, dimmer while not heard.
-            int color = low ? R.color.recording_text : up ? R.color.energy : R.color.text_tertiary;
-            dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, color)));
-            dot.setAlpha(low && !up ? 0.55f : 1f);
+            dot.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this,
+                    up ? R.color.energy : R.color.text_tertiary)));
             dot.setTag(StickerDevices.normalize(address));
             String tail = com.kooo.evcam.input.StickerNames.label(this, address);
-            String state = getString(up ? R.string.sticker_connected : R.string.sticker_link_off) + " " + tail;
-            if (low) {
-                String warning = getString(R.string.sticker_battery_low_warn, tail, battery);
-                state = state + ", " + warning;
-                warnLowBattery(address, warning);
-            }
-            dot.setContentDescription(state);
+            dot.setContentDescription(getString(up ? R.string.sticker_connected : R.string.sticker_link_off)
+                    + " " + tail);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
             params.leftMargin = gap / 2;
             params.rightMargin = gap / 2;
@@ -545,23 +536,6 @@ public class RecordingFloatingService extends Service {
                     android.widget.Toast.LENGTH_SHORT).show();
         });
         return label;
-    }
-
-    /** A sticker at or below this battery level gets a red dot and a daily reminder. */
-    private static final int LOW_BATTERY_PCT = 20;
-    private static final long LOW_BATTERY_EVERY_MS = 24L * 60 * 60 * 1000;
-    private static final java.util.Map<String, Long> LOW_WARNED = new java.util.HashMap<>();
-
-    /** Say it once a day per sticker, not on every repaint. */
-    private void warnLowBattery(String address, String warning) {
-        String mac = StickerDevices.normalize(address);
-        long now = System.currentTimeMillis();
-        Long last = LOW_WARNED.get(mac);
-        if (last != null && now - last < LOW_BATTERY_EVERY_MS) {
-            return;
-        }
-        LOW_WARNED.put(mac, now);
-        android.widget.Toast.makeText(this, warning, android.widget.Toast.LENGTH_LONG).show();
     }
 
     /** A press arrived from this sticker: pop its dot so the driver sees it was heard. */

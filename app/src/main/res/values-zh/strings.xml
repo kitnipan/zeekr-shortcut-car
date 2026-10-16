@@ -284,14 +284,12 @@
     <string name="sticker_discovering">已连接。正在读取服务…</string>
     <string name="sticker_forget">忘记</string>
     <string name="sticker_connected">已连接</string>
+    <string name="sticker_added_signal">已添加。按一下试试。</string>
     <string name="sticker_rename_title">给智能贴 %1$s 起名</string>
     <string name="sticker_rename_hint">例如：方向盘左侧</string>
     <string name="sticker_rename_save">保存</string>
     <string name="sticker_rename_clear">清除</string>
     <string name="sticker_rename_hint_a11y">%1$s，点按改名</string>
-    <string name="sticker_battery">电量 %1$d%%</string>
-    <string name="sticker_battery_low">电量低 %1$d%%</string>
-    <string name="sticker_battery_low_warn">智能贴 %1$s：电量低（%2$d%%）</string>
     <string name="sticker_ble_label">BLE</string>
     <string name="sticker_ble_listening">正在监听智能贴按键</string>
     <string name="sticker_ble_off">未监听智能贴按键</string>

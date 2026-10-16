@@ -40,10 +40,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Smart stickers: turns a press into a shortcut and owns the Bluetooth radio for them.
  *
- * <p>Saved stickers are never connected: their presses are read from their broadcasts by
- * {@link StickerBeacon}. A GATT link is made only to set a sticker up (the sticker screen's
- * Connect) and for a short battery check after a press. This class decides when the broadcast
- * scan may run (no setup link, no sticker screen holding the radio, Bluetooth on).</p>
+ * <p>ZEEKR_button stickers are never connected: they are added from their signal and their
+ * presses are read from their broadcasts by {@link StickerBeacon}. A GATT link is made only to
+ * set up another kind of button (the sticker screen's Connect). This class decides when the
+ * broadcast scan may run (no setup link, no sticker screen holding the radio, Bluetooth on).</p>
  *
  * <p>All state lives on one thread ({@code sticker-gatt}, where GATT callbacks also land).
  * One dial at a time, always direct (see {@link StickerRecover}). Every link phase has a
@@ -409,9 +409,8 @@ public final class StickerHub {
             return out;
         }
         // Saved stickers are read from their broadcasts (StickerBeacon), never connected.
-        // A GATT link is only made while a sticker screen sets one up, or for a battery check.
+        // A GATT link is only made to set up a button that is not a ZEEKR_button.
         out.addAll(PROBING);
-        out.addAll(BATTERY_CHECK);
         return out;
     }
 
@@ -508,7 +507,7 @@ public final class StickerHub {
 
     /** The broadcast scan may run only when nothing else needs the radio. */
     private static boolean beaconAllowed() {
-        if (scanHold || radioOff || !PROBING.isEmpty() || !BATTERY_CHECK.isEmpty()) {
+        if (scanHold || radioOff || !PROBING.isEmpty()) {
             return false;
         }
         for (Link link : LINKS.values()) {
@@ -701,32 +700,9 @@ public final class StickerHub {
                     pump();
                     return;
                 }
-                if (BATTERY_CHECK.contains(mac)) {
-                    // Battery check only: no button channel (a press must not also arrive here
-                    // and fire twice), read the level and let go.
-                    disarm(link);
-                    if (!readBattery(link)) {
-                        endBatteryCheck(mac, "no battery channel");
-                    } else {
-                        G.postDelayed(() -> endBatteryCheck(mac, "read timeout"), 5_000L);
-                    }
-                    return;
-                }
                 link.phase = Phase.SUBSCRIBING;
                 link.subscribe = new ArrayDeque<>(notifies);
                 subscribeNext(link);
-            }
-
-            @Override
-            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
-                                             int status) {
-                batteryRead(mac, gatt, characteristic, characteristic.getValue(), status);
-            }
-
-            @Override
-            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
-                                             byte[] value, int status) {
-                batteryRead(mac, gatt, characteristic, value, status);
             }
 
             @Override
@@ -832,7 +808,6 @@ public final class StickerHub {
         link.readyAt = SystemClock.elapsedRealtime();
         link.lastPressAt = 0;
         log("ready " + link.mac + " in " + (link.readyAt - link.lastDial) + "ms bond=" + bond(link.gatt));
-        readBattery(link);
         String mac = link.mac;
         Context context = app;
         MAIN.post(() -> {
@@ -859,10 +834,6 @@ public final class StickerHub {
         }
         trace("fail " + link.mac + " reason=" + reasonName(reason) + " status=" + status
                 + " try=" + link.attempt);
-        if (BATTERY_CHECK.contains(link.mac) && link.attempt >= 2) {
-            endBatteryCheck(link.mac, "no answer");
-            return;
-        }
         boolean probing = PROBING.contains(link.mac);
         if (probing || StickerRecover.reportFailure(link.attempt)) {
             report(link.mac, reason, status);
@@ -1172,131 +1143,11 @@ public final class StickerHub {
             watch.onPacket(address, raw);
         }
         runShortcut(address, raw);
-        maybeCheckBattery(address);
     }
 
-    // =================================================================== battery
-
-    private static final String BATTERY_PREFS = "sticker_battery";
-    /** Re-read a sticker's battery at most this often. */
-    private static final long BATTERY_EVERY_MS = 6L * 60 * 60 * 1000;
-    /** After a failed check, wait this long before trying again. */
-    private static final long BATTERY_RETRY_MS = 30L * 60 * 1000;
-    /** A whole check (dial, discover, read) is abandoned after this long. */
-    private static final long BATTERY_CHECK_MAX_MS = 20_000L;
+    /** Battery level channel: a button without a button channel notifies it; it is not a press. */
     private static final java.util.UUID BATTERY_LEVEL_UUID =
             java.util.UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
-    private static final Set<String> BATTERY_CHECK = new HashSet<>();
-    private static final Map<String, Long> BATTERY_TRIED_AT = new ConcurrentHashMap<>();
-
-    /** Last known battery percent of a saved sticker, or null. Any thread. */
-    public static Integer batteryPercent(Context context, String address) {
-        String mac = StickerDevices.normalize(address);
-        android.content.SharedPreferences prefs =
-                context.getApplicationContext().getSharedPreferences(BATTERY_PREFS, Context.MODE_PRIVATE);
-        return prefs.contains(mac) ? prefs.getInt(mac, 0) : null;
-    }
-
-    /** When that battery percent was read (wall clock ms), or 0. */
-    public static long batteryAt(Context context, String address) {
-        String mac = StickerDevices.normalize(address);
-        return context.getApplicationContext().getSharedPreferences(BATTERY_PREFS, Context.MODE_PRIVATE)
-                .getLong(mac + "@", 0L);
-    }
-
-    /**
-     * The sticker only takes a connection for a few seconds after a press, so that is when the
-     * battery can be read. Do it at most every 6 hours; listening pauses for those seconds
-     * without starting over, so a press made meanwhile still runs, a little late.
-     */
-    private static void maybeCheckBattery(String address) {
-        Context context = app;
-        if (context == null) {
-            return;
-        }
-        String mac = StickerDevices.normalize(address);
-        long now = System.currentTimeMillis();
-        if (now - batteryAt(context, mac) < BATTERY_EVERY_MS) {
-            return;
-        }
-        Long tried = BATTERY_TRIED_AT.get(mac);
-        if (tried != null && now - tried < BATTERY_RETRY_MS) {
-            return;
-        }
-        BATTERY_TRIED_AT.put(mac, now);
-        G.post(() -> {
-            if (scanHold || radioOff || !PROBING.isEmpty() || !BATTERY_CHECK.isEmpty()) {
-                return;
-            }
-            BATTERY_CHECK.add(mac);
-            Link link = link(mac);
-            link.attempt = 0;
-            // Give the broadcast scan a moment to stop: a dial during a scan never answers here.
-            link.dueAt = SystemClock.elapsedRealtime() + 400;
-            trace("battery check " + mac);
-            reconcile();
-            G.postDelayed(() -> endBatteryCheck(mac, "took too long"), BATTERY_CHECK_MAX_MS);
-        });
-    }
-
-    /** Ask the open link for its battery level. False when it has none. GATT thread. */
-    private static boolean readBattery(Link link) {
-        if (link.gatt == null) {
-            return false;
-        }
-        List<BluetoothGattService> services = link.gatt.getServices();
-        if (services == null) {
-            return false;
-        }
-        for (BluetoothGattService service : services) {
-            BluetoothGattCharacteristic level = service.getCharacteristic(BATTERY_LEVEL_UUID);
-            if (level != null) {
-                try {
-                    return link.gatt.readCharacteristic(level);
-                } catch (SecurityException e) {
-                    return false;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static void batteryRead(String mac, BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
-                                    byte[] value, int status) {
-        Link link = LINKS.get(mac);
-        if (link == null || link.gatt != gatt || !BATTERY_LEVEL_UUID.equals(characteristic.getUuid())) {
-            return;
-        }
-        if (status == BluetoothGatt.GATT_SUCCESS && value != null && value.length > 0 && app != null) {
-            int pct = Math.max(0, Math.min(100, value[0] & 0xFF));
-            app.getSharedPreferences(BATTERY_PREFS, Context.MODE_PRIVATE).edit()
-                    .putInt(mac, pct).putLong(mac + "@", System.currentTimeMillis()).apply();
-            trace("battery " + mac + " " + pct + "%");
-            MAIN.post(() -> {
-                for (Watch watch : WATCHES) {
-                    watch.onState(mac, isUp(mac));
-                }
-            });
-        } else {
-            trace("battery read " + mac + " failed status=" + status);
-        }
-        endBatteryCheck(mac, null);
-    }
-
-    /** Finish a battery check (done or failed): drop the link and listen again. GATT thread. */
-    private static void endBatteryCheck(String mac, String failure) {
-        if (!BATTERY_CHECK.remove(mac)) {
-            return;
-        }
-        if (failure != null) {
-            trace("battery check " + mac + " gave up: " + failure);
-        }
-        Link link = LINKS.remove(mac);
-        if (link != null) {
-            teardown(link, false, true);
-        }
-        reconcile();
-    }
 
     /** A button started or stopped being heard on air. Main thread. */
     static void beaconState(String address, boolean heard) {
