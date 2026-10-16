@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.19-beta] - 2026-10-16
+
+### Fixed
+
+- A smart sticker that drops comes back as soon as it is pressed, and the link stays up while the app is in the background.
+
 ## [2.11.18-beta] - 2026-10-16
 
 ### New and improved
