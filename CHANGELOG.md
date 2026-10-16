@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.34-beta] - 2026-10-16
+
+### Fixed
+
+- Smart sticker listening no longer stays off (BLE grey) until the app is restarted. If it ever does, tap BLE on the floating button to start listening again.
+
 ## [2.11.33-beta] - 2026-10-16
 
 ### New and improved
