@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.43-beta] - 2026-10-17
+
+### Fixed
+
+- Smart stickers start working again by themselves after the car's Bluetooth turns off and on, without restarting the app. Tapping BLE now does the same full restart of the sticker listener.
+
 ## [2.11.42-beta] - 2026-10-17
 
 ### Fixed
