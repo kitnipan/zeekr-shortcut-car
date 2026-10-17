@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.44-beta] - 2026-10-17
+
+### Changed
+
+- The sticker log notes when the car searches for Bluetooth devices, to find why some presses are missed.
+
 ## [2.11.43-beta] - 2026-10-17
 
 ### Fixed
