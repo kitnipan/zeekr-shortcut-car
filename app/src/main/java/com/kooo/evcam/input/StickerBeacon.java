@@ -58,10 +58,11 @@ final class StickerBeacon {
 
     private static Context app;
     private static BluetoothLeScanner scanner;
-    private static Set<String> scanning = new HashSet<>();
+    /** Saved buttons being listened for. Replaced, never mutated, so the callback can read it. */
+    private static volatile Set<String> scanning = new HashSet<>();
     private static boolean wantOn;
     /** A controller or shortcut screen is open: any ZEEKR_button counts, saved or not. */
-    private static boolean openToNew;
+    private static volatile boolean openToNew;
     /**
      * The sticker screens took the radio. Presses made there are theirs, so the next scan
      * starts from a fresh baseline instead of replaying the last one. Not after Bluetooth off:
@@ -306,6 +307,12 @@ final class StickerBeacon {
         return new ScanCallback() {
             @Override
             public void onScanResult(int callbackType, ScanResult result) {
+                // The scan is unfiltered (this car ignores filters), so every device nearby lands
+                // here, the car's own module about 10 times a second. Drop anything that is not
+                // one of ours right here, before any decoding or queueing on the main thread.
+                if (!ours(result)) {
+                    return;
+                }
                 ScanCallback self = this;
                 MAIN.post(() -> {
                     if (callback == self) {
@@ -322,7 +329,9 @@ final class StickerBeacon {
                         return;
                     }
                     for (ScanResult result : results) {
-                        seen(result);
+                        if (ours(result)) {
+                            seen(result);
+                        }
                     }
                 });
             }
@@ -343,6 +352,29 @@ final class StickerBeacon {
                 });
             }
         };
+    }
+
+    /**
+     * Cheap first look: a saved button by address, or, only while a shortcut screen wants to
+     * capture a new one, anything with the button's data shape. Any thread.
+     */
+    static boolean ours(ScanResult result) {
+        if (result == null || result.getDevice() == null) {
+            return false;
+        }
+        String address;
+        try {
+            address = result.getDevice().getAddress();
+        } catch (SecurityException e) {
+            return false;
+        }
+        if (address != null && scanning.contains(address)) {
+            return true;
+        }
+        if (!openToNew || result.getScanRecord() == null) {
+            return false;
+        }
+        return StickerAdverts.fields(result.getScanRecord().getBytes()) != null;
     }
 
     static String failName(int code) {
