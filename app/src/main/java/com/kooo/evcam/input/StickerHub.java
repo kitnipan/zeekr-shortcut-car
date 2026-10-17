@@ -129,7 +129,10 @@ public final class StickerHub {
             long now = SystemClock.elapsedRealtime();
             if (pingPending && now - pingSentAt > STUCK_AFTER_MS) {
                 replaceThread(now - pingSentAt);
-            } else if (!pingPending) {
+            } else {
+                healIfOff(now, false);
+            }
+            if (!pingPending) {
                 pingPending = true;
                 pingSentAt = now;
                 G.post(() -> {
@@ -140,6 +143,48 @@ public final class StickerHub {
             MAIN.postDelayed(this, WATCH_EVERY_MS);
         }
     };
+
+    /** BLE off with no reason for this long: restart it as if BLE had been tapped. */
+    private static final long OFF_TOO_LONG_MS = 45_000L;
+    /** Never auto-restart more often than this. */
+    private static final long AUTO_RESTART_EVERY_MS = 120_000L;
+    private static long offSince;
+    private static long lastAutoRestart;
+
+    /**
+     * Main thread. Listening is off but nothing should keep it off: stickers are saved,
+     * Bluetooth is on, the app was not quit, and no sticker screen is open (those pause it on
+     * purpose). After 45 s of that, or at once when the app comes back to the front, restart it.
+     */
+    private static void healIfOff(long now, boolean appCameBack) {
+        Context context = app;
+        if (context == null || StickerBeacon.status() != BEACON_OFF) {
+            offSince = 0;
+            return;
+        }
+        if (stopScan != null || UserExit.isExited(context)
+                || StickerDevices.parse(new AppConfig(context).getStickerDevices()).isEmpty()) {
+            offSince = 0;
+            return;
+        }
+        BluetoothAdapter radio = adapter(context);
+        if (radio == null || !radio.isEnabled()) {
+            offSince = 0;
+            return;
+        }
+        if (offSince == 0) {
+            offSince = now;
+        }
+        boolean due = appCameBack || now - offSince >= OFF_TOO_LONG_MS;
+        if (!due || now - lastAutoRestart < AUTO_RESTART_EVERY_MS) {
+            return;
+        }
+        lastAutoRestart = now;
+        StickerLog.line("auto restart: BLE off " + (now - offSince) / 1000 + "s with no reason"
+                + (appCameBack ? " (app came back)" : ""));
+        offSince = 0;
+        restartListening(context);
+    }
 
     private static void startWatch() {
         MAIN.post(() -> {
@@ -254,6 +299,9 @@ public final class StickerHub {
         boolean changed = on != inFront;
         inFront = on;
         Context application = context.getApplicationContext();
+        if (entered) {
+            MAIN.postDelayed(() -> healIfOff(SystemClock.elapsedRealtime(), true), 5_000L);
+        }
         G.post(() -> {
             attach(application);
             if (changed) {
