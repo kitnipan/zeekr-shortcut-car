@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.45-beta] - 2026-10-17
+
+### Fixed
+
+- Instant capture and flash-to-pass save the right moment while that minute is still recording, instead of failing or saving the end of the minute before.
+
 ## [2.11.44-beta] - 2026-10-17
 
 ### Changed
