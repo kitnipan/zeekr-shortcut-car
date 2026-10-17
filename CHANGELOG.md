@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.41-beta] - 2026-10-17
+
+### Fixed
+
+- Smart sticker listening (BLE) restarts by itself when it stays off for no reason, and as soon as the app comes back to the front. No need to tap BLE.
+
 ## [2.11.40-beta] - 2026-10-17
 
 ### Fixed
