@@ -452,8 +452,8 @@ final class BeaconEngine {
         discoverySeen = false;
         MAIN.post(() -> {
             if (callback == from) {
-                trace(String.format(java.util.Locale.US, "radio quiet %.1fs discovering=%s",
-                        gap / 1000f, found ? "yes" : "no"));
+                trace(String.format(java.util.Locale.US, "radio quiet %.1fs discovering=%s %s",
+                        gap / 1000f, found ? "yes" : "no", RadioSnapshot.describe(app, radio)));
             }
         });
     }
