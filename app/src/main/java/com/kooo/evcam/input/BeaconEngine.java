@@ -92,6 +92,11 @@ final class BeaconEngine {
     private static Out out;
     /** Last advert from any device; written by the scan callback thread. */
     private static volatile long lastAnyAt;
+    /** The car was in Bluetooth discovery at some poll since the last advert. */
+    private static volatile boolean discoverySeen;
+    private static boolean discovering;
+    private static BluetoothAdapter radio;
+    private static final long DISCOVERY_POLL_MS = 500L;
     private static BluetoothLeScanner scanner;
     /** Saved buttons being listened for. Replaced, never mutated, so the callback can read it. */
     private static volatile Set<String> scanning = new HashSet<>();
@@ -224,6 +229,8 @@ final class BeaconEngine {
         // resetting here kept every retry at #1 (car log 2026-10-17). CHECK resets it instead,
         // once the scan has stayed up.
         lastAnyAt = 0;
+        discoverySeen = false;
+        radio = adapter;
         scanning = new HashSet<>(wanted);
         startedAt = now;
         lastAdvertAt = now;
@@ -239,11 +246,14 @@ final class BeaconEngine {
         MAIN.postDelayed(CHECK, CHECK_MS);
         MAIN.removeCallbacks(REFRESH);
         MAIN.postDelayed(REFRESH, REFRESH_MS);
+        MAIN.removeCallbacks(DISCOVERY);
+        MAIN.post(DISCOVERY);
     }
 
     private static void stop(String why) {
         MAIN.removeCallbacks(CHECK);
         MAIN.removeCallbacks(REFRESH);
+        MAIN.removeCallbacks(DISCOVERY);
         MAIN.removeCallbacks(RETRY);
         BluetoothLeScanner current = scanner;
         ScanCallback old = callback;
@@ -284,6 +294,35 @@ final class BeaconEngine {
             stop(null);
             start();
             notifyStatus();
+        }
+    };
+
+    /**
+     * Is the car searching for Bluetooth devices (classic discovery)? That search takes the
+     * radio from LE scans, and its usual length (5.12 s) matches the radio quiet gaps in the
+     * car log of 2026-10-17. Polled: this car does not deliver the discovery broadcasts.
+     */
+    private static final Runnable DISCOVERY = new Runnable() {
+        @Override
+        public void run() {
+            BluetoothAdapter adapter = radio;
+            if (scanner == null || adapter == null) {
+                return;
+            }
+            boolean now;
+            try {
+                now = adapter.isDiscovering();
+            } catch (SecurityException e) {
+                return;
+            }
+            if (now) {
+                discoverySeen = true;
+            }
+            if (now != discovering) {
+                discovering = now;
+                trace("car bluetooth discovery " + (now ? "started" : "stopped"));
+            }
+            MAIN.postDelayed(this, DISCOVERY_POLL_MS);
         }
     };
 
@@ -404,12 +443,17 @@ final class BeaconEngine {
         long prev = lastAnyAt;
         lastAnyAt = now;
         if (prev == 0 || now - prev < QUIET_MS) {
+            discoverySeen = false;
             return;
         }
         long gap = now - prev;
+        // Read here: the next advert, a moment later, clears it. Polls ran during the gap.
+        boolean found = discoverySeen;
+        discoverySeen = false;
         MAIN.post(() -> {
             if (callback == from) {
-                trace(String.format(java.util.Locale.US, "radio quiet %.1fs", gap / 1000f));
+                trace(String.format(java.util.Locale.US, "radio quiet %.1fs discovering=%s",
+                        gap / 1000f, found ? "yes" : "no"));
             }
         });
     }
