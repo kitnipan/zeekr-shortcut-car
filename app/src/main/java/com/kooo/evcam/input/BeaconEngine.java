@@ -97,6 +97,15 @@ final class BeaconEngine {
     private static boolean discovering;
     private static BluetoothAdapter radio;
     private static final long DISCOVERY_POLL_MS = 500L;
+    /**
+     * Nothing at all heard for this long: the scan went deaf without an error. Seen after the
+     * car's Bluetooth settings stopped discovery: 20 s and 85 s of silence until the app was
+     * restarted (car log 2026-10-17). The car's own module alone sends about ten a second.
+     */
+    private static final long DEAF_MS = 15_000L;
+    /** While it stays deaf (car asleep), restart no more often than this. */
+    private static final long DEAF_RETRY_MS = 30_000L;
+    private static long lastDeafRestart;
     private static BluetoothLeScanner scanner;
     /** Saved buttons being listened for. Replaced, never mutated, so the callback can read it. */
     private static volatile Set<String> scanning = new HashSet<>();
@@ -321,10 +330,29 @@ final class BeaconEngine {
             if (now != discovering) {
                 discovering = now;
                 trace("car bluetooth discovery " + (now ? "started" : "stopped"));
+                if (!now) {
+                    // The scan often stays deaf once discovery ends; a fresh one hears again.
+                    restartScan("after discovery");
+                    return;
+                }
+            }
+            long at = SystemClock.elapsedRealtime();
+            long heardAt = lastAnyAt == 0 ? startedAt : lastAnyAt;
+            if (!now && at - heardAt > DEAF_MS && at - lastDeafRestart > DEAF_RETRY_MS) {
+                lastDeafRestart = at;
+                restartScan(String.format(java.util.Locale.US, "deaf %.0fs", (at - heardAt) / 1000f));
+                return;
             }
             MAIN.postDelayed(this, DISCOVERY_POLL_MS);
         }
     };
+
+    private static void restartScan(String why) {
+        trace("beacon scan restart (" + why + ")");
+        stop(null);
+        start();
+        notifyStatus();
+    }
 
     /** The car's scanner can go quiet without telling us; restart if nothing arrives. */
     private static final Runnable CHECK = new Runnable() {
