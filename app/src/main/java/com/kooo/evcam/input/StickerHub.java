@@ -101,12 +101,86 @@ public final class StickerHub {
     }
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    private static final HandlerThread THREAD = new HandlerThread("sticker-gatt");
-    private static final Handler G;
+    /**
+     * The sticker thread. Replaceable: a Bluetooth call that hangs while the car's radio sleeps
+     * and wakes would otherwise stall every sticker job (and the BLE tap) until the app restarts.
+     */
+    private static volatile HandlerThread thread = newThread();
+    private static volatile Handler G = new Handler(thread.getLooper());
 
-    static {
-        THREAD.start();
-        G = new Handler(THREAD.getLooper());
+    private static HandlerThread newThread() {
+        HandlerThread t = new HandlerThread("sticker-gatt");
+        t.start();
+        return t;
+    }
+
+    // ---- thread watchdog (main thread)
+    private static final long WATCH_EVERY_MS = 15_000L;
+    private static final long STUCK_AFTER_MS = 30_000L;
+    private static volatile long threadBeat = SystemClock.elapsedRealtime();
+    private static boolean pingPending;
+    private static long pingSentAt;
+    private static boolean watching;
+
+    /** Main thread, every 15 s: is the sticker thread still answering? */
+    private static final Runnable WATCH = new Runnable() {
+        @Override
+        public void run() {
+            long now = SystemClock.elapsedRealtime();
+            if (pingPending && now - pingSentAt > STUCK_AFTER_MS) {
+                replaceThread(now - pingSentAt);
+            } else if (!pingPending) {
+                pingPending = true;
+                pingSentAt = now;
+                G.post(() -> {
+                    threadBeat = SystemClock.elapsedRealtime();
+                    MAIN.post(() -> pingPending = false);
+                });
+            }
+            MAIN.postDelayed(this, WATCH_EVERY_MS);
+        }
+    };
+
+    private static void startWatch() {
+        MAIN.post(() -> {
+            if (!watching) {
+                watching = true;
+                MAIN.postDelayed(WATCH, WATCH_EVERY_MS);
+            }
+        });
+    }
+
+    /**
+     * The sticker thread has not answered for {@code stuckMs}: start a fresh one. The old one is
+     * told to quit (whatever it is stuck in finishes on its own); its links are dropped, not
+     * closed, since closing them is what might hang again. Main thread.
+     */
+    private static void replaceThread(long stuckMs) {
+        HandlerThread old = thread;
+        thread = newThread();
+        G = new Handler(thread.getLooper());
+        pingPending = false;
+        try {
+            old.quit();
+        } catch (RuntimeException ignored) {
+            // already gone
+        }
+        StickerLog.line("sticker thread stuck " + stuckMs / 1000 + "s: replaced, listening restarts");
+        G.post(() -> {
+            LINKS.clear();
+            UP.clear();
+            PROBING.clear();
+            PROBE_AT.clear();
+            priority = "";
+            scanHold = false;
+            if (app != null) {
+                BluetoothAdapter adapter = adapter(app);
+                radioOff = adapter == null || !adapter.isEnabled();
+            }
+            lastBeaconWhy = "";
+            reconcile();
+        });
+        StickerBeacon.forceRestart();
     }
 
     // ---- GATT-thread state
@@ -300,6 +374,7 @@ public final class StickerHub {
     private static void attach(Context application) {
         app = application;
         if (!receiverRegistered) {
+            startWatch();
             StickerLog.attach(application);
             trace("---- start " + Build.MANUFACTURER + " " + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT
                     + " app=" + com.kooo.evcam.BuildConfig.VERSION_NAME);
@@ -486,6 +561,23 @@ public final class StickerHub {
             return;
         }
         Context application = context.getApplicationContext();
+        // On the main thread first, so the tap works even if the sticker thread is stuck: say
+        // what state everything is in, then start listening for the saved stickers right away.
+        StickerLog.attach(application);
+        BluetoothAdapter radio = adapter(application);
+        boolean on = radio != null && radio.isEnabled();
+        boolean exited = UserExit.isExited(application);
+        java.util.Set<String> saved = new HashSet<>(
+                StickerDevices.parse(new AppConfig(application).getStickerDevices()));
+        StickerLog.line("BLE tapped: bluetooth=" + (on ? "on" : "off") + " exited=" + exited
+                + " saved=" + saved.size() + " scanHold=" + scanHold + " radioOff=" + radioOff
+                + " probing=" + PROBING.size() + " links=" + LINKS.size()
+                + " threadAnswered=" + (SystemClock.elapsedRealtime() - threadBeat) / 1000 + "s ago"
+                + " beacon=" + StickerBeacon.status());
+        if (on && !exited) {
+            StickerBeacon.sync(application, saved, true, !WATCHES.isEmpty(), false);
+        }
+        StickerBeacon.forceRestart();
         G.post(() -> {
             attach(application);
             trace("restart listening (tapped BLE)");
