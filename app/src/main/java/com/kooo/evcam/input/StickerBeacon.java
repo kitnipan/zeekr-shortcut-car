@@ -1,124 +1,273 @@
 package com.kooo.evcam.input;
 
-import android.Manifest;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
+import android.content.ComponentName;
 import android.content.Context;
-import android.content.pm.PackageManager;
-import android.os.Build;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
+import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
 import android.os.SystemClock;
 
-import androidx.core.content.ContextCompat;
-
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Reads presses straight from the ZEEKR_button broadcasts, with no connection at all.
+ * The app's side of the broadcast scan. The scan itself ({@link BeaconEngine}) runs in the
+ * ":ble" process ({@link BeaconService}); this binds to it, hands it what to listen for, and
+ * turns what comes back into presses and status for {@link StickerHub}.
  *
- * <p>After each press the button broadcasts about once a second for ~15 s, non-connectable,
- * then goes quiet. Its data carries a press counter (cnt) that moves once per press and the
- * press kind (y: 00 single, 02 double). So a changed cnt is a press. Connecting was never needed:
- * the GATT link hung up 15 s after each press and lost the press that woke it.</p>
- *
- * <p>This radio cannot scan and connect at the same time, so {@link StickerHub} decides
- * when the scan may run (no sticker screen scanning, no setup connection, Bluetooth on).
- * Main thread only.</p>
+ * <p>When that process gives up (scans keep failing) or dies, it is bound again after a short
+ * wait, longer each time it fails again without hearing anything. Main thread unless noted.</p>
  */
 final class StickerBeacon {
 
-    /**
-     * No advert from any button for this long while scanning: restart the scan. A button is
-     * quiet between presses (it broadcasts for about 15 s after each one), so this is long.
-     */
-    private static final long SILENT_MS = 5L * 60 * 1000;
-    private static final long CHECK_MS = 10_000L;
-    /** Android refuses more than five scan starts in 30 s; stay well under. */
-    private static final long MIN_RESTART_MS = 8_000L;
-    private static final long RETRY_MS = 5_000L;
-    private static final long REFRESH_MS = 20L * 60 * 1000;
+    /** First rebind after the BLE process went; each failed one waits 4 times longer. */
+    private static final long REBIND_MS = 1_000L;
+    private static final long REBIND_MAX_MS = 5L * 60 * 1000;
+    /** A tap and the auto heal can ask together; one fresh process is enough. */
+    private static final long RESTART_DEBOUNCE_MS = 5_000L;
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    /** A button not heard for this long shows as down (it broadcasts ~15 s after a press). */
-    private static final long HEARD_MS = 15_000L;
-
-    private static final Map<String, Integer> LAST_CNT = new HashMap<>();
-    /** Last advert time per button; read from any thread for the status dots. */
-    private static final Map<String, Long> HEARD = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Set<String> HEARD = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private static Context app;
-    private static BluetoothLeScanner scanner;
-    /** Saved buttons being listened for. Replaced, never mutated, so the callback can read it. */
-    private static volatile Set<String> scanning = new HashSet<>();
-    private static boolean wantOn;
-    /** A controller or shortcut screen is open: any ZEEKR_button counts, saved or not. */
-    private static volatile boolean openToNew;
-    /**
-     * The sticker screens took the radio. Presses made there are theirs, so the next scan
-     * starts from a fresh baseline instead of replaying the last one. Not after Bluetooth off:
-     * the first press after the car wakes must still count.
-     */
-    private static boolean rebaseline;
+    private static Messenger service;
+    private static boolean bound;
+    /** Restarts in a row that heard nothing; sets the rebind wait. */
+    private static int restarts;
+    private static long lastRestartAsk;
+
     private static Set<String> wanted = new HashSet<>();
-    private static long startedAt;
-    private static long lastAdvertAt;
+    private static boolean allowed;
+    private static boolean anyButton;
+    private static boolean rebaseline;
+    private static boolean wantOn;
+    private static int engineStatus = BeaconEngine.OFF;
+    private static int lastStatus = -1;
 
     private StickerBeacon() {
     }
 
     /**
      * Run the scan for exactly these buttons, or stop it when {@code allowed} is false.
-     * Safe to call often; only a change of address set restarts the scan.
+     * Safe to call often from any thread; only a change is sent on.
      */
-    static void sync(Context context, Set<String> addresses, boolean allowed, boolean anyButton,
+    static void sync(Context context, Set<String> addresses, boolean allowedNow, boolean any,
                      boolean screenHasRadio) {
         Context application = context == null ? null : context.getApplicationContext();
         Set<String> next = new HashSet<>(addresses == null ? new HashSet<>() : addresses);
         MAIN.post(() -> {
-            app = application;
-            wanted = next;
-            openToNew = anyButton;
-            if (screenHasRadio) {
-                rebaseline = true;
+            if (application != null) {
+                app = application;
             }
-            wantOn = allowed && (!next.isEmpty() || anyButton);
-            apply();
+            boolean changed = !next.equals(wanted) || allowedNow != allowed || any != anyButton
+                    || (screenHasRadio && !rebaseline);
+            wanted = next;
+            allowed = allowedNow;
+            anyButton = any;
+            rebaseline |= screenHasRadio;
+            wantOn = allowedNow && (!next.isEmpty() || any);
+            if (!bound) {
+                bind();
+            } else if (changed) {
+                sendConfig();
+            }
+            notifyStatus();
         });
     }
 
-    /** True while the scan is running (presses come from here, not from GATT). */
+    /** True while the scan is running (presses come from here, not from GATT). Main thread. */
     static boolean isScanning() {
-        return scanner != null;
+        return status() == StickerHub.BEACON_LISTENING;
     }
 
     /** This button was heard on air recently, so it is reachable. Any thread. */
     static boolean isHeard(String mac) {
-        Long at = HEARD.get(mac);
-        return at != null && SystemClock.elapsedRealtime() - at < HEARD_MS;
+        return HEARD.contains(mac);
     }
-
-    private static int lastStatus = -1;
 
     /** Listening, not listening, or failed and retrying. Main thread. */
     static int status() {
-        if (scanner != null) {
-            return StickerHub.BEACON_LISTENING;
+        if (service == null) {
+            return wantOn ? StickerHub.BEACON_RETRYING : StickerHub.BEACON_OFF;
         }
-        if (wantOn && failures > 0) {
-            return StickerHub.BEACON_RETRYING;
-        }
-        return StickerHub.BEACON_OFF;
+        return engineStatus;
     }
+
+    /**
+     * Start over in a fresh BLE process (tapped BLE, or the hub's auto heal). Restarting the
+     * scan inside the old one never helped once it was stuck (car log 2026-10-17).
+     */
+    static void forceRestart() {
+        MAIN.post(() -> {
+            long now = SystemClock.elapsedRealtime();
+            if (lastRestartAsk != 0 && now - lastRestartAsk < RESTART_DEBOUNCE_MS) {
+                return;
+            }
+            lastRestartAsk = now;
+            restarts = 0;
+            Messenger to = service;
+            if (to != null) {
+                Bundle b = new Bundle();
+                b.putString(BeaconService.KEY_LINE, "asked by the app");
+                Message m = Message.obtain(null, BeaconService.MSG_RESTART);
+                m.setData(b);
+                try {
+                    to.send(m);
+                    return;
+                } catch (RemoteException e) {
+                    // already gone: bind a new one below
+                }
+            }
+            unbind();
+            bind();
+        });
+    }
+
+    static String failName(int code) {
+        return BeaconEngine.failName(code);
+    }
+
+    private static void bind() {
+        if (app == null || bound) {
+            return;
+        }
+        MAIN.removeCallbacks(REBIND);
+        try {
+            bound = app.bindService(new Intent(app, BeaconService.class), CONNECTION, Context.BIND_AUTO_CREATE);
+        } catch (SecurityException e) {
+            bound = false;
+        }
+        if (!bound) {
+            StickerHub.trace("BLE process bind refused");
+            later();
+        }
+    }
+
+    private static void unbind() {
+        if (bound && app != null) {
+            try {
+                app.unbindService(CONNECTION);
+            } catch (IllegalArgumentException ignored) {
+                // not bound after all
+            }
+        }
+        bound = false;
+        service = null;
+    }
+
+    private static final Runnable REBIND = StickerBeacon::bind;
+
+    private static void later() {
+        long wait = Math.min(REBIND_MAX_MS, REBIND_MS << Math.min(16, 2 * restarts));
+        restarts++;
+        StickerHub.trace("BLE process gone, new one in " + wait / 1000 + "s (#" + restarts + ")");
+        MAIN.removeCallbacks(REBIND);
+        MAIN.postDelayed(REBIND, wait);
+    }
+
+    /** Its process went (gave up, crashed or was killed): forget it and bind a fresh one. */
+    private static void lost() {
+        unbind();
+        engineStatus = BeaconEngine.OFF;
+        for (String mac : new ArrayList<>(HEARD)) {
+            HEARD.remove(mac);
+            StickerHub.beaconState(mac, false);
+        }
+        later();
+        notifyStatus();
+    }
+
+    private static final ServiceConnection CONNECTION = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            service = new Messenger(binder);
+            sendConfig();
+            notifyStatus();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            lost();
+        }
+
+        @Override
+        public void onBindingDied(ComponentName name) {
+            if (bound) {
+                lost();
+            }
+        }
+    };
+
+    private static void sendConfig() {
+        Messenger to = service;
+        if (to == null) {
+            return;
+        }
+        Bundle b = new Bundle();
+        b.putStringArrayList(BeaconService.KEY_ADDRESSES, new ArrayList<>(wanted));
+        b.putBoolean(BeaconService.KEY_ALLOWED, allowed);
+        b.putBoolean(BeaconService.KEY_ANY, anyButton);
+        b.putBoolean(BeaconService.KEY_REBASELINE, rebaseline);
+        Message m = Message.obtain(null, BeaconService.MSG_CONFIG);
+        m.setData(b);
+        m.replyTo = INBOX;
+        try {
+            to.send(m);
+            rebaseline = false;
+        } catch (RemoteException e) {
+            lost();
+        }
+    }
+
+    private static final Messenger INBOX = new Messenger(new Handler(Looper.getMainLooper()) {
+        @Override
+        public void handleMessage(Message msg) {
+            Bundle b = msg.getData();
+            switch (msg.what) {
+                case BeaconService.MSG_TRACE:
+                    StickerHub.trace(b.getString(BeaconService.KEY_LINE, ""));
+                    break;
+                case BeaconService.MSG_HEARD: {
+                    String mac = b.getString(BeaconService.KEY_MAC);
+                    if (mac == null) {
+                        break;
+                    }
+                    boolean heard = msg.arg1 == 1;
+                    if (heard) {
+                        restarts = 0;
+                        HEARD.add(mac);
+                    } else {
+                        HEARD.remove(mac);
+                    }
+                    StickerHub.beaconState(mac, heard);
+                    break;
+                }
+                case BeaconService.MSG_PRESS: {
+                    String mac = b.getString(BeaconService.KEY_MAC);
+                    byte[] frame = b.getByteArray(BeaconService.KEY_FRAME);
+                    if (mac != null && frame != null) {
+                        StickerHub.beaconPress(mac, frame);
+                    }
+                    break;
+                }
+                case BeaconService.MSG_STATUS:
+                    engineStatus = msg.arg1;
+                    notifyStatus();
+                    break;
+                default:
+                    break;
+            }
+        }
+    });
 
     /** Tell the float when listening starts, stops or starts failing. */
     private static void notifyStatus() {
@@ -127,350 +276,5 @@ final class StickerBeacon {
             lastStatus = now;
             StickerHub.beaconStatusChanged();
         }
-    }
-
-    private static void apply() {
-        applyScan();
-        notifyStatus();
-    }
-
-    /** The user asked for a fresh start (tapped BLE): new scan now, failures forgotten. */
-    static void forceRestart() {
-        MAIN.post(() -> {
-            failures = 0;
-            MAIN.removeCallbacks(RETRY);
-            if (!wantOn) {
-                notifyStatus();
-                return;
-            }
-            stop(null);
-            startedAt = 0;
-            start();
-            notifyStatus();
-        });
-    }
-
-    private static void applyScan() {
-        if (!wantOn) {
-            stop("off");
-            return;
-        }
-        if (scanner != null && scanning.equals(wanted)) {
-            return;
-        }
-        stop(null);
-        start();
-    }
-
-    private static void start() {
-        if (app == null) {
-            return;
-        }
-        if (!canScan(app)) {
-            retryLater("no scan permission");
-            return;
-        }
-        long now = SystemClock.elapsedRealtime();
-        if (startedAt != 0 && now - startedAt < MIN_RESTART_MS) {
-            MAIN.postDelayed(StickerBeacon::apply, MIN_RESTART_MS - (now - startedAt));
-            return;
-        }
-        BluetoothManager manager = (BluetoothManager) app.getSystemService(Context.BLUETOOTH_SERVICE);
-        BluetoothAdapter adapter = manager == null ? null : manager.getAdapter();
-        BluetoothLeScanner next = adapter == null || !adapter.isEnabled() ? null : adapter.getBluetoothLeScanner();
-        if (next == null) {
-            retryLater("scanner not ready");
-            return;
-        }
-        // Unfiltered: an address filter matched nothing on this head unit (car log 2.11.26,
-        // 30 s silent while the BLE signals screen heard both buttons). seen() keeps only ours.
-        ScanSettings settings = new ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
-                .setReportDelay(0)
-                .build();
-        // A new callback per start: reusing one across quick stop/start cycles is a known way
-        // to get SCAN_FAILED_APPLICATION_REGISTRATION_FAILED (2). Old ones are ignored.
-        ScanCallback fresh = newCallback();
-        try {
-            next.startScan(null, settings, fresh);
-        } catch (SecurityException | IllegalArgumentException | IllegalStateException e) {
-            retryLater("refused: " + e.getMessage());
-            return;
-        }
-        callback = fresh;
-        scanner = next;
-        failures = 0;
-        scanning = new HashSet<>(wanted);
-        startedAt = now;
-        lastAdvertAt = now;
-        if (rebaseline) {
-            rebaseline = false;
-            countsLoaded = true;
-            LAST_CNT.clear();
-        } else {
-            loadCounts();
-        }
-        StickerHub.trace("beacon scan on " + scanning);
-        MAIN.removeCallbacks(CHECK);
-        MAIN.postDelayed(CHECK, CHECK_MS);
-        MAIN.removeCallbacks(REFRESH);
-        MAIN.postDelayed(REFRESH, REFRESH_MS);
-    }
-
-    private static void stop(String why) {
-        MAIN.removeCallbacks(CHECK);
-        MAIN.removeCallbacks(REFRESH);
-        MAIN.removeCallbacks(RETRY);
-        BluetoothLeScanner current = scanner;
-        ScanCallback old = callback;
-        scanner = null;
-        callback = null;
-        scanning = new HashSet<>();
-        if (current != null && old != null) {
-            try {
-                current.stopScan(old);
-            } catch (SecurityException | IllegalStateException ignored) {
-                // Bluetooth already off
-            }
-        }
-        // A restart keeps the dots lit; only switching the scan off clears them.
-        if ("off".equals(why)) {
-            for (String mac : new ArrayList<>(HEARD.keySet())) {
-                HEARD.remove(mac);
-                StickerHub.beaconState(mac, false);
-            }
-        }
-        if (current != null && why != null) {
-            StickerHub.trace("beacon scan " + why);
-        }
-    }
-
-    /**
-     * Android quietly downgrades an unfiltered scan that runs for 30 minutes. Start a fresh one
-     * before that, keeping the press counters so no press is lost or replayed across it.
-     */
-    private static final Runnable REFRESH = new Runnable() {
-        @Override
-        public void run() {
-            if (scanner == null) {
-                return;
-            }
-            stop(null);
-            start();
-            notifyStatus();
-        }
-    };
-
-    /** The car's scanner can go quiet without telling us; restart if nothing arrives. */
-    private static final Runnable CHECK = new Runnable() {
-        @Override
-        public void run() {
-            if (scanner == null) {
-                return;
-            }
-            long now = SystemClock.elapsedRealtime();
-            for (Map.Entry<String, Long> e : new ArrayList<>(HEARD.entrySet())) {
-                if (now - e.getValue() >= HEARD_MS) {
-                    HEARD.remove(e.getKey());
-                    StickerHub.trace("beacon " + e.getKey() + " not heard for " + HEARD_MS / 1000 + "s");
-                    StickerHub.beaconState(e.getKey(), false);
-                }
-            }
-            if (now - lastAdvertAt > SILENT_MS) {
-                StickerHub.trace("beacon scan silent " + SILENT_MS / 1000 + "s, restarting");
-                stop(null);
-                start();
-                notifyStatus();
-                return;
-            }
-            MAIN.postDelayed(this, CHECK_MS);
-        }
-    };
-
-    private static ScanCallback callback;
-    private static int failures;
-
-    private static final Runnable RETRY = StickerBeacon::apply;
-
-    /** Try again later, backing off 5, 10, 20 s, then every 60 s. Never gives up. */
-    private static void retryLater(String why) {
-        failures++;
-        long wait = Math.min(60_000L, RETRY_MS << Math.min(4, failures - 1));
-        StickerHub.trace("beacon scan " + why + ", retry in " + wait / 1000 + "s (#" + failures + ")");
-        MAIN.removeCallbacks(RETRY);
-        MAIN.postDelayed(RETRY, wait);
-        notifyStatus();
-    }
-
-    private static ScanCallback newCallback() {
-        return new ScanCallback() {
-            @Override
-            public void onScanResult(int callbackType, ScanResult result) {
-                // The scan is unfiltered (this car ignores filters), so every device nearby lands
-                // here, the car's own module about 10 times a second. Drop anything that is not
-                // one of ours right here, before any decoding or queueing on the main thread.
-                if (!ours(result)) {
-                    return;
-                }
-                ScanCallback self = this;
-                MAIN.post(() -> {
-                    if (callback == self) {
-                        seen(result);
-                    }
-                });
-            }
-
-            @Override
-            public void onBatchScanResults(List<ScanResult> results) {
-                ScanCallback self = this;
-                MAIN.post(() -> {
-                    if (callback != self) {
-                        return;
-                    }
-                    for (ScanResult result : results) {
-                        if (ours(result)) {
-                            seen(result);
-                        }
-                    }
-                });
-            }
-
-            @Override
-            public void onScanFailed(int errorCode) {
-                ScanCallback self = this;
-                MAIN.post(() -> {
-                    if (callback != self) {
-                        return;
-                    }
-                    callback = null;
-                    scanner = null;
-                    scanning = new HashSet<>();
-                    MAIN.removeCallbacks(CHECK);
-                    MAIN.removeCallbacks(REFRESH);
-                    retryLater("failed code=" + errorCode + " (" + failName(errorCode) + ")");
-                });
-            }
-        };
-    }
-
-    /**
-     * Cheap first look: a saved button by address, or, only while a shortcut screen wants to
-     * capture a new one, anything with the button's data shape. Any thread.
-     */
-    static boolean ours(ScanResult result) {
-        if (result == null || result.getDevice() == null) {
-            return false;
-        }
-        String address;
-        try {
-            address = result.getDevice().getAddress();
-        } catch (SecurityException e) {
-            return false;
-        }
-        if (address != null && scanning.contains(address)) {
-            return true;
-        }
-        if (!openToNew || result.getScanRecord() == null) {
-            return false;
-        }
-        return StickerAdverts.fields(result.getScanRecord().getBytes()) != null;
-    }
-
-    static String failName(int code) {
-        switch (code) {
-            case 1: return "already started";
-            case 2: return "app registration failed";
-            case 3: return "internal error";
-            case 4: return "feature unsupported";
-            case 5: return "out of hardware resources";
-            case 6: return "scanning too frequently";
-            default: return "unknown";
-        }
-    }
-
-    private static void seen(ScanResult result) {
-        if (scanner == null || result == null || result.getDevice() == null || result.getScanRecord() == null) {
-            return;
-        }
-        String mac;
-        try {
-            mac = StickerDevices.normalize(result.getDevice().getAddress());
-        } catch (SecurityException e) {
-            return;
-        }
-        boolean saved = scanning.contains(mac);
-        int[] shape = StickerAdverts.fields(result.getScanRecord().getBytes());
-        // An unsaved button only while a controller / shortcut screen wants to capture one;
-        // its data shape is what marks it (the name is not in every advert).
-        if (!saved && !(openToNew && shape != null)) {
-            return;
-        }
-        lastAdvertAt = SystemClock.elapsedRealtime();
-        failures = 0;
-        if (HEARD.put(mac, lastAdvertAt) == null) {
-            StickerHub.beaconState(mac, true);
-        }
-        int[] f = shape;
-        if (f == null) {
-            return;
-        }
-        int cnt = f[0];
-        int y = f[1];
-        Integer last = LAST_CNT.put(mac, cnt);
-        if (last == null || last != cnt) {
-            saveCount(mac, cnt);
-        }
-        if (!StickerAdverts.isNewPress(last, cnt)) {
-            if (last == null) {
-                StickerHub.trace(String.format("beacon %s baseline cnt=%02X rssi=%d", mac, cnt, result.getRssi()));
-            }
-            return;
-        }
-        int missed = ((cnt - last) & 0xFF) - 1;
-        byte[] frame = StickerAdverts.frameFor(y);
-        StickerHub.trace(String.format("beacon press %s cnt=%02X y=%02X %s rssi=%d%s", mac, cnt, y,
-                y == StickerAdverts.Y_DOUBLE ? "double" : y == StickerAdverts.Y_SINGLE ? "single" : "unknown",
-                result.getRssi(), missed > 0 ? " missed=" + missed : ""));
-        if (frame != null) {
-            StickerHub.beaconPress(mac, frame);
-        }
-    }
-
-    private static final String PREFS = "sticker_beacon";
-    private static boolean countsLoaded;
-
-    /**
-     * The last press counter per button survives scan restarts and app restarts. Otherwise the
-     * first press after a quiet spell, or after the app starts, only set a baseline and was
-     * lost (car log 2.11.27). A button only broadcasts for ~15 s after a press, so at worst a
-     * press made while the app was starting runs a moment late, which is what was meant.
-     */
-    private static void loadCounts() {
-        if (countsLoaded || app == null) {
-            return;
-        }
-        countsLoaded = true;
-        Map<String, ?> all = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getAll();
-        for (Map.Entry<String, ?> e : all.entrySet()) {
-            if (e.getValue() instanceof Integer && !LAST_CNT.containsKey(e.getKey())) {
-                LAST_CNT.put(e.getKey(), (Integer) e.getValue());
-            }
-        }
-    }
-
-    private static void saveCount(String mac, int cnt) {
-        if (app != null) {
-            app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(mac, cnt).apply();
-        }
-    }
-
-    private static boolean canScan(Context context) {
-        if (Build.VERSION.SDK_INT >= 31) {
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN)
-                    == PackageManager.PERMISSION_GRANTED;
-        }
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED;
     }
 }

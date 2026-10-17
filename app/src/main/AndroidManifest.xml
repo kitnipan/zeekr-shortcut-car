@@ -117,6 +117,13 @@
             android:foregroundServiceType="camera"
             android:exported="false" />
 
+        <!-- Sticker broadcast scan in its own process: killed and restarted alone when this
+             head unit's Bluetooth stack leaves scans failing (code 3) after Bluetooth off/on -->
+        <service
+            android:name=".input.BeaconService"
+            android:exported="false"
+            android:process=":ble" />
+
         <service
             android:name=".input.MegaphoneService"
             android:exported="false"

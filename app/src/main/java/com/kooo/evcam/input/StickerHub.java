@@ -1249,9 +1249,9 @@ public final class StickerHub {
     }
 
     /** Broadcast listening state for the float's BLE label. */
-    public static final int BEACON_OFF = 0;
-    public static final int BEACON_LISTENING = 1;
-    public static final int BEACON_RETRYING = 2;
+    public static final int BEACON_OFF = BeaconEngine.OFF;
+    public static final int BEACON_LISTENING = BeaconEngine.LISTENING;
+    public static final int BEACON_RETRYING = BeaconEngine.RETRYING;
 
     private static final List<Runnable> BEACON_LISTENERS = new CopyOnWriteArrayList<>();
 

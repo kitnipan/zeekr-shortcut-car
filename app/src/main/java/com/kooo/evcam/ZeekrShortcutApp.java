@@ -26,6 +26,10 @@ public class ZeekrShortcutApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        // 贴纸广播扫描的 ":ble" 进程只跑 BeaconService，不要相机、黑匣子这些（它们属于主进程）
+        if (Application.getProcessName().endsWith(":ble")) {
+            return;
+        }
         com.kooo.evcam.settings.DeveloperMode.init(this);
         lastConfig = new Configuration(getResources().getConfiguration());
         // 黑匣子尽早接上。ContentProvider 比这里还早，那边也会接一次，谁先谁算
