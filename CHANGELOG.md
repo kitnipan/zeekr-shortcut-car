@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.47-beta] - 2026-10-17
+
+### Fixed
+
+- Smart stickers no longer stop responding after the car's Bluetooth settings screen is closed; restarting the app is no longer needed.
+
 ## [2.11.46-beta] - 2026-10-17
 
 ### Changed
