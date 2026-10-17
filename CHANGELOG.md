@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.40-beta] - 2026-10-17
+
+### Fixed
+
+- After locking the car and coming back, smart sticker listening (BLE) no longer stays off, and tapping BLE on the floating button now always restarts it.
+
 ## [2.11.39-beta] - 2026-10-17
 
 ### Changed
