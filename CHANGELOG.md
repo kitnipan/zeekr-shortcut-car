@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.42-beta] - 2026-10-17
+
+### Fixed
+
+- Less lag when pressing a smart sticker quickly: the app no longer processes every nearby Bluetooth device's signal.
+
 ## [2.11.41-beta] - 2026-10-17
 
 ### Fixed
