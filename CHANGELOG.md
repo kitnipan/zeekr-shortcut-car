@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.46-beta] - 2026-10-17
+
+### Changed
+
+- The sticker log notes Wi-Fi and the car's remembered Bluetooth devices when the radio goes quiet, to find why some presses are missed.
+
 ## [2.11.45-beta] - 2026-10-17
 
 ### Fixed
