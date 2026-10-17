@@ -380,7 +380,10 @@ public final class InstantCapture {
             AppLog.e(TAG, "即时片段没有可参考的完好文件", e);
             return new ArrayList<>();
         }
-        File cache = new File(app.getCacheDir(), "instant");
+        // Same name as the live file, in its own folder: the start time and camera are read
+        // from the name. An "open-" prefix made it unreadable, so the copy never covered the
+        // flash and the capture failed or cut the file before (capture log 2026-10-17).
+        File cache = new File(new File(app.getCacheDir(), "instant"), OPEN_DIR);
         if (!cache.exists() && !cache.mkdirs()) {
             return new ArrayList<>();
         }
@@ -397,7 +400,7 @@ public final class InstantCapture {
             if (!snapshotOpenFile(Mp4Repair.scan(file).status)) {
                 continue;
             }
-            File copy = new File(cache, "open-" + file.getName());
+            File copy = new File(cache, file.getName());
             try {
                 copySnapshot(file, copy);
                 Mp4Repair.repair(copy, template, null);
@@ -436,9 +439,13 @@ public final class InstantCapture {
         return null;
     }
 
+    /** Under the instant cache: repaired copies of still-open files, named like the live one. */
+    private static final String OPEN_DIR = "open";
+
     private static void dropOpenCopies(List<File> repaired) {
         for (File extra : repaired) {
-            if (extra != null && extra.getName().startsWith("open-")
+            if (extra != null && extra.getParentFile() != null
+                    && OPEN_DIR.equals(extra.getParentFile().getName())
                     && extra.exists() && !extra.delete()) {
                 AppLog.w(TAG, "删不掉补过索引的副本: " + extra.getAbsolutePath());
             }
